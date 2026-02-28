@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-if [ ! -d ~/myenv ]; then
-  python3 -m venv ~/myenv --system-site-packages
+if [ ! -d ~/venv_dev2-cust1 ]; then
+  python3 -m venv ~/venv_dev2-cust1 --system-site-packages
 fi
-source ~/myenv/bin/activate
+#TODO: Add pip command for deps
+source ~/venv_dev2-cust1/bin/activate
 python manage.py runserver 0.0.0.0:3000
