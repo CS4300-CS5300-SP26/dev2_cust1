@@ -17,11 +17,19 @@ media/
 static/
 staticfiles/  # If you use 'collectstatic' in deployment
 
+# Local/cache directories
+.cache/
+.config/
+.local/
+
 # IDEs and OS files
 .idea/        # JetBrains IDEs (e.g., PyCharm)
 .vscode/      # VS Code
 .DS_Store     # macOS
 *~            # Temporary files
+# Claude temporary files
+tmpclaude-*
+tmpclaude-*/
 
 # Documentation
 .coverage
