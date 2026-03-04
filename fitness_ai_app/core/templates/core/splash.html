@@ -19,19 +19,16 @@
             --black: #000000;
             --white: #FFFFFF;
             --classic-crimson: #D42338;
-            --dark-bg: #0A0A0A;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--dark-bg);
+            background-color: var(--black);
             color: var(--white);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            background-image:
-                radial-gradient(ellipse at 50% 0%, rgba(246, 125, 38, 0.12) 0%, transparent 60%);
         }
 
         .splash-container {
@@ -45,17 +42,9 @@
         }
 
         /* Logo area */
-        header {
-            width: 100%;
-            max-width: 320px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
         .logo-container {
             width: 100%;
+            max-width: 320px;
             border: 2px solid var(--harvest-orange);
             border-radius: 16px;
             padding: 24px;
@@ -63,7 +52,7 @@
             justify-content: center;
             align-items: center;
             background: rgba(246, 125, 38, 0.08);
-            box-shadow: 0 0 30px rgba(246, 125, 38, 0.1);
+            margin-bottom: 24px;
         }
 
         .logo-container img {
@@ -84,40 +73,13 @@
         .app-subtitle {
             font-size: 1rem;
             color: rgba(255, 255, 255, 0.65);
-            margin-bottom: 16px;
-        }
-
-        /* Features section */
-        section.features {
-            width: 100%;
-            max-width: 320px;
-            display: flex;
-            justify-content: space-around;
             margin-bottom: 48px;
         }
 
-        .feature-item {
-            text-align: center;
-            color: rgba(255, 255, 255, 0.55);
-            font-size: 0.8rem;
-        }
-
-        .feature-icon {
-            font-size: 1.5rem;
-            margin-bottom: 4px;
-        }
-
         /* Buttons */
-        nav {
-            width: 100%;
-            max-width: 320px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
         .btn {
             width: 100%;
+            max-width: 320px;
             padding: 16px 24px;
             border-radius: 12px;
             font-size: 1.1rem;
@@ -138,7 +100,6 @@
             color: var(--white);
             border: none;
             margin-bottom: 16px;
-            box-shadow: 0 4px 20px rgba(246, 125, 38, 0.3);
         }
 
         .btn-primary:hover {
@@ -161,20 +122,11 @@
             font-size: 0.85rem;
             color: rgba(255, 255, 255, 0.5);
             font-style: italic;
-            text-align: center;
         }
 
         .note-text span {
             color: var(--classic-crimson);
             font-weight: 600;
-        }
-
-        /* Footer */
-        footer {
-            text-align: center;
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.35);
-            padding-top: 16px;
         }
 
         /* Spacer to push content toward center-top */
@@ -184,43 +136,19 @@
     </style>
 </head>
 <body>
-    <main class="splash-container">
-        <header>
-            <div class="logo-container">
-                <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai Logo">
-            </div>
-        </header>
+    <div class="splash-container">
+        <div class="logo-container">
+            <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai Logo">
+        </div>
 
         <h1 class="app-title">Spotter.ai</h1>
         <p class="app-subtitle">Your all-in-one fitness companion</p>
 
-        <section class="features">
-            <div class="feature-item">
-                <div class="feature-icon">&#x1F4AA;</div>
-                <span>Workouts</span>
-            </div>
-            <div class="feature-item">
-                <div class="feature-icon">&#x1F4CA;</div>
-                <span>Tracking</span>
-            </div>
-            <div class="feature-item">
-                <div class="feature-icon">&#x1F916;</div>
-                <span>AI Coach</span>
-            </div>
-        </section>
+        <a href="#" class="btn btn-primary">Get Started</a>
+        <a href="#" class="btn btn-secondary">Log In</a>
 
-        <nav>
-            <a href="#" class="btn btn-primary">Get Started</a>
-            <a href="#" class="btn btn-secondary">Log In</a>
-        </nav>
-
-        <p class="note-text"><span>AI-powered</span> fitness plans tailored just for you</p>
 
         <div class="spacer"></div>
-
-        <footer>
-            <p>&copy; 2026 Spotter.ai &mdash; All rights reserved.</p>
-        </footer>
-    </main>
+    </div>
 </body>
 </html>
