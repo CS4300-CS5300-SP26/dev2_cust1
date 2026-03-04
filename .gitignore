@@ -37,3 +37,9 @@ tmpclaude-*/
 htmlcov/
 nosetests.xml
 
+# Copilot CLI session folder
+.copilot/
+
+# ssh
+.ssh/
+
