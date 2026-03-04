@@ -16,7 +16,7 @@ venv_*/
 local_settings.py
 media/
 static/
-staticfiles/  # If you use 'collectstatic' in deployment
+staticfiles/
 
 # Local/cache directories
 .cache/
