@@ -9,22 +9,37 @@ __pycache__/
 env/
 venv/
 ENV/
+venv_*/
 
 # Django
 *.sqlite3
 local_settings.py
 media/
 static/
-staticfiles/  # If you use 'collectstatic' in deployment
+staticfiles/
+
+# Local/cache directories
+.cache/
+.config/
+.local/
 
 # IDEs and OS files
 .idea/        # JetBrains IDEs (e.g., PyCharm)
 .vscode/      # VS Code
 .DS_Store     # macOS
 *~            # Temporary files
+# Claude temporary files
+tmpclaude-*
+tmpclaude-*/
 
 # Documentation
 .coverage
 htmlcov/
 nosetests.xml
+
+# Copilot CLI session folder
+.copilot/
+
+# ssh
+.ssh/
 
