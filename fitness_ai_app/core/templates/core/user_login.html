@@ -100,11 +100,24 @@
         </div>
         <div class="title">Log In</div>
         <div class="desc">Sign in to your Spotter.ai account to continue.</div>
-        <form style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
+        {% if messages %}
+        <div style="width:100%;max-width:320px;margin-bottom:18px;">
+            {% for message in messages %}
+            <div style="padding:12px 16px;border-radius:10px;margin-bottom:8px;font-size:0.95rem;
+                {% if message.tags == 'error' %}background:rgba(212,35,56,0.15);border:1px solid var(--classic-crimson);color:var(--classic-crimson);
+                {% else %}background:rgba(46,204,113,0.15);border:1px solid #2ecc71;color:#2ecc71;{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'user_login' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
+            {% csrf_token %}
             <input type="email" name="email" placeholder="Email" required style="padding:14px 18px;border-radius:10px;border:2px solid var(--harvest-orange);background:rgba(246,125,38,0.08);color:var(--white);font-size:1rem;margin-bottom:0;box-sizing:border-box;">
             <input type="password" name="password" placeholder="Password" required style="padding:14px 18px;border-radius:10px;border:2px solid var(--harvest-orange);background:rgba(246,125,38,0.08);color:var(--white);font-size:1rem;margin-bottom:0;box-sizing:border-box;">
             <button type="submit" class="btn btn-primary" style="margin-top:18px;">Log In</button>
         </form>
+        <a href="{% url 'user_get_started' %}" style="color:var(--harvest-orange);font-size:0.95rem;text-decoration:none;">Don't have an account? Sign Up</a>
         <div class="spacer"></div>
     </div>
 </body>
