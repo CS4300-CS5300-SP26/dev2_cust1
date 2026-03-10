@@ -37,6 +37,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.apple',
+    'allauth.socialaccount.providers.facebook',
+    'allauth.socialaccount.providers.instagram',
     'core',
 ]
 
@@ -48,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'fitness_ai_app.urls'
@@ -134,4 +143,51 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'spotter.ai2026@gmail.com'
 EMAIL_HOST_PASSWORD = 'deoe otmf cwgl kibk'
 DEFAULT_FROM_EMAIL = 'Spotter.ai <spotter.ai2026@gmail.com>'
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# django-allauth settings
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_ADAPTER = 'core.adapter.AutoSocialAdapter'
+LOGIN_REDIRECT_URL = '/home_dash/'
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+        'APP': {
+            'client_id': '793009292829-49rsomv0cuaeo9tl6nbkkq63koqogipc.apps.googleusercontent.com',
+            'secret': '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',
+        },
+    },
+    'apple': {
+        'APP': {
+            'client_id': 'YOUR_APPLE_CLIENT_ID',
+            'secret': 'YOUR_APPLE_SECRET',
+            'key': 'YOUR_APPLE_KEY_ID',
+        },
+    },
+    'facebook': {
+        'METHOD': 'oauth2',
+        'SCOPE': ['email', 'public_profile'],
+        'APP': {
+            'client_id': 'YOUR_FACEBOOK_APP_ID',
+            'secret': 'YOUR_FACEBOOK_SECRET',
+        },
+    },
+    'instagram': {
+        'APP': {
+            'client_id': 'YOUR_INSTAGRAM_CLIENT_ID',
+            'secret': 'YOUR_INSTAGRAM_SECRET',
+        },
+    },
+}
 
