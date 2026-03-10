@@ -7,5 +7,5 @@ urlpatterns = [
     path('user_login/', views.user_login, name='user_login'),
     path('user_logout/', views.user_logout, name='user_logout'),
     path('home_dash/', views.home_dash, name='home_dash'),
-    path('verify_code/<int:user_id>/', views.verify_code, name='verify_code'),
+    path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),
 ]
