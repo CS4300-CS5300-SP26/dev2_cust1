@@ -73,8 +73,9 @@ def verify_email(request, token):
     verification.save()
     verification.user.is_active = True
     verification.user.save()
-    messages.success(request, 'Your email has been verified! You can now log in.')
-    return redirect('user_login')
+    login(request, verification.user, backend='django.contrib.auth.backends.ModelBackend')
+    messages.success(request, 'Your email has been verified! Welcome to Spotter.ai.')
+    return redirect('home_dash')
 
 
 def user_login(request):
@@ -104,4 +105,24 @@ def user_logout(request):
 
 @login_required
 def home_dash(request):
-    return render(request, 'home_dash_dir/home_dash.html')
+    return render(request, 'home_dash_dir/home_dash.html', {'active_tab': 'home'})
+
+
+@login_required
+def train_page(request):
+    return render(request, 'train_dir/train_page.html', {'active_tab': 'train'})
+
+
+@login_required
+def nutrition_page(request):
+    return render(request, 'nutrition_dir/nutrition_page.html', {'active_tab': 'nutrition'})
+
+
+@login_required
+def ai_page(request):
+    return render(request, 'ai_dir/ai_page.html', {'active_tab': 'ai'})
+
+
+@login_required
+def social_page(request):
+    return render(request, 'socal_dir/social_page.html', {'active_tab': 'social'})

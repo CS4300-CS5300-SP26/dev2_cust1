@@ -8,6 +8,10 @@ urlpatterns = [
     path('user_login/', views.user_login, name='user_login'),
     path('user_logout/', views.user_logout, name='user_logout'),
     path('home_dash/', views.home_dash, name='home_dash'),
+    path('train/', views.train_page, name='train_page'),
+    path('nutrition/', views.nutrition_page, name='nutrition_page'),
+    path('ai/', views.ai_page, name='ai_page'),
+    path('social/', views.social_page, name='social_page'),
     path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),
     # Social login shortcuts
     path('login/google/', RedirectView.as_view(url='/accounts/google/login/', query_string=True), name='google_login'),
