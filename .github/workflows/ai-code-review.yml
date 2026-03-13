@@ -28,7 +28,8 @@ jobs:
           python-version: "3.12.3"
 
       - name: Install dependencies
-        run: pip install openai Django djangorestframework 
+        run: pip install - name: Install dependencies
+  run: pip install --upgrade openai Django djangorestframework 
 
       - name: Run AI Review
         env:
