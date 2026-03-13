@@ -1,45 +1,45 @@
- name: AI Code Review
+name: AI Code Review
    
-   on:
-     pull_request:
-       types: [opened, synchronize, reopened]
+  on:
+    pull_request:
+      types: [opened, synchronize, reopened]
    
-   permissions:
-     issues: write
-     pull-requests: write
-     contents: read
+  permissions:
+    issues: write
+    pull-requests: write
+    contents: read
    
-   jobs:
-     review:
-       runs-on: ubuntu-latest
+  jobs:
+    review:
+      runs-on: ubuntu-latest
    
-       steps:
-         - name: Checkout repository
-           uses: actions/checkout@v4
-           with:
-             fetch-depth: 2
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 2
    
-         - name: Get PR diff
-           run: |
-             git fetch origin ${{ github.base_ref }}
-             git diff origin/${{ github.base_ref }} > diff.txt
+        - name: Get PR diff
+          run: |
+            git fetch origin ${{ github.base_ref }}
+            git diff origin/${{ github.base_ref }} > diff.txt
    
-         - name: Install Python
-           uses: actions/setup-python@v4
-           with:
-             python-version: "3.12.3"
+        - name: Install Python
+          uses: actions/setup-python@v4
+          with:
+            python-version: "3.12.3"
    
-         - name: Install dependencies
-           run: |
-             pip install openai django djangorestframework
+        - name: Install dependencies
+          run: |
+            pip install openai django djangorestframework
    
-         - name: Run AI Review
-           env:
-             OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-           run: python ai_review.py
+        - name: Run AI Review
+          env:
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          run: python ai_review.py
    
-         - name: Post Comment
-           uses: peter-evans/create-or-update-comment@v3
-           with:
-             issue-number: ${{ github.event.pull_request.number }}
-             body-file: review.txt
+        - name: Post Comment
+          uses: peter-evans/create-or-update-comment@v3
+          with:
+            issue-number: ${{ github.event.pull_request.number }}
+            body-file: review.txt
