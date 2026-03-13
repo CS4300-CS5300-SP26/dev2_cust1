@@ -7,12 +7,13 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 with open("diff.txt", "r") as f:
     diff = f.read()
 
-prompt = f"Review this code diff:\n{diff}"
-
 try:
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=prompt
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": "You are an expert software engineer performing a code review on a Django project."},
+            {"role": "user", "content": f"Provide concise feedback paying special attention to Django convention, security, and code efficiency, and in each case mentioning the file name and line number for the suggestion. Here's the pull request diff:\n{diff}"}
+        ],
+        model="gpt-4o"
     )
 
     review = response.output_text
