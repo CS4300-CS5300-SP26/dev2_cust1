@@ -2,7 +2,7 @@ name: AI Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 permissions:
   issues: write
@@ -15,7 +15,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Get PR diff
         run: |
@@ -28,7 +30,8 @@ jobs:
           python-version: "3.12.3"
 
       - name: Install dependencies
-        run: pip install --upgrade openai Django djangorestframework 
+        run: |
+          pip install openai django djangorestframework
 
       - name: Run AI Review
         env:
