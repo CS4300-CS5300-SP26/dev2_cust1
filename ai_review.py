@@ -35,7 +35,7 @@ try:
                 ),
             },
         ],
-        model="gpt-4o-mini",
+        model="gpt-5.1-codex-mini",
     )
     feedback = chat_completion.choices[0].message.content
     print(feedback)
