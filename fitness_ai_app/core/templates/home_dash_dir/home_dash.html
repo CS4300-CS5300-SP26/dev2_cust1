@@ -1,0 +1,10 @@
+{% extends "core/base_app.html" %}
+
+{% block title %}Dashboard - Spotter.ai{% endblock %}
+
+{% block content %}
+<div style="text-align:center;padding-top:40px;">
+    <div style="font-size:1.5rem;font-weight:700;margin-bottom:6px;">Welcome, {{ request.user.first_name|default:request.user.email }}!</div>
+    <div style="font-size:1rem;color:rgba(255,255,255,0.65);">Your Spotter.ai dashboard</div>
+</div>
+{% endblock %}

@@ -15,7 +15,6 @@ venv_*/
 *.sqlite3
 local_settings.py
 media/
-static/
 staticfiles/
 
 # Local/cache directories
