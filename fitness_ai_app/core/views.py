@@ -2,7 +2,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from datetime import datetime, date, timedelta
 
@@ -128,7 +127,7 @@ def nutrition_page(request):
     else:
         selected_date = date.today()
     
-    meals = Meal.objects.filter(user=request.user, date=selected_date)
+    meals = Meal.objects.filter(user=request.user, date=selected_date).prefetch_related('items')
     
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
