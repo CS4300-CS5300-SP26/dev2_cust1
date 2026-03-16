@@ -1,13 +1,19 @@
+import logging
+import smtplib
+from datetime import datetime, date, timedelta
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.conf import settings
+from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from datetime import datetime, date, timedelta
 
 from .forms import RegistrationForm
 from .models import Meal, FoodItem
+
 
 
 def splash(request):
@@ -19,6 +25,8 @@ def splash(request):
 from django.core.mail import send_mail
 from .models import EmailVerification
 
+logger = logging.getLogger(__name__)
+
 def user_get_started(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -26,27 +34,34 @@ def user_get_started(request):
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            verification = EmailVerification.objects.create(user=user)
-            verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
-            html_message = f"""
-            <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
-                <div style="text-align:center;margin:32px 0;">
-                    <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
-                </div>
-                <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-            </div>
-            """
-            send_mail(
-                'Verify your Spotter.ai account',
-                f'Click this link to verify your account: {verify_url}',
-                'spotter.ai2026@gmail.com',
-                [user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    verification = EmailVerification.objects.create(user=user)
+                    verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
+                    html_message = f"""
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
+                        </div>
+                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
+                    </div>
+                    """
+                    send_mail(
+                        'Verify your Spotter.ai account',
+                        f'Click this link to verify your account: {verify_url}',
+                        settings.DEFAULT_FROM_EMAIL,
+                        [user.email],
+                        html_message=html_message,
+                        fail_silently=False,
+                    )
+            except (smtplib.SMTPException, OSError):
+                logger.exception('Failed to send verification email during signup for %s', form.cleaned_data['email'])
+                form.add_error(None, 'We could not send your verification email right now. Please try again in a moment.')
+                return render(request, 'core/user_get_started.html', {'form': form})
+
             messages.success(request, 'A verification link has been sent to your email. Please check your inbox and click the link to activate your account.')
             return redirect('user_login')
         else:

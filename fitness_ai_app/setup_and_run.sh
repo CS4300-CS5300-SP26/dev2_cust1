@@ -5,7 +5,7 @@ if [ ! -d ~/venv_dev2-cust1 ]; then
 fi
 
 source ~/venv_dev2-cust1/bin/activate
-pip install django django-allauth requests PyJWT cryptography
+pip install -r requirements.txt
 python manage.py migrate
 python manage.py collectstatic --noinput
 python manage.py runserver 0.0.0.0:3000
