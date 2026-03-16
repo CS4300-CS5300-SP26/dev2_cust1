@@ -1,8 +1,11 @@
+import uuid
+import smtplib
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from datetime import timedelta
-import uuid
 
 from .models import EmailVerification
 from .forms import RegistrationForm
@@ -152,6 +155,19 @@ class RegistrationViewTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('Verify', mail.outbox[0].subject)
         self.assertIn('email@spotter.ai', mail.outbox[0].to)
+
+    def test_registration_rolls_back_when_email_send_fails(self):
+        with patch('core.views.send_mail', side_effect=smtplib.SMTPException('smtp unavailable')):
+            r = self.client.post('/user_get_started/', {
+                'email': 'failmail@spotter.ai',
+                'password': 'securepass123',
+                'confirm_password': 'securepass123',
+            })
+
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'We could not send your verification email right now.')
+        self.assertFalse(User.objects.filter(username='failmail@spotter.ai').exists())
+        self.assertFalse(EmailVerification.objects.filter(user__username='failmail@spotter.ai').exists())
 
     def test_duplicate_email_rejected(self):
         User.objects.create_user(username='dup@spotter.ai', email='dup@spotter.ai', password='pass12345')
