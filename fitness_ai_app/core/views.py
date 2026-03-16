@@ -1,9 +1,13 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from datetime import datetime, date, timedelta
 
 from .forms import RegistrationForm
+from .models import Meal, FoodItem
 
 
 def splash(request):
@@ -115,7 +119,101 @@ def train_page(request):
 
 @login_required
 def nutrition_page(request):
-    return render(request, 'nutrition_dir/nutrition_page.html', {'active_tab': 'nutrition'})
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+    
+    meals = Meal.objects.filter(user=request.user, date=selected_date)
+    
+    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    context = {
+        'active_tab': 'nutrition',
+        'meals': meals,
+        'selected_date': selected_date,
+        'date_string': selected_date.strftime('%Y-%m-%d'),
+        'prev_date': prev_date,
+        'next_date': next_date,
+    }
+    return render(request, 'nutrition_dir/nutrition_page.html', context)
+
+
+@login_required
+@require_POST
+def add_meal(request):
+    meal_name = request.POST.get('meal_name', '').strip()
+    date_param = request.POST.get('date')
+    
+    if not meal_name or not date_param:
+        messages.error(request, 'Meal name and date are required.')
+        return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+    
+    try:
+        meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Invalid date format.')
+        return redirect('/nutrition/')
+    
+    Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
+    messages.success(request, f'Meal "{meal_name}" added successfully.')
+    return redirect(f'/nutrition/?date={date_param}')
+
+
+@login_required
+@require_POST
+def add_food_item(request):
+    meal_id = request.POST.get('meal_id')
+    food_name = request.POST.get('food_name', '').strip()
+    food_calories = request.POST.get('food_calories', '0')
+    date_param = request.POST.get('date')
+    
+    if not meal_id or not food_name or not food_calories:
+        messages.error(request, 'All fields are required.')
+        return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+    
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    
+    try:
+        calories = int(food_calories)
+    except ValueError:
+        messages.error(request, 'Calories must be a number.')
+        return redirect(f'/nutrition/?date={date_param}')
+    
+    FoodItem.objects.create(meal=meal, name=food_name, calories=calories)
+    messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
+    return redirect(f'/nutrition/?date={date_param}')
+
+
+@login_required
+@require_POST
+def toggle_food_item(request):
+    item_id = request.POST.get('item_id')
+    date_param = request.POST.get('date')
+    
+    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    food_item.completed = not food_item.completed
+    food_item.save()
+    
+    return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+
+
+@login_required
+@require_POST
+def delete_food_item(request):
+    item_id = request.POST.get('item_id')
+    date_param = request.POST.get('date')
+    
+    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    food_item.delete()
+    messages.success(request, 'Food item deleted.')
+    
+    return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
 
 
 @login_required

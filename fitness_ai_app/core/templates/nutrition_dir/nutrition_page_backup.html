@@ -539,49 +539,56 @@
     <div class="content-container">
         <!-- Date Navigator -->
         <div class="date-navigator">
-            <a href="{% url 'nutrition_page' %}?date={{ prev_date }}" class="date-nav-btn" title="Previous day">
+            <button class="date-nav-btn" id="prevDateBtn" title="Previous day">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
-            </a>
-            <span class="date-label">{{ selected_date|date:"D, M d" }}</span>
-            <a href="{% url 'nutrition_page' %}?date={{ next_date }}" class="date-nav-btn" title="Next day">
+            </button>
+            <span class="date-label" id="dateLabel">Fri, Mar 14</span>
+            <button class="date-nav-btn" id="nextDateBtn" title="Next day">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
-            </a>
-            <input type="date" id="dateInput" class="calendar-btn" style="width:24px;height:24px;cursor:pointer;padding:0;border:none;background:transparent;color:white;" onchange="window.location.href='{% url 'nutrition_page' %}?date=' + this.value;" title="Open calendar">
+            </button>
+            <button class="calendar-btn" id="calendarBtn" title="Open calendar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <polyline points="16 2 16 6 8 6 8 2"></polyline>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </button>
         </div>
 
         <!-- Calories Card -->
-        <div class="card calories-card" title="Total calories for the day">
+        <div class="card calories-card" id="caloriesCard" title="Click to edit calories">
             <label class="card-label">CALORIES — TODAY</label>
             <div class="calories-display">
-                <span class="calories-value" id="totalCalories">0 kcal</span>
+                <span class="calories-value" id="caloriesValue">1820 / 2400</span>
+                <span class="calories-unit">kcal</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                <div class="progress-fill" id="progressFill" style="width: 75.83%"></div>
             </div>
         </div>
 
         <!-- Macros Card -->
-        <div class="card macros-card" title="Macronutrient breakdown">
+        <div class="card macros-card" id="macrosCard" title="Click to edit macros">
             <label class="card-label">MACROS</label>
             <div class="macros-grid">
                 <div class="macro-pill" style="border-color: #e85c00">
-                    <div class="macro-percentage">—</div>
+                    <div class="macro-percentage">73%</div>
                     <div class="macro-name">PROTEIN</div>
-                    <div class="macro-grams">—g</div>
+                    <div class="macro-grams">148g</div>
                 </div>
                 <div class="macro-pill" style="border-color: #e83355">
-                    <div class="macro-percentage">—</div>
+                    <div class="macro-percentage">50%</div>
                     <div class="macro-name">CARBS</div>
-                    <div class="macro-grams">—g</div>
+                    <div class="macro-grams">210g</div>
                 </div>
                 <div class="macro-pill" style="border-color: #888888">
-                    <div class="macro-percentage">—</div>
+                    <div class="macro-percentage">35%</div>
                     <div class="macro-name">FAT</div>
-                    <div class="macro-grams">—g</div>
+                    <div class="macro-grams">62g</div>
                 </div>
             </div>
         </div>
@@ -590,7 +597,7 @@
         <div class="meals-section">
             <div class="section-header">
                 <label class="section-label">TODAY'S MEALS</label>
-                <button class="add-meal-btn" type="button" onclick="document.getElementById('addMealForm').style.display = document.getElementById('addMealForm').style.display === 'none' ? 'block' : 'none'" title="Add new meal">
+                <button class="add-meal-btn" id="addMealHeaderBtn" title="Add new meal">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -598,77 +605,175 @@
                 </button>
             </div>
 
-            <div id="addMealForm" style="display:none; margin-bottom:16px;">
-                <form method="POST" action="{% url 'add_meal' %}" style="background-color:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">
-                    {% csrf_token %}
-                    <input type="hidden" name="date" value="{{ date_string }}">
-                    <input type="text" name="meal_name" placeholder="Meal name (e.g., Breakfast)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
-                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:8px;color:white;font-weight:600;cursor:pointer;">Add Meal</button>
-                </form>
-            </div>
-
             <div class="meals-list">
-                {% if meals %}
-                    {% for meal in meals %}
-                    <div class="meal-card">
-                        <div class="meal-header">
-                            <span class="meal-name">{{ meal.name }}</span>
-                            <span class="meal-calories meal-cal-total" data-meal-id="{{ meal.id }}">0 kcal</span>
-                            <button class="meal-edit-btn" type="button" onclick="this.closest('.meal-card').querySelector('.add-food-form').style.display = this.closest('.meal-card').querySelector('.add-food-form').style.display === 'none' ? 'block' : 'none'" title="Edit meal">
+                <!-- Breakfast -->
+                <div class="meal-card">
+                    <div class="meal-header">
+                        <span class="meal-name">Breakfast</span>
+                        <span class="meal-calories">505 kcal</span>
+                        <button class="meal-edit-btn" title="Edit meal">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="food-items-list">
+                        <div class="food-item completed">
+                            <button class="checkbox checked">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </button>
+                            <span class="food-name">Greek yogurt, granola</span>
+                            <span class="food-calories">320</span>
+                            <button class="delete-btn" title="Delete item">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 20h9"></path>
-                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
                             </button>
                         </div>
-                        <div class="food-items-list">
-                            {% for item in meal.items.all %}
-                            <div class="food-item {% if item.completed %}completed{% endif %}">
-                                <form method="POST" action="{% url 'toggle_food_item' %}" style="display:flex;align-items:center;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                    <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
-                                        {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
-                                    </button>
-                                </form>
-                                <span class="food-name">{{ item.name }}</span>
-                                <span class="food-calories">{{ item.calories }}</span>
-                                <form method="POST" action="{% url 'delete_food_item' %}" style="display:flex;align-items:center;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                    <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="delete-btn" title="Delete item" onclick="return confirm('Delete this item?');" style="border:none;background:none;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
-                            {% endfor %}
+                        <div class="food-item completed">
+                            <button class="checkbox checked">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </button>
+                            <span class="food-name">2 scrambled eggs</span>
+                            <span class="food-calories">180</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
                         </div>
-                        <div class="add-food-form" style="display:none;">
-                            <form method="POST" action="{% url 'add_food_item' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
-                                {% csrf_token %}
-                                <input type="hidden" name="meal_id" value="{{ meal.id }}">
-                                <input type="hidden" name="date" value="{{ date_string }}">
-                                <input type="text" name="food_name" placeholder="Food name" required style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                <input type="number" name="food_calories" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
-                            </form>
+                        <div class="food-item">
+                            <button class="checkbox">
+                            </button>
+                            <span class="food-name">Black coffee</span>
+                            <span class="food-calories">5</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div style="text-align:center;padding:40px 20px;color:var(--textMuted);">
-                        <p>No meals logged for this date</p>
+                    <button class="add-food-btn" title="Add food item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>Add food item</span>
+                    </button>
+                </div>
+
+                <!-- Lunch -->
+                <div class="meal-card">
+                    <div class="meal-header">
+                        <span class="meal-name">Lunch</span>
+                        <span class="meal-calories">465 kcal</span>
+                        <button class="meal-edit-btn" title="Edit meal">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                            </svg>
+                        </button>
                     </div>
-                {% endif %}
+                    <div class="food-items-list">
+                        <div class="food-item completed">
+                            <button class="checkbox checked">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </button>
+                            <span class="food-name">Grilled chicken breast</span>
+                            <span class="food-calories">250</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="food-item completed">
+                            <button class="checkbox checked">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </button>
+                            <span class="food-name">Brown rice</span>
+                            <span class="food-calories">215</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="add-food-btn" title="Add food item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>Add food item</span>
+                    </button>
+                </div>
+
+                <!-- Dinner -->
+                <div class="meal-card">
+                    <div class="meal-header">
+                        <span class="meal-name">Dinner</span>
+                        <span class="meal-calories">470 kcal</span>
+                        <button class="meal-edit-btn" title="Edit meal">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="food-items-list">
+                        <div class="food-item">
+                            <button class="checkbox">
+                            </button>
+                            <span class="food-name">Salmon fillet</span>
+                            <span class="food-calories">350</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="food-item">
+                            <button class="checkbox">
+                            </button>
+                            <span class="food-name">Roasted vegetables</span>
+                            <span class="food-calories">120</span>
+                            <button class="delete-btn" title="Delete item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="add-food-btn" title="Add food item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>Add food item</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Log a Meal Button -->
-            <button class="log-meal-btn" type="button" onclick="document.getElementById('addMealForm').style.display = document.getElementById('addMealForm').style.display === 'none' ? 'block' : 'none'" title="Log a new meal or supplement">
+            <button class="log-meal-btn" id="logMealBtn" title="Log a new meal or supplement">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -680,35 +785,35 @@
 
     <!-- Bottom Navigation -->
     <div class="bottom-nav">
-        <a href="{% url 'home_dash' %}" class="nav-item" title="Home">
+        <button class="nav-item" title="Home">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
             <span>Home</span>
-        </a>
-        <a href="{% url 'train_page' %}" class="nav-item" title="Train">
+        </button>
+        <button class="nav-item" title="Train">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
             </svg>
             <span>Train</span>
-        </a>
-        <a href="{% url 'nutrition_page' %}" class="nav-item active" title="Nutrition">
+        </button>
+        <button class="nav-item active" title="Nutrition">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M12 6v6l4 2"></path>
             </svg>
             <span>Nutrition</span>
-        </a>
-        <a href="{% url 'ai_page' %}" class="nav-item" title="AI">
+        </button>
+        <button class="nav-item" title="AI">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"></path>
                 <path d="M12 6v6l4 2"></path>
             </svg>
             <span>AI</span>
-        </a>
-        <a href="{% url 'social_page' %}" class="nav-item" title="Social">
+        </button>
+        <button class="nav-item" title="Social">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
@@ -716,51 +821,62 @@
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
             <span>Social</span>
-        </a>
+        </button>
     </div>
 </div>
 
 <script>
-    // Set date input to current selected date
-    document.getElementById('dateInput').value = '{{ date_string }}';
-    
-    // Calculate total calories
-    function updateCalories() {
-        let totalCalories = 0;
-        const foodItems = document.querySelectorAll('.food-calories');
-        foodItems.forEach(item => {
-            totalCalories += parseInt(item.textContent) || 0;
-        });
-        
-        const totalElement = document.getElementById('totalCalories');
-        if (totalElement) {
-            totalElement.textContent = totalCalories + ' kcal';
-            // Update progress bar (assuming 2400 kcal as target)
-            const percentage = Math.min((totalCalories / 2400) * 100, 100);
-            const progressFill = document.getElementById('progressFill');
-            if (progressFill) {
-                progressFill.style.width = percentage + '%';
-            }
-        }
-        
-        // Update meal totals
-        const mealCalTotals = document.querySelectorAll('.meal-cal-total');
-        mealCalTotals.forEach(total => {
-            const mealId = total.dataset.mealId;
-            let mealTotal = 0;
-            // Find all food items for this meal
-            const mealCard = total.closest('.meal-card');
-            if (mealCard) {
-                const items = mealCard.querySelectorAll('.food-calories');
-                items.forEach(item => {
-                    mealTotal += parseInt(item.textContent) || 0;
-                });
-                total.textContent = mealTotal + ' kcal';
-            }
-        });
+    let selectedDate = new Date();
+    const dateLabel = document.getElementById('dateLabel');
+    const prevDateBtn = document.getElementById('prevDateBtn');
+    const nextDateBtn = document.getElementById('nextDateBtn');
+
+    function formatDate(date) {
+        const options = { weekday: 'short', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
     }
-    
-    // Calculate on load
-    updateCalories();
+
+    function updateDateLabel() {
+        dateLabel.textContent = formatDate(selectedDate);
+    }
+
+    prevDateBtn.addEventListener('click', () => {
+        selectedDate.setDate(selectedDate.getDate() - 1);
+        updateDateLabel();
+    });
+
+    nextDateBtn.addEventListener('click', () => {
+        selectedDate.setDate(selectedDate.getDate() + 1);
+        updateDateLabel();
+    });
+
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+
+    const checkboxes = document.querySelectorAll('.checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation();
+            checkbox.classList.toggle('checked');
+            checkbox.closest('.food-item').classList.toggle('completed');
+        });
+    });
+
+    const deleteButtons = document.querySelectorAll('.delete-btn');
+    deleteButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this item?')) {
+                btn.closest('.food-item').remove();
+            }
+        });
+    });
+
+    updateDateLabel();
 </script>
 {% endblock %}
