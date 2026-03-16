@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.conf import settings
 
 from .forms import RegistrationForm
 
@@ -38,7 +39,7 @@ def user_get_started(request):
             send_mail(
                 'Verify your Spotter.ai account',
                 f'Click this link to verify your account: {verify_url}',
-                'spotter.ai2026@gmail.com',
+                settings.DEFAULT_FROM_EMAIL,
                 [user.email],
                 html_message=html_message,
                 fail_silently=False,
