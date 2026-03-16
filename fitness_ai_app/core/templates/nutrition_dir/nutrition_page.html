@@ -3,6 +3,7 @@
 {% block title %}Nutrition - Spotter.ai{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
     * {
         margin: 0;
@@ -108,7 +109,82 @@
         background-color: var(--background);
     }
 
-    .date-nav-btn,
+    .date-nav-btn {
+        background-color: transparent;
+        border: none;
+        color: var(--textPrimary);
+        cursor: pointer;
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+    }
+
+    .date-nav-btn:hover {
+        color: var(--accent);
+    }
+
+    .date-label {
+        font-size: 14px;
+        color: var(--textSecondary);
+        font-weight: 500;
+        flex: 1;
+        text-align: center;
+    }
+
+    /* Flatpickr custom theme */
+    .flatpickr-calendar {
+        background-color: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+    }
+
+    .flatpickr-calendar .flatpickr-monthDropdown-months,
+    .flatpickr-calendar .flatpickr-monthDropdown-months select,
+    .flatpickr-calendar .flatpickr-currentMonth {
+        color: var(--textPrimary);
+        background-color: var(--card);
+    }
+
+    .flatpickr-calendar .flatpickr-weekday {
+        color: var(--textSecondary);
+        background-color: var(--card);
+    }
+
+    .flatpickr-calendar .flatpickr-day {
+        color: var(--textSecondary);
+    }
+
+    .flatpickr-calendar .flatpickr-day:hover {
+        background-color: var(--accentDim);
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    .flatpickr-calendar .flatpickr-day.selected {
+        background-color: var(--accent);
+        border-color: var(--accent);
+        color: white;
+    }
+
+    .flatpickr-calendar .flatpickr-day.today {
+        border-color: var(--accent);
+    }
+
+    .flatpickr-calendar .flatpickr-day.inRange {
+        background-color: var(--accentDim);
+    }
+
+    .flatpickr-calendar .flatpickr-day.prevMonthDay,
+    .flatpickr-calendar .flatpickr-day.nextMonthDay {
+        color: var(--textMuted);
+    }
+
+    .flatpickr-calendar .arrowUp::after {
+        border-bottom-color: var(--accent);
+    }
+
     .calendar-btn {
         background-color: transparent;
         border: none;
@@ -121,17 +197,8 @@
         transition: color 0.2s ease;
     }
 
-    .date-nav-btn:hover,
     .calendar-btn:hover {
         color: var(--accent);
-    }
-
-    .date-label {
-        font-size: 14px;
-        color: var(--textSecondary);
-        font-weight: 500;
-        flex: 1;
-        text-align: center;
     }
 
     /* Content Container */
@@ -550,7 +617,7 @@
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
             </a>
-            <input type="date" id="dateInput" class="calendar-btn" style="width:24px;height:24px;cursor:pointer;padding:0;border:none;background:transparent;color:white;" onchange="window.location.href='{% url 'nutrition_page' %}?date=' + this.value;" title="Open calendar">
+            <input type="text" id="dateInput" class="calendar-btn" placeholder="📅" style="width:28px;height:28px;cursor:pointer;padding:0;border:none;background:transparent;color:white;font-size:16px;" title="Open calendar">
         </div>
 
         <!-- Calories Card -->
