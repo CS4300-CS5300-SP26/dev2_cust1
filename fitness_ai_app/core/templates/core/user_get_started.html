@@ -1,0 +1,30 @@
+{% extends "core/base.html" %}
+
+{% block title %}Get Started - Spotter.ai{% endblock %}
+
+{% block content %}
+<div class="title">Get Started</div>
+<div class="desc">Create your Spotter.ai account and begin your fitness journey!</div>
+{% if form.non_field_errors %}
+<div style="width:100%;max-width:320px;margin-bottom:12px;">
+    {% for error in form.non_field_errors %}
+    <div style="padding:12px 16px;border-radius:10px;margin-bottom:8px;font-size:0.95rem;background:rgba(212,35,56,0.15);border:1px solid var(--classic-crimson);color:var(--classic-crimson);">
+        {{ error }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+<form method="post" action="{% url 'user_get_started' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
+    {% csrf_token %}
+    <input type="email" name="email" placeholder="Email" value="{{ form.email.value|default:'' }}" required class="form-input">
+    {% if form.email.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.email.errors.0 }}</div>{% endif %}
+    <input type="password" name="password" placeholder="Password (min 8 characters)" required class="form-input">
+    {% if form.password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.password.errors.0 }}</div>{% endif %}
+    <input type="password" name="confirm_password" placeholder="Confirm Password" required class="form-input">
+    {% if form.confirm_password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.confirm_password.errors.0 }}</div>{% endif %}
+    <button type="submit" class="btn btn-primary" style="margin-top:12px;">Create Account</button>
+</form>
+<a href="{% url 'user_login' %}" class="btn btn-primary" style="max-width:320px;background:transparent;border:2px solid var(--harvest-orange);color:var(--harvest-orange);">Already have an account? Log In</a>
+
+{% include "core/includes/social_auth_buttons.html" with divider_text="or sign up with" %}
+{% endblock %}

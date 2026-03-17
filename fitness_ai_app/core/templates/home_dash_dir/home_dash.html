@@ -1,0 +1,26 @@
+{% extends "core/base_app.html" %}
+
+{% block title %}Dashboard - Spotter.ai{% endblock %}
+
+{% block content %}
+<div style="text-align:center;padding-top:40px;">
+    <div style="font-size:1.5rem;font-weight:700;margin-bottom:6px;">Welcome, {{ request.user.first_name|default:request.user.email }}!</div>
+    <div style="font-size:1rem;color:rgba(255,255,255,0.65);margin-bottom:40px;">Your Spotter.ai dashboard</div>
+    
+    <!-- Quick Links -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:400px;margin:0 auto;">
+        <a href="{% url 'nutrition_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+            📊 Nutrition Tracker
+        </a>
+        <a href="{% url 'train_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+            💪 Training Log
+        </a>
+        <a href="{% url 'ai_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+            🤖 AI Coach
+        </a>
+        <a href="{% url 'social_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+            👥 Community
+        </a>
+    </div>
+</div>
+{% endblock %}

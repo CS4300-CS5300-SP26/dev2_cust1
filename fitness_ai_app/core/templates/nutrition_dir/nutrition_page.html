@@ -1,0 +1,229 @@
+{% extends "core/base_app.html" %}
+
+{% load static %}
+
+{% block title %}Nutrition - Spotter.ai{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<link rel="stylesheet" href="{% static 'css/nutrition_page.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="nutrition-screen">
+    <!-- Header -->
+    <div class="header">
+        <h1>Nutrition</h1>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar-container">
+        <div class="tab-bar">
+            <button class="tab-button active" data-tab="today">Today</button>
+            <button class="tab-button" data-tab="history">History</button>
+            <button class="tab-button" data-tab="search">Search</button>
+            <button class="tab-button" data-tab="supplements">Supplements</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-container">
+        <!-- Date Navigator -->
+        <div class="date-navigator">
+            <div class="date-nav-buttons">
+                <a href="{% url 'nutrition_page' %}?date={{ prev_date }}" class="date-nav-btn" title="Previous day">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </a>
+                <span class="date-label">{{ selected_date|date:"D, M d" }}</span>
+                <a href="{% url 'nutrition_page' %}?date={{ next_date }}" class="date-nav-btn" title="Next day">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+            </div>
+            <input type="text" id="dateInput" style="display:none;">
+            <button type="button" class="calendar-btn" id="calendarTrigger" title="Open calendar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Calories Card -->
+        <div class="card calories-card" title="Total calories for the day">
+            <label class="card-label">CALORIES — TODAY</label>
+            <div class="calories-display">
+                <span class="calories-consumed">{{ total_calories }}</span>
+                <span class="calories-separator">/</span>
+                <span class="calories-goal">{{ calorie_goal }}</span>
+                <span class="calories-unit">kcal</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ calories_percentage }}%"></div>
+            </div>
+        </div>
+
+        <!-- Macros Card -->
+        <div class="card macros-card" title="Macronutrient breakdown">
+            <label class="card-label">MACROS</label>
+            <div class="macros-grid">
+                <div class="macro-pill protein-pill">
+                    <div class="macro-percentage" id="proteinPercent">—</div>
+                    <div class="macro-name">PROTEIN</div>
+                    <div class="macro-grams" id="proteinGrams">—g</div>
+                </div>
+                <div class="macro-pill carbs-pill">
+                    <div class="macro-percentage" id="carbsPercent">—</div>
+                    <div class="macro-name">CARBS</div>
+                    <div class="macro-grams" id="carbsGrams">—g</div>
+                </div>
+                <div class="macro-pill fat-pill">
+                    <div class="macro-percentage" id="fatPercent">—</div>
+                    <div class="macro-name">FAT</div>
+                    <div class="macro-grams" id="fatGrams">—g</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Meals Section -->
+        <div class="meals-section">
+            <div class="section-header">
+                <label class="section-label">TODAY'S MEALS</label>
+                <button class="add-meal-btn" type="button" data-toggle-target="addMealForm" title="Add new meal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="addMealForm" style="display:none; margin-bottom:16px;">
+                <form method="POST" action="{% url 'add_meal' %}" style="background-color:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="date" value="{{ date_string }}">
+                    <input type="text" name="meal_name" placeholder="Meal name (e.g., Breakfast)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
+                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:8px;color:white;font-weight:600;cursor:pointer;">Add Meal</button>
+                </form>
+            </div>
+
+            <div class="meals-list">
+                {% if meals %}
+                    {% for meal in meals %}
+                    <div class="meal-card">
+                        <div class="meal-header">
+                            <span class="meal-name">{{ meal.name }}</span>
+                            <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
+                            <button class="meal-edit-btn" type="button" data-toggle-sibling="add-food-form" title="Edit meal">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 20h9"></path>
+                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="food-items-list">
+                            {% for item in meal.items.all %}
+                            <div class="food-item {% if item.completed %}completed{% endif %}">
+                                <form method="POST" action="{% url 'toggle_food_item' %}" style="display:flex;align-items:center;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="date" value="{{ date_string }}">
+                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                        {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
+                                    </button>
+                                </form>
+                                <span class="food-name">{{ item.name }}</span>
+                                <span class="food-calories">{{ item.calories }}</span>
+                                <form method="POST" action="{% url 'delete_food_item' %}" style="display:flex;align-items:center;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="date" value="{{ date_string }}">
+                                    <button type="submit" class="delete-btn" title="Delete item" onclick="return confirm('Delete this item?');" style="border:none;background:none;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="add-food-form" style="display:none;">
+                            <form method="POST" action="{% url 'add_food_item' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
+                                {% csrf_token %}
+                                <input type="hidden" name="meal_id" value="{{ meal.id }}">
+                                <input type="hidden" name="date" value="{{ date_string }}">
+                                <input type="text" name="food_name" placeholder="Food name" required style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <input type="number" name="food_calories" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align:center;padding:40px 20px;color:var(--textMuted);">
+                        <p>No meals logged for this date</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Log a Meal Button -->
+            <button class="log-meal-btn" type="button" data-toggle-target="addMealForm" title="Log a new meal or supplement">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Log a meal / supplement</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    // Initialize flatpickr calendar picker
+    var fp = flatpickr('#dateInput', {
+        dateFormat: 'Y-m-d',
+        defaultDate: '{{ date_string }}',
+        appendTo: document.querySelector('.date-navigator'),
+        clickOpens: false,
+        disableMobile: true,
+        onChange: function(selectedDates) {
+            if (selectedDates.length > 0) {
+                var formatted = selectedDates[0].toISOString().split('T')[0];
+                window.location.href = '/nutrition/?date=' + formatted;
+            }
+        }
+    });
+
+    // Open calendar when button is clicked
+    document.getElementById('calendarTrigger').addEventListener('click', function() {
+        fp.open();
+    });
+
+    // Toggle form visibility
+    document.querySelectorAll('[data-toggle-target]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var target = document.getElementById(this.dataset.toggleTarget);
+            if (target) {
+                target.style.display = target.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+    document.querySelectorAll('[data-toggle-sibling]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var form = this.closest('.meal-card').querySelector('.add-food-form');
+            if (form) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

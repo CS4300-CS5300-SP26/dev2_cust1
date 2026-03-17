@@ -1,0 +1,17 @@
+{% extends "core/base.html" %}
+
+{% block title %}Log In - Spotter.ai{% endblock %}
+
+{% block content %}
+<div class="title">Log In</div>
+<div class="desc">Sign in to your Spotter.ai account to continue.</div>
+<form method="post" action="{% url 'user_login' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
+    {% csrf_token %}
+    <input type="email" name="email" placeholder="Email" required class="form-input">
+    <input type="password" name="password" placeholder="Password" required class="form-input">
+    <button type="submit" class="btn btn-primary" style="margin-top:18px;">Log In</button>
+</form>
+<a href="{% url 'user_get_started' %}" style="color:var(--harvest-orange);font-size:0.95rem;text-decoration:none;">Don't have an account? Sign Up</a>
+
+{% include "core/includes/social_auth_buttons.html" with divider_text="or continue with" %}
+{% endblock %}
