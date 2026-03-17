@@ -30,20 +30,25 @@ for VENV_PATH in "$REPO_ROOT/venv" "$HOME/venv_dev2-cust1"; do
     fi
 done
 
-# ── Stash unstaged changes so tests run against the staged snapshot ──
-STASH_NAME="pre-commit-$(date +%s)"
-git stash push -q --keep-index -m "$STASH_NAME" 2>/dev/null || true
-STASHED=0
-if git stash list | head -1 | grep -q "$STASH_NAME"; then
-    STASHED=1
-fi
+# ── Save and remove unstaged changes so tests run against the staged snapshot ──
+# Uses diff/patch instead of git stash to avoid SIGPIPE failures under
+# pipefail and merge conflicts when the same file has staged + unstaged changes.
+PATCH_FILE=$(mktemp)
+PATCH_APPLIED=0
 
-restore_stash() {
-    if [ "$STASHED" = "1" ]; then
-        git stash pop --index -q 2>/dev/null || true
+restore_unstaged() {
+    if [ "$PATCH_APPLIED" = "1" ]; then
+        git apply --whitespace=nowarn "$PATCH_FILE" 2>/dev/null || true
     fi
+    rm -f "$PATCH_FILE"
 }
-trap restore_stash EXIT
+trap restore_unstaged EXIT
+
+git diff --binary > "$PATCH_FILE"
+if [ -s "$PATCH_FILE" ]; then
+    git checkout -- .
+    PATCH_APPLIED=1
+fi
 
 # ── Run unit tests with coverage ──
 echo ""
