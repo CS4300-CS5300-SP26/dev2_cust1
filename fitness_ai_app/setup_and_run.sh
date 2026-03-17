@@ -18,7 +18,7 @@ if [ ! -f ../.env ]; then
 # 3. Copy the 16-character password below (without spaces)
 
 EMAIL_HOST_USER=spotter.ai2026@gmail.com
-EMAIL_HOST_PASSWORD=othhkwrzjjjkjwav
+EMAIL_HOST_PASSWORD=your-16-character-app-password-here (ask Ranis)
 DEFAULT_FROM_EMAIL="Spotter.ai <spotter.ai2026@gmail.com>"
 EOF
   echo "📧 Created .env file - Please add your Gmail App Password!"
