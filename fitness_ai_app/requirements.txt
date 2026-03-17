@@ -6,4 +6,5 @@ cryptography
 gunicorn
 whitenoise
 dj-database-url
+openai
 psycopg[binary]
