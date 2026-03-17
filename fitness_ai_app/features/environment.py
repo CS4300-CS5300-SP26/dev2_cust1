@@ -9,3 +9,9 @@ from django.conf import settings
 def before_all(context):
     """Use the in-memory email backend for all BDD scenarios."""
     settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+
+def before_scenario(context, scenario):
+    """Skip any scenario tagged with @skip."""
+    if 'skip' in scenario.effective_tags:
+        scenario.skip('Feature temporarily disabled')
