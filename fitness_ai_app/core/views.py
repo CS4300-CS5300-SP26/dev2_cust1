@@ -63,7 +63,7 @@ def user_get_started(request):
                     logger.info(f'Email sent successfully! Result: {result}')
             except Exception as e:
                 logger.exception(f'Failed to send verification email during signup for {form.cleaned_data.get("email")}')
-                form.add_error(None, f'We could not send your verification email: {str(e)}')
+                form.add_error(None, 'We could not send your verification email right now.')
                 return render(request, 'core/user_get_started.html', {'form': form})
 
             messages.success(request, 'Account created! Check your email to verify your account.')
