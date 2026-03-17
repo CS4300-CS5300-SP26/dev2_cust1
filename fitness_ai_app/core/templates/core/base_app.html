@@ -176,8 +176,19 @@
             height: 24px;
         }
 
-        {% block extra_css %}{% endblock %}
+        @media (max-width: 480px) {
+            body {
+                align-items: flex-start;
+            }
+            .splash-container {
+                max-width: 100%;
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+        }
     </style>
+        {% block extra_css %}{% endblock %}
+    
 </head>
 <body>
 
@@ -256,5 +267,6 @@
             }
         });
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
