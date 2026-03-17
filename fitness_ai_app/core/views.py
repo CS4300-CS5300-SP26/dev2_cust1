@@ -31,6 +31,7 @@ def splash(request):
     return render(request, 'core/splash.html')
 
 
+@login_required
 def chat_page(request):
     return render(request, 'core/chat.html')
 
@@ -297,11 +298,6 @@ def delete_food_item(request):
     messages.success(request, 'Food item deleted.')
     
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-
-
-@login_required
-def ai_page(request):
-    return render(request, 'ai_dir/ai_page.html', {'active_tab': 'ai'})
 
 
 @login_required

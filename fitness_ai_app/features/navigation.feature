@@ -45,7 +45,6 @@ Feature: App Navigation
       | /home_dash/ |
       | /train/     |
       | /nutrition/ |
-      | /ai/        |
       | /social/    |
 
   Scenario Outline: Profile bubble and logout link are on all pages
@@ -59,7 +58,6 @@ Feature: App Navigation
       | /home_dash/ |
       | /train/     |
       | /nutrition/ |
-      | /ai/        |
       | /social/    |
 
   Scenario Outline: Logo is present on all pages
@@ -71,5 +69,4 @@ Feature: App Navigation
       | /home_dash/ |
       | /train/     |
       | /nutrition/ |
-      | /ai/        |
       | /social/    |

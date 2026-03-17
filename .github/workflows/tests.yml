@@ -30,7 +30,13 @@ jobs:
       - name: Run unit & integration tests with coverage
         run: |
           coverage run --source=core manage.py test core -v2
-          coverage report
 
-      - name: Run BDD tests (Behave)
-        run: python manage.py behave --no-capture
+      - name: Run BDD tests (Behave) with coverage
+        run: |
+          coverage run -a --source=core manage.py behave --no-capture
+
+      - name: Print coverage report
+        run: |
+          echo ""
+          echo "── Coverage Report ────────────────────────────────"
+          coverage report

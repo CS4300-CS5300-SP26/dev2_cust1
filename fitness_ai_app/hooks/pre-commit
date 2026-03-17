@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-commit hook: run unit tests and print coverage before each commit.
+# pre-commit hook: run unit + BDD tests on staged code and print coverage.
 #
 # To skip for a single commit (e.g., a WIP commit):
 #   SKIP_TESTS=1 git commit -m "..."
@@ -22,13 +22,43 @@ echo "🧪 Running pre-commit tests with coverage..."
 cd "$APP_DIR"
 
 # Activate virtual environment if one exists at the repo root.
-if [ -f "$REPO_ROOT/venv/bin/activate" ]; then
-    # shellcheck source=/dev/null
-    source "$REPO_ROOT/venv/bin/activate"
+for VENV_PATH in "$REPO_ROOT/venv" "$HOME/venv_dev2-cust1"; do
+    if [ -f "$VENV_PATH/bin/activate" ]; then
+        # shellcheck source=/dev/null
+        source "$VENV_PATH/bin/activate"
+        break
+    fi
+done
+
+# ── Stash unstaged changes so tests run against the staged snapshot ──
+STASH_NAME="pre-commit-$(date +%s)"
+git stash push -q --keep-index -m "$STASH_NAME" 2>/dev/null || true
+STASHED=0
+if git stash list | head -1 | grep -q "$STASH_NAME"; then
+    STASHED=1
 fi
 
-coverage run --source=core manage.py test core -v0
+restore_stash() {
+    if [ "$STASHED" = "1" ]; then
+        git stash pop -q 2>/dev/null || true
+    fi
+}
+trap restore_stash EXIT
+
+# ── Run unit tests with coverage ──
 echo ""
+echo "── Unit Tests ──────────────────────────────────────"
+coverage run --source=core manage.py test core -v0
+
+# ── Run BDD (Behave) tests, appending coverage data ──
+echo ""
+echo "── BDD Tests (Behave) ────────────────────────────"
+coverage run -a --source=core manage.py behave --no-capture -v0
+
+# ── Coverage report ──
+echo ""
+echo "── Coverage Report ────────────────────────────────"
 coverage report
+
 echo ""
 echo "✅ All tests passed!"
