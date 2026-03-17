@@ -106,6 +106,59 @@ body {
     background-color: rgba(246, 125, 38, 0.1);
 }
 
+.form-input {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 2px solid var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.08);
+    color: var(--white);
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.social-auth-divider {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    align-items: center;
+    margin: 28px 0 20px;
+}
+
+.social-auth-divider-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.social-auth-divider-text {
+    padding: 0 16px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+}
+
+.social-auth-row {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 16px;
+}
+
+.social-auth-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
 .spacer {
     flex: 1;
 }
