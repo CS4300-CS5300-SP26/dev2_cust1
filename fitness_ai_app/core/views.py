@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
+from django.urls import reverse
 
 from .forms import RegistrationForm
 from .models import Meal, FoodItem
@@ -167,17 +168,17 @@ def add_meal(request):
     
     if not meal_name or not date_param:
         messages.error(request, 'Meal name and date are required.')
-        return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
     
     try:
         meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
     except ValueError:
         messages.error(request, 'Invalid date format.')
-        return redirect('/nutrition/')
+        return redirect(reverse('nutrition_page'))
     
     Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
     messages.success(request, f'Meal "{meal_name}" added successfully.')
-    return redirect(f'/nutrition/?date={date_param}')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
 @login_required
@@ -190,7 +191,7 @@ def add_food_item(request):
     
     if not meal_id or not food_name or not food_calories:
         messages.error(request, 'All fields are required.')
-        return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
     
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
     
@@ -198,11 +199,11 @@ def add_food_item(request):
         calories = int(food_calories)
     except ValueError:
         messages.error(request, 'Calories must be a number.')
-        return redirect(f'/nutrition/?date={date_param}')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}")
     
     FoodItem.objects.create(meal=meal, name=food_name, calories=calories)
     messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
-    return redirect(f'/nutrition/?date={date_param}')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
 @login_required
@@ -215,7 +216,7 @@ def toggle_food_item(request):
     food_item.completed = not food_item.completed
     food_item.save()
     
-    return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
 @login_required
@@ -228,7 +229,7 @@ def delete_food_item(request):
     food_item.delete()
     messages.success(request, 'Food item deleted.')
     
-    return redirect(f'/nutrition/?date={date_param}' if date_param else '/nutrition/')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
 @login_required

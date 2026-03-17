@@ -1,27 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Set date input to current selected date
-    const dateInput = document.getElementById('dateInput');
-    if (dateInput) {
-        dateInput.value = dateInput.dataset.dateString || '';
-    }
-    
-    // Initialize flatpickr if available
-    if (typeof flatpickr !== 'undefined') {
-        flatpickr('#dateInput', {
-            mode: 'single',
-            dateFormat: 'Y-m-d',
-            onChange: function(selectedDates) {
-                if (selectedDates.length > 0) {
-                    const date = selectedDates[0];
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    window.location.href = `/nutrition/?date=${year}-${month}-${day}`;
-                }
-            }
-        });
-    }
-    
     // Calculate total calories
     updateCalories();
 });
