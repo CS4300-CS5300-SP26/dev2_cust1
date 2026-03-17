@@ -1,0 +1,15 @@
+[run]
+source = core
+omit =
+    core/migrations/*
+
+[report]
+show_missing = True
+fail_under = 80
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__
+
+[html]
+directory = htmlcov
