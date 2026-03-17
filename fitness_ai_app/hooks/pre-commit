@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# pre-commit hook: run unit tests and print coverage before each commit.
+#
+# To skip for a single commit (e.g., a WIP commit):
+#   SKIP_TESTS=1 git commit -m "..."
+#
+# To disable permanently on your local machine, run:
+#   git config core.hooksPath /dev/null    # or just delete .git/hooks/pre-commit
+
+set -euo pipefail
+
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+    echo "⏭  Pre-commit tests skipped (SKIP_TESTS=1)"
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+APP_DIR="$REPO_ROOT/fitness_ai_app"
+
+echo "🧪 Running pre-commit tests with coverage..."
+
+cd "$APP_DIR"
+
+# Activate virtual environment if one exists at the repo root.
+if [ -f "$REPO_ROOT/venv/bin/activate" ]; then
+    # shellcheck source=/dev/null
+    source "$REPO_ROOT/venv/bin/activate"
+fi
+
+coverage run --source=core manage.py test core -v0
+echo ""
+coverage report
+echo ""
+echo "✅ All tests passed!"
