@@ -27,6 +27,6 @@ class RegistrationForm(forms.Form):
             username=data['email'],
             email=data['email'],
             password=data['password'],
-            is_active=False,
+            is_active=True,  # TEMPORARILY: Allow instant account creation without email verification
         )
         return user
