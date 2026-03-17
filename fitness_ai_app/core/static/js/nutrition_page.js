@@ -33,9 +33,9 @@ function updateCalories() {
         totalCalories += parseInt(item.textContent) || 0;
     });
     
-    const totalElement = document.getElementById('totalCalories');
-    if (totalElement) {
-        totalElement.textContent = totalCalories + ' kcal';
+    const consumedElement = document.getElementById('totalCalories');
+    if (consumedElement) {
+        consumedElement.textContent = totalCalories;
         // Update progress bar (assuming 2400 kcal as target)
         const percentage = Math.min((totalCalories / 2400) * 100, 100);
         const progressFill = document.getElementById('progressFill');

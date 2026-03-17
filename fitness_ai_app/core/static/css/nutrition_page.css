@@ -74,9 +74,9 @@ body {
     border-radius: 20px;
     font-size: 14px;
     font-weight: 600;
-    border: 1px solid var(--border);
+    border: 1px solid #2e2e2e;
     background-color: transparent;
-    color: var(--textMuted);
+    color: #888;
     cursor: pointer;
     transition: all 0.2s ease;
     white-space: nowrap;
@@ -87,7 +87,7 @@ body {
 }
 
 .tab-button.active {
-    border-color: var(--accent);
+    border: 1.5px solid var(--accent);
     background-color: var(--accentDim);
     color: var(--accent);
 }
@@ -102,28 +102,62 @@ body {
     background-color: var(--background);
 }
 
+.date-nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
 .date-nav-btn {
-    background-color: transparent;
-    border: none;
-    color: var(--textPrimary);
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: var(--textSecondary);
     cursor: pointer;
-    padding: 8px;
+    padding: 0;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
 }
 
 .date-nav-btn:hover {
     color: var(--accent);
+    border-color: var(--accent);
 }
 
 .date-label {
     font-size: 14px;
     color: var(--textSecondary);
     font-weight: 500;
+    font-family: 'Courier New', monospace;
     flex: 1;
     text-align: center;
+}
+
+.calendar-btn {
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: var(--textSecondary);
+    cursor: pointer;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.calendar-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
 }
 
 /* Flatpickr custom theme */
@@ -240,27 +274,41 @@ body {
 .calories-display {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 16px;
 }
 
-.calories-value {
+.calories-consumed {
     font-size: 36px;
     font-weight: 700;
     color: var(--textPrimary);
     font-family: 'Courier New', monospace;
 }
 
-.calories-unit {
-    font-size: 14px;
+.calories-separator {
+    font-size: 22px;
     color: var(--textMuted);
+    font-family: 'Courier New', monospace;
+}
+
+.calories-goal {
+    font-size: 22px;
+    color: var(--textMuted);
+    font-family: 'Courier New', monospace;
+}
+
+.calories-unit {
+    font-size: 12px;
+    color: var(--textMuted);
+    font-family: 'Courier New', monospace;
+    margin-left: 2px;
 }
 
 .progress-bar {
     width: 100%;
-    height: 8px;
+    height: 5px;
     background-color: var(--border);
-    border-radius: 4px;
+    border-radius: 3px;
     overflow: hidden;
 }
 
@@ -276,24 +324,53 @@ body {
 }
 
 .macros-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    display: flex;
+    gap: 10px;
+    flex-direction: row;
 }
 
 .macro-pill {
-    border: 2px solid;
+    flex: 1;
+    border: 1.5px solid;
     border-radius: 12px;
-    padding: 16px 12px;
+    padding: 14px 10px;
     text-align: center;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: transparent;
+}
+
+.macro-pill.protein-pill {
+    border-color: var(--proteinColor);
+    background-color: rgba(232, 92, 0, 0.07);
+}
+
+.macro-pill.carbs-pill {
+    border-color: var(--carbColor);
+    background-color: rgba(232, 51, 85, 0.07);
+}
+
+.macro-pill.fat-pill {
+    border-color: #444;
+    background-color: rgba(80, 80, 80, 0.1);
 }
 
 .macro-percentage {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     font-family: 'Courier New', monospace;
     color: var(--textPrimary);
+    margin-bottom: 4px;
+}
+
+.macro-pill.protein-pill .macro-percentage {
+    color: var(--proteinColor);
+}
+
+.macro-pill.carbs-pill .macro-percentage {
+    color: var(--carbColor);
+}
+
+.macro-pill.fat-pill .macro-percentage {
+    color: var(--fatColor);
 }
 
 .macro-name {
@@ -301,14 +378,13 @@ body {
     font-weight: 600;
     text-transform: uppercase;
     color: var(--textMuted);
-    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .macro-grams {
-    font-size: 12px;
+    font-size: 10px;
     font-family: 'Courier New', monospace;
-    color: var(--textMuted);
-    margin-top: 4px;
+    color: #444;
 }
 
 /* Meals Section */
@@ -326,27 +402,31 @@ body {
 }
 
 .section-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--textMuted);
-    letter-spacing: 0.5px;
+    letter-spacing: 1.2px;
 }
 
 .add-meal-btn {
-    background-color: transparent;
-    border: none;
+    background-color: rgba(232, 92, 0, 0.15);
+    border: 1px solid rgba(232, 92, 0, 0.3);
     color: var(--accent);
     cursor: pointer;
-    padding: 8px;
+    padding: 0;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease;
+    border-radius: 7px;
+    transition: all 0.2s ease;
 }
 
 .add-meal-btn:hover {
-    color: #ff9f43;
+    background-color: rgba(232, 92, 0, 0.25);
+    border-color: rgba(232, 92, 0, 0.5);
 }
 
 /* Meals List */
@@ -360,7 +440,7 @@ body {
 .meal-card {
     background-color: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
 }
 
@@ -368,8 +448,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 14px;
+    border-bottom: 1px solid #1e1e1e;
 }
 
 .meal-name {
@@ -379,7 +459,7 @@ body {
 }
 
 .meal-calories {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--textMuted);
     font-family: 'Courier New', monospace;
     flex: 1;
@@ -392,11 +472,13 @@ body {
     border: none;
     color: var(--textMuted);
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: color 0.2s ease;
+    width: 18px;
+    height: 18px;
 }
 
 .meal-edit-btn:hover {
@@ -414,8 +496,8 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 9px 14px;
+    border-bottom: 1px solid #1c1c1c;
     transition: background-color 0.2s ease;
 }
 
@@ -435,8 +517,8 @@ body {
 .checkbox {
     width: 16px;
     height: 16px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
+    border: 1.5px solid #333;
+    border-radius: 4px;
     background-color: transparent;
     color: var(--textPrimary);
     cursor: pointer;
@@ -454,18 +536,18 @@ body {
 .checkbox.checked {
     background-color: var(--accent);
     border-color: var(--accent);
-    color: #000;
+    color: #fff;
 }
 
 .food-name {
     font-size: 13px;
-    color: var(--textSecondary);
+    color: #aaa;
     flex: 1;
 }
 
 .food-calories {
-    font-size: 12px;
-    color: var(--textMuted);
+    font-size: 11px;
+    color: #444;
     font-family: 'Courier New', monospace;
     min-width: 40px;
     text-align: right;
@@ -476,12 +558,14 @@ body {
     border: none;
     color: var(--textMuted);
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     transition: color 0.2s ease;
+    width: 16px;
+    height: 16px;
 }
 
 .delete-btn:hover {
@@ -511,13 +595,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: 16px;
-    border: 2px dashed var(--border);
+    gap: 8px;
+    padding: 14px;
+    border: 1.5px dashed #2a2a2a;
     border-radius: 14px;
     background-color: transparent;
     color: var(--textMuted);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -534,9 +618,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-around;
-    padding: 12px 0;
-    background-color: var(--card);
-    border-top: 1px solid var(--border);
+    padding: 10px 0 18px;
+    background-color: #111;
+    border-top: 1px solid #1e1e1e;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -549,14 +633,27 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 8px 12px;
+    padding: 0;
     background-color: transparent;
     border: none;
     color: #444;
     cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 500;
     transition: color 0.2s ease;
+    flex: 1;
+    text-decoration: none;
+}
+
+.nav-item svg {
+    width: 20px;
+    height: 20px;
+    background-color: #1e1e1e;
+    padding: 0;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .nav-item:hover {
@@ -565,6 +662,10 @@ body {
 
 .nav-item.active {
     color: var(--accent);
+}
+
+.nav-item.active svg {
+    background-color: var(--accent);
 }
 
 /* Responsive */
