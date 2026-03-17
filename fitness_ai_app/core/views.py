@@ -1,7 +1,8 @@
 import logging
 import smtplib
+from datetime import datetime, date, timedelta
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -11,6 +12,7 @@ from django.db import transaction
 
 from .forms import RegistrationForm
 from .models import Meal, FoodItem
+
 
 
 def splash(request):
