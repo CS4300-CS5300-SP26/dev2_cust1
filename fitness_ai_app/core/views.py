@@ -1,14 +1,19 @@
 import logging
 import smtplib
+from datetime import datetime, date, timedelta
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
+from django.urls import reverse
 
 from .forms import RegistrationForm
+from .models import Meal, FoodItem
+
 
 
 def splash(request):
@@ -32,32 +37,33 @@ def user_get_started(request):
             try:
                 with transaction.atomic():
                     user = form.save()
-                    verification = EmailVerification.objects.create(user=user)
-                    verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
-                    html_message = f"""
-                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
-                        <div style="text-align:center;margin:32px 0;">
-                            <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
-                        </div>
-                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-                    </div>
-                    """
-                    send_mail(
-                        'Verify your Spotter.ai account',
-                        f'Click this link to verify your account: {verify_url}',
-                        settings.DEFAULT_FROM_EMAIL,
-                        [user.email],
-                        html_message=html_message,
-                        fail_silently=False,
-                    )
+                    # TEMPORARILY DISABLED: Email verification
+                    # verification = EmailVerification.objects.create(user=user)
+                    # verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
+                    # html_message = f"""
+                    # <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                    #     <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                    #     <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
+                    #     <div style="text-align:center;margin:32px 0;">
+                    #         <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
+                    #     </div>
+                    #     <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
+                    # </div>
+                    # """
+                    # send_mail(
+                    #     'Verify your Spotter.ai account',
+                    #     f'Click this link to verify your account: {verify_url}',
+                    #     settings.DEFAULT_FROM_EMAIL,
+                    #     [user.email],
+                    #     html_message=html_message,
+                    #     fail_silently=False,
+                    # )
             except (smtplib.SMTPException, OSError):
                 logger.exception('Failed to send verification email during signup for %s', form.cleaned_data['email'])
                 form.add_error(None, 'We could not send your verification email right now. Please try again in a moment.')
                 return render(request, 'core/user_get_started.html', {'form': form})
 
-            messages.success(request, 'A verification link has been sent to your email. Please check your inbox and click the link to activate your account.')
+            messages.success(request, 'Account created successfully! You can now log in.')
             return redirect('user_login')
         else:
             return render(request, 'core/user_get_started.html', {'form': form})
@@ -129,7 +135,101 @@ def train_page(request):
 
 @login_required
 def nutrition_page(request):
-    return render(request, 'nutrition_dir/nutrition_page.html', {'active_tab': 'nutrition'})
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+    
+    meals = Meal.objects.filter(user=request.user, date=selected_date).prefetch_related('items')
+    
+    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    context = {
+        'active_tab': 'nutrition',
+        'meals': meals,
+        'selected_date': selected_date,
+        'date_string': selected_date.strftime('%Y-%m-%d'),
+        'prev_date': prev_date,
+        'next_date': next_date,
+    }
+    return render(request, 'nutrition_dir/nutrition_page.html', context)
+
+
+@login_required
+@require_POST
+def add_meal(request):
+    meal_name = request.POST.get('meal_name', '').strip()
+    date_param = request.POST.get('date')
+    
+    if not meal_name or not date_param:
+        messages.error(request, 'Meal name and date are required.')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+    
+    try:
+        meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Invalid date format.')
+        return redirect(reverse('nutrition_page'))
+    
+    Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
+    messages.success(request, f'Meal "{meal_name}" added successfully.')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def add_food_item(request):
+    meal_id = request.POST.get('meal_id')
+    food_name = request.POST.get('food_name', '').strip()
+    food_calories = request.POST.get('food_calories', '0')
+    date_param = request.POST.get('date')
+    
+    if not meal_id or not food_name or not food_calories:
+        messages.error(request, 'All fields are required.')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+    
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    
+    try:
+        calories = int(food_calories)
+    except ValueError:
+        messages.error(request, 'Calories must be a number.')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+    
+    FoodItem.objects.create(meal=meal, name=food_name, calories=calories)
+    messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def toggle_food_item(request):
+    item_id = request.POST.get('item_id')
+    date_param = request.POST.get('date')
+    
+    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    food_item.completed = not food_item.completed
+    food_item.save()
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
+def delete_food_item(request):
+    item_id = request.POST.get('item_id')
+    date_param = request.POST.get('date')
+    
+    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    food_item.delete()
+    messages.success(request, 'Food item deleted.')
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
 @login_required
