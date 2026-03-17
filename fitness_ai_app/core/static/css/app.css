@@ -1,0 +1,123 @@
+/* Authenticated page overrides */
+.splash-container {
+    padding-bottom: 90px;
+    position: relative;
+}
+
+/* Profile bubble */
+.profile-bubble {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+}
+
+.profile-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--harvest-orange);
+    color: var(--white);
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-dropdown {
+    display: none;
+    position: absolute;
+    top: 46px;
+    right: 0;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+}
+
+.profile-dropdown.show {
+    display: block;
+}
+
+.profile-dropdown .user-info {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.profile-dropdown .user-email {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.profile-dropdown .user-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--white);
+}
+
+.profile-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    color: var(--classic-crimson);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.profile-dropdown a:hover {
+    background: rgba(212, 35, 56, 0.1);
+}
+
+/* Bottom nav */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 100;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.7rem;
+    font-weight: 500;
+    transition: color 0.2s;
+    padding: 8px 12px;
+}
+
+.nav-item.active {
+    color: var(--harvest-orange);
+}
+
+.nav-item:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.nav-item.active:hover {
+    color: var(--harvest-orange);
+}
+
+.nav-icon {
+    width: 24px;
+    height: 24px;
+}
