@@ -5,7 +5,7 @@
 {% block title %}Nutrition - Spotter.ai{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 <link rel="stylesheet" href="{% static 'css/nutrition_page.css' %}">
 {% endblock %}
 
@@ -188,22 +188,24 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // Initialize flatpickr on hidden input
-    flatpickr('#dateInput', {
-        mode: 'single',
+    // Initialize flatpickr calendar picker
+    var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
-        onClose: function(selectedDates) {
+        defaultDate: '{{ date_string }}',
+        appendTo: document.querySelector('.date-navigator'),
+        clickOpens: false,
+        disableMobile: true,
+        onChange: function(selectedDates) {
             if (selectedDates.length > 0) {
-                const d = selectedDates[0];
-                const formatted = d.toISOString().split('T')[0];
+                var formatted = selectedDates[0].toISOString().split('T')[0];
                 window.location.href = '/nutrition/?date=' + formatted;
             }
         }
     });
-    
+
     // Open calendar when button is clicked
     document.getElementById('calendarTrigger').addEventListener('click', function() {
-        document.getElementById('dateInput')._flatpickr.open();
+        fp.open();
     });
 
     // Toggle form visibility
