@@ -58,13 +58,13 @@
         <div class="card calories-card" title="Total calories for the day">
             <label class="card-label">CALORIES — TODAY</label>
             <div class="calories-display">
-                <span class="calories-consumed" id="totalCalories">0</span>
+                <span class="calories-consumed">{{ total_calories }}</span>
                 <span class="calories-separator">/</span>
-                <span class="calories-goal" id="calorieGoal">—</span>
+                <span class="calories-goal">{{ calorie_goal }}</span>
                 <span class="calories-unit">kcal</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                <div class="progress-fill" style="width: {{ calories_percentage }}%"></div>
             </div>
         </div>
 
@@ -94,7 +94,7 @@
         <div class="meals-section">
             <div class="section-header">
                 <label class="section-label">TODAY'S MEALS</label>
-                <button class="add-meal-btn" type="button" onclick="document.getElementById('addMealForm').style.display = document.getElementById('addMealForm').style.display === 'none' ? 'block' : 'none'" title="Add new meal">
+                <button class="add-meal-btn" type="button" data-toggle-target="addMealForm" title="Add new meal">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -117,8 +117,8 @@
                     <div class="meal-card">
                         <div class="meal-header">
                             <span class="meal-name">{{ meal.name }}</span>
-                            <span class="meal-calories meal-cal-total" data-meal-id="{{ meal.id }}">0 kcal</span>
-                            <button class="meal-edit-btn" type="button" onclick="this.closest('.meal-card').querySelector('.add-food-form').style.display = this.closest('.meal-card').querySelector('.add-food-form').style.display === 'none' ? 'block' : 'none'" title="Edit meal">
+                            <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
+                            <button class="meal-edit-btn" type="button" data-toggle-sibling="add-food-form" title="Edit meal">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 20h9"></path>
                                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
@@ -172,7 +172,7 @@
             </div>
 
             <!-- Log a Meal Button -->
-            <button class="log-meal-btn" type="button" onclick="document.getElementById('addMealForm').style.display = document.getElementById('addMealForm').style.display === 'none' ? 'block' : 'none'" title="Log a new meal or supplement">
+            <button class="log-meal-btn" type="button" data-toggle-target="addMealForm" title="Log a new meal or supplement">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -187,7 +187,6 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="{% static 'js/nutrition_page.js' %}"></script>
 <script>
     // Initialize flatpickr on hidden input
     flatpickr('#dateInput', {
@@ -205,6 +204,24 @@
     // Open calendar when button is clicked
     document.getElementById('calendarTrigger').addEventListener('click', function() {
         document.getElementById('dateInput')._flatpickr.open();
+    });
+
+    // Toggle form visibility
+    document.querySelectorAll('[data-toggle-target]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var target = document.getElementById(this.dataset.toggleTarget);
+            if (target) {
+                target.style.display = target.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+    document.querySelectorAll('[data-toggle-sibling]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var form = this.closest('.meal-card').querySelector('.add-food-form');
+            if (form) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            }
+        });
     });
 </script>
 {% endblock %}

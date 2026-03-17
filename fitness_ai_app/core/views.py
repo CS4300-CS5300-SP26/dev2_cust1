@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm
@@ -143,12 +144,28 @@ def nutrition_page(request):
             selected_date = date.today()
     else:
         selected_date = date.today()
-    
-    meals = Meal.objects.filter(user=request.user, date=selected_date).prefetch_related('items')
-    
+
+    meals = (
+        Meal.objects.filter(user=request.user, date=selected_date)
+        .prefetch_related('items')
+        .annotate(meal_total=Sum('items__calories'))
+    )
+
+    total_calories = FoodItem.objects.filter(
+        meal__user=request.user,
+        meal__date=selected_date,
+        completed=True,
+    ).aggregate(total=Sum('calories'))['total'] or 0
+
+    calorie_goal = 2400
+    calories_percentage = min(
+        round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
+        100,
+    )
+
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
-    
+
     context = {
         'active_tab': 'nutrition',
         'meals': meals,
@@ -156,6 +173,9 @@ def nutrition_page(request):
         'date_string': selected_date.strftime('%Y-%m-%d'),
         'prev_date': prev_date,
         'next_date': next_date,
+        'total_calories': total_calories,
+        'calorie_goal': calorie_goal,
+        'calories_percentage': calories_percentage,
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
