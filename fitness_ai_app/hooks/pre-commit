@@ -40,7 +40,7 @@ fi
 
 restore_stash() {
     if [ "$STASHED" = "1" ]; then
-        git stash pop -q 2>/dev/null || true
+        git stash pop --index -q 2>/dev/null || true
     fi
 }
 trap restore_stash EXIT
