@@ -5,32 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Spotter.ai{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <style>
-        :root {
-            --harvest-orange: #F67D26;
-            --black: #000000;
-            --white: #FFFFFF;
-            --classic-crimson: #D42338;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--black);
-            color: var(--white);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
         .splash-container {
-            width: 100%;
-            max-width: 420px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 60px 32px 90px;
-            box-sizing: border-box;
+            padding-bottom: 90px;
             position: relative;
         }
 
@@ -98,43 +76,6 @@
             background: rgba(212,35,56,0.1);
         }
 
-        .logo-container {
-            width: 100%;
-            max-width: 320px;
-            border: 2px solid var(--harvest-orange);
-            border-radius: 16px;
-            padding: 24px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: rgba(246, 125, 38, 0.08);
-            margin-bottom: 24px;
-            box-sizing: border-box;
-        }
-        .logo-container img {
-            width: 140px;
-            height: auto;
-            box-sizing: border-box;
-        }
-        .title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--white);
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
-            box-sizing: border-box;
-        }
-        .desc {
-            font-size: 1rem;
-            color: rgba(255,255,255,0.65);
-            margin-bottom: 48px;
-            box-sizing: border-box;
-        }
-        .spacer {
-            flex: 1;
-            box-sizing: border-box;
-        }
-
         /* Bottom nav */
         .bottom-nav {
             position: fixed;
@@ -175,20 +116,8 @@
             width: 24px;
             height: 24px;
         }
-
-        @media (max-width: 480px) {
-            body {
-                align-items: flex-start;
-            }
-            .splash-container {
-                max-width: 100%;
-                padding-left: 16px;
-                padding-right: 16px;
-            }
-        }
     </style>
-        {% block extra_css %}{% endblock %}
-    
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
 
