@@ -4,7 +4,11 @@ Tests for the Nutrition Page
 This module contains all tests related to the nutrition tracking functionality,
 including the nutrition page view, HTML rendering, styling, and JavaScript interactions.
 """
-
+"""
+Run tests using:
+cd /home/student/dev2_cust1/fitness_ai_app && python3 manage.py test 
+core.tests_nutrition -v 2
+"""
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.utils import timezone
