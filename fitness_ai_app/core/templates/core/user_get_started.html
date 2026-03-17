@@ -91,6 +91,23 @@
             flex: 1;
             box-sizing: border-box;
         }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--white);
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -117,7 +134,7 @@
             {% if form.password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.password.errors.0 }}</div>{% endif %}
             <input type="password" name="confirm_password" placeholder="Confirm Password" required style="padding:14px 18px;border-radius:10px;border:2px solid var(--harvest-orange);background:rgba(246,125,38,0.08);color:var(--white);font-size:1rem;box-sizing:border-box;">
             {% if form.confirm_password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.confirm_password.errors.0 }}</div>{% endif %}
-            <button type="submit" class="btn btn-primary" style="margin-top:12px;">Create Account</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn" style="margin-top:12px;">Create Account</button>
         </form>
         <a href="{% url 'user_login' %}" class="btn btn-primary" style="max-width:320px;background:transparent;border:2px solid var(--harvest-orange);color:var(--harvest-orange);">Already have an account? Log In</a>
 
@@ -145,5 +162,16 @@
         </div>
         <div class="spacer"></div>
     </div>
+    <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const btn = document.getElementById('submitBtn');
+            if (btn.disabled) {
+                e.preventDefault();
+                return;
+            }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Creating Account...';
+        });
+    </script>
 </body>
 </html>
