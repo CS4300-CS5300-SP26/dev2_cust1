@@ -25,36 +25,32 @@ cd dev2_cust1/fitness_ai_app
 
 3. Install dependencies (if not already installed):
 ```
-pip install django django-allauth requests PyJWT cryptography
+pip install -r requirements.txt
 ```
 
-4. Run all unit tests:
+4. **Run all tests with coverage (recommended):**
+```
+python manage.py test_all
+```
+This single command runs all Django unit tests and Behave BDD tests with coverage, then prints a coverage report at the end.
+
+5. Run unit tests only:
 ```
 python manage.py test core -v2
 ```
-Or use `-v0` for compact output:
-```
-python manage.py test core -v0
-```
 
-5. Run BDD/acceptance tests:
+6. Run BDD/acceptance tests only:
 ```
 python manage.py behave
 ```
 
-6. Run tests with coverage:
-```
-coverage run --source=core manage.py test core
-coverage run -a --source=core manage.py behave
-coverage report
-```
-Generate an HTML coverage report:
+7. Generate an HTML coverage report (after running `test_all`):
 ```
 coverage html
 ```
 The report will be in `htmlcov/index.html`. Coverage threshold is set to 80%.
 
-7. Install the pre-commit hook (runs tests automatically before each commit):
+8. Install the pre-commit hook (runs tests automatically before each commit):
 ```
 bash install_hooks.sh
 ```
