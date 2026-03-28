@@ -10,6 +10,7 @@ pip install -r requirements.txt
 # Create .env file if it doesn't exist
 if [ ! -f ./.env.dev ]; then
   cp ./.env.example ./.env.dev
+  echo "############################ Don't forget to set up the environment passwords ###########################"
 else
   echo "✓ .env.dev file already exists"
 fi
