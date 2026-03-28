@@ -17,9 +17,9 @@ from dotenv import load_dotenv
 
 import dj_database_url
 
-# Load .env file from project root
+# Load .env.dev file from project root
 BASE_DIR = Path(__file__).resolve().parent.parent
-ENV_PATH = BASE_DIR.parent / '.env'
+ENV_PATH = BASE_DIR / '.env.dev'
 load_dotenv(ENV_PATH)
 
 
@@ -241,3 +241,6 @@ SOCIALACCOUNT_PROVIDERS = {
         },
     },
 }
+
+# Email verification setting for development
+EMAIL_VERIFICATION_ENABLED = env_bool('EMAIL_VERIFICATION_ENABLED', False)

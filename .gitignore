@@ -10,6 +10,7 @@ env/
 venv/
 ENV/
 venv_*/
+fitness_ai_app/.env.dev
 
 # Django
 *.sqlite3
