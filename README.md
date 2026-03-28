@@ -1,4 +1,4 @@
-# Fitness AI App
+### Fitness AI App
 
 A Django-based fitness AI web application.
 
@@ -9,15 +9,14 @@ A Django-based fitness AI web application.
 
 Visit http://localhost:3000 to see the app running
 
+## Email varification for development 
+1. Open the file .env.dev inside fitness_ai_app
+2. At the bottom where it says "EMAIL_VERIFICATION_ENABLED" change "False" to "True" to enable the email varifications.
+   If you don't want email varification for testing puposes, keep it on "False"
+NOTE: Make sure you rerun the server manually when switching the between False and True, and vice versa. Also
+   make sure your .env.dev file already exists. If not then run the setup_and_run.sh in the fitness_ai_app directory.
 
-## Setup The SMTP email varification
-
-1. After running the "setup_and_run.sh," you will see the ".env" file in the "DEV2_CUST1" directory.
-2. make sure you stop your server first by pressing "CTRL + C" on the terminal that you ran the setup.
-3. Ask Ranis to DM you the 16 digit code to paste into the ".env" file so you can run tests with email verifications
-
-
-# Run tests
+## Run tests
 
 1. Activate the virtual environment:
 ```
