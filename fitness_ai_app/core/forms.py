@@ -27,6 +27,6 @@ class RegistrationForm(forms.Form):
             username=data['email'],
             email=data['email'],
             password=data['password'],
-            is_active=True,
+            is_active=False,
         )
         return user

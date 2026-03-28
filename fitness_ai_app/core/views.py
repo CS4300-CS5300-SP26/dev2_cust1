@@ -63,8 +63,8 @@ def api_chat(request):
         return JsonResponse({"reply": reply})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
-# from django.core.mail import send_mail
-# from .models import EmailVerification
+from django.core.mail import send_mail
+from .models import EmailVerification
 
 logger = logging.getLogger(__name__)
 
@@ -75,46 +75,53 @@ def user_get_started(request):
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
-            # Email verification temporarily disabled — credentials not working.
-            # try:
-            #     with transaction.atomic():
-            #         user = form.save()
-            #         logger.info(f'User created: {user.username}, is_active={user.is_active}')
-            #
-            #         verification = EmailVerification.objects.create(user=user)
-            #         logger.info(f'Verification created for {user.username} with token {verification.token}')
-            #
-            #         verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
-            #         logger.info(f'Verify URL: {verify_url}')
-            #
-            #         html_message = f"""
-            #         <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-            #             <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-            #             <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
-            #             <div style="text-align:center;margin:32px 0;">
-            #                 <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
-            #             </div>
-            #             <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-            #         </div>
-            #         """
-            #
-            #         logger.info(f'Sending verification email to {user.email} from {settings.DEFAULT_FROM_EMAIL}')
-            #         result = send_mail(
-            #             'Verify your Spotter.ai account',
-            #             f'Click this link to verify your account: {verify_url}',
-            #             settings.DEFAULT_FROM_EMAIL,
-            #             [user.email],
-            #             html_message=html_message,
-            #             fail_silently=False,
-            #         )
-            #         logger.info(f'Email sent successfully! Result: {result}')
-            # except Exception as e:
-            #     logger.exception(f'Failed to send verification email during signup for {form.cleaned_data.get("email")}')
-            #     form.add_error(None, 'We could not send your verification email right now.')
-            #     return render(request, 'core/user_get_started.html', {'form': form})
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    logger.info(f'User created: {user.username}, is_active={user.is_active}')
 
-            messages.success(request, 'Account created! Please log in.')
+                    if settings.EMAIL_VERIFICATION_ENABLED:
+                        # Email verification is enabled - user must verify before login
+                        verification = EmailVerification.objects.create(user=user)
+                        logger.info(f'Verification created for {user.username} with token {verification.token}')
+
+                        verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
+                        logger.info(f'Verify URL: {verify_url}')
+
+                        html_message = f"""
+                        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                            <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                            <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
+                            <div style="text-align:center;margin:32px 0;">
+                                <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
+                            </div>
+                            <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
+                        </div>
+                        """
+
+                        logger.info(f'Sending verification email to {user.email} from {settings.DEFAULT_FROM_EMAIL}')
+                        result = send_mail(
+                            'Verify your Spotter.ai account',
+                            f'Click this link to verify your account: {verify_url}',
+                            settings.DEFAULT_FROM_EMAIL,
+                            [user.email],
+                            html_message=html_message,
+                            fail_silently=False,
+                        )
+                        logger.info(f'Email sent successfully! Result: {result}')
+                        messages.success(request, 'Account created! Please check your email to verify.')
+                    else:
+                        # Email verification is disabled - auto-activate user for testing
+                        user.is_active = True
+                        user.save()
+                        verification = EmailVerification.objects.create(user=user, verified=True)
+                        logger.info(f'Email verification disabled - user auto-activated: {user.username}')
+                        messages.success(request, 'Account created successfully! You can now log in.')
+            except Exception as e:
+                logger.exception(f'Failed during signup for {form.cleaned_data.get("email")}')
+                form.add_error(None, 'We could not create your account right now.')
+                return render(request, 'core/user_get_started.html', {'form': form})
+
             return redirect('user_login')
         else:
             return render(request, 'core/user_get_started.html', {'form': form})
@@ -123,31 +130,30 @@ def user_get_started(request):
     return render(request, 'core/user_get_started.html', {'form': form})
 
 
-# Email verification temporarily disabled — credentials not working.
-# def verify_email(request, token):
-#     from django.contrib.auth.models import User
-#     try:
-#         verification = EmailVerification.objects.get(token=token)
-#     except EmailVerification.DoesNotExist:
-#         messages.error(request, 'Invalid verification link.')
-#         return redirect('user_login')
-#
-#     if verification.verified:
-#         messages.info(request, 'Your account is already verified. Please log in.')
-#         return redirect('user_login')
-#
-#     if verification.is_expired():
-#         messages.error(request, 'Verification link has expired. Please sign up again.')
-#         verification.user.delete()
-#         return redirect('user_get_started')
-#
-#     verification.verified = True
-#     verification.save()
-#     verification.user.is_active = True
-#     verification.user.save()
-#     login(request, verification.user, backend='django.contrib.auth.backends.ModelBackend')
-#     messages.success(request, 'Your email has been verified! Welcome to Spotter.ai.')
-#     return redirect('home_dash')
+def verify_email(request, token):
+    from django.contrib.auth.models import User
+    try:
+        verification = EmailVerification.objects.get(token=token)
+    except EmailVerification.DoesNotExist:
+        messages.error(request, 'Invalid verification link.')
+        return redirect('user_login')
+
+    if verification.verified:
+        messages.info(request, 'Your account is already verified. Please log in.')
+        return redirect('user_login')
+
+    if verification.is_expired():
+        messages.error(request, 'Verification link has expired. Please sign up again.')
+        verification.user.delete()
+        return redirect('user_get_started')
+
+    verification.verified = True
+    verification.save()
+    verification.user.is_active = True
+    verification.user.save()
+    login(request, verification.user, backend='django.contrib.auth.backends.ModelBackend')
+    messages.success(request, 'Your email has been verified! Welcome to Spotter.ai.')
+    return redirect('home_dash')
 
 
 def user_login(request):

@@ -61,7 +61,7 @@ class RegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('email', form.errors)
 
-    @unittest.skip('Email verification is temporarily disabled; users are created active')
+    @unittest.skip('Email verification is disabled by default; users are created active')
     def test_save_creates_inactive_user(self):
         form = RegistrationForm(data={
             'email': 'new@spotter.ai',
@@ -75,7 +75,6 @@ class RegistrationFormTests(TestCase):
         self.assertEqual(user.username, 'new@spotter.ai')
 
 
-@unittest.skip('Email verification is temporarily disabled — credentials not working')
 class EmailVerificationModelTests(TestCase):
     """Tests for the EmailVerification model"""
 
@@ -125,9 +124,9 @@ class SplashViewTests(TestCase):
         self.assertIn('home_dash', r.url)
 
 
-@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-class RegistrationViewTests(TestCase):
-    """Tests for the signup (Get Started) page"""
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', EMAIL_VERIFICATION_ENABLED=False)
+class RegistrationViewDisabledTests(TestCase):
+    """Tests for registration with email verification disabled (default for dev)"""
 
     def setUp(self):
         self.client = Client()
@@ -137,8 +136,7 @@ class RegistrationViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Get Started')
 
-    @unittest.skip('Email verification is temporarily disabled; registration redirects to login directly')
-    def test_successful_registration(self):
+    def test_successful_registration_auto_activates_user(self):
         r = self.client.post('/user_get_started/', {
             'email': 'new@spotter.ai',
             'password': 'securepass123',
@@ -146,34 +144,22 @@ class RegistrationViewTests(TestCase):
         })
         self.assertEqual(r.status_code, 302)
         user = User.objects.get(username='new@spotter.ai')
-        self.assertFalse(user.is_active)
-        self.assertTrue(EmailVerification.objects.filter(user=user).exists())
+        self.assertTrue(user.is_active)
+        verification = EmailVerification.objects.get(user=user)
+        self.assertTrue(verification.verified)
 
-    @unittest.skip('Email verification is temporarily disabled; no verification email is sent')
-    def test_registration_sends_email(self):
-        from django.core import mail
+    def test_user_can_login_immediately(self):
         self.client.post('/user_get_started/', {
-            'email': 'email@spotter.ai',
+            'email': 'immediate@spotter.ai',
             'password': 'securepass123',
             'confirm_password': 'securepass123',
         })
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('Verify', mail.outbox[0].subject)
-        self.assertIn('email@spotter.ai', mail.outbox[0].to)
-
-    @unittest.skip('Email verification is temporarily disabled; SMTP rollback path is not exercised')
-    def test_registration_rolls_back_when_email_send_fails(self):
-        with patch('core.views.send_mail', side_effect=smtplib.SMTPException('smtp unavailable')):
-            r = self.client.post('/user_get_started/', {
-                'email': 'failmail@spotter.ai',
-                'password': 'securepass123',
-                'confirm_password': 'securepass123',
-            })
-
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'We could not send your verification email right now.')
-        self.assertFalse(User.objects.filter(username='failmail@spotter.ai').exists())
-        self.assertFalse(EmailVerification.objects.filter(user__username='failmail@spotter.ai').exists())
+        r = self.client.post('/user_login/', {
+            'email': 'immediate@spotter.ai',
+            'password': 'securepass123',
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('home_dash', r.url)
 
     def test_duplicate_email_rejected(self):
         User.objects.create_user(username='dup@spotter.ai', email='dup@spotter.ai', password='pass12345')
@@ -200,9 +186,52 @@ class RegistrationViewTests(TestCase):
         self.assertEqual(r.status_code, 302)
 
 
-@unittest.skip('Email verification is temporarily disabled — credentials not working')
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', EMAIL_VERIFICATION_ENABLED=True)
+class RegistrationViewEnabledTests(TestCase):
+    """Tests for registration with email verification enabled"""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_successful_registration_creates_inactive_user(self):
+        r = self.client.post('/user_get_started/', {
+            'email': 'enabled@spotter.ai',
+            'password': 'securepass123',
+            'confirm_password': 'securepass123',
+        })
+        self.assertEqual(r.status_code, 302)
+        user = User.objects.get(username='enabled@spotter.ai')
+        self.assertFalse(user.is_active)
+        self.assertTrue(EmailVerification.objects.filter(user=user).exists())
+
+    def test_registration_sends_email(self):
+        from django.core import mail
+        self.client.post('/user_get_started/', {
+            'email': 'email@spotter.ai',
+            'password': 'securepass123',
+            'confirm_password': 'securepass123',
+        })
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Verify', mail.outbox[0].subject)
+        self.assertIn('email@spotter.ai', mail.outbox[0].to)
+
+    def test_registration_rolls_back_when_email_send_fails(self):
+        with patch('core.views.send_mail', side_effect=smtplib.SMTPException('smtp unavailable')):
+            r = self.client.post('/user_get_started/', {
+                'email': 'failmail@spotter.ai',
+                'password': 'securepass123',
+                'confirm_password': 'securepass123',
+            })
+
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'We could not create your account right now.')
+        self.assertFalse(User.objects.filter(username='failmail@spotter.ai').exists())
+        self.assertFalse(EmailVerification.objects.filter(user__username='failmail@spotter.ai').exists())
+
+
+@override_settings(EMAIL_VERIFICATION_ENABLED=True)
 class EmailVerificationViewTests(TestCase):
-    """Tests for the email verification link"""
+    """Tests for the email verification link when enabled"""
 
     def setUp(self):
         self.client = Client()

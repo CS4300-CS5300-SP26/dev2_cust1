@@ -17,7 +17,7 @@ urlpatterns = [
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),
     path('ai/', views.chat_page, name='ai_page'),
     path('social/', views.social_page, name='social_page'),
-    # path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),  # Email verification temporarily disabled
+    path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),
     # Social login shortcuts
     path('login/google/', RedirectView.as_view(url='/accounts/google/login/', query_string=True), name='google_login'),
     path('login/apple/', RedirectView.as_view(url='/accounts/apple/login/', query_string=True), name='apple_login'),
