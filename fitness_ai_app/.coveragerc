@@ -2,6 +2,9 @@
 source = core
 omit =
     core/migrations/*
+    core/tests.py
+    core/management/commands/test_all.py
+    features/*
 
 [report]
 show_missing = True
