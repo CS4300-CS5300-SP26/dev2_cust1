@@ -10,6 +10,12 @@ A Django-based fitness AI web application.
 Visit http://localhost:3000 to see the app running
 
 
+## Setup The SMTP email varification
+
+1. After running the "setup_and_run.sh," you will see the ".env" file in the "DEV2_CUST1" directory.
+2. make sure you stop your server first by pressing "CTRL + C" on the terminal that you ran the setup.
+3. Ask Ranis to DM you the 16 digit code to paste into the ".env" file so you can run tests with email verifications
+
 
 # Run tests
 
