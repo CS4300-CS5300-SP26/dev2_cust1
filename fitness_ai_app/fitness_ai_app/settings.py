@@ -17,9 +17,9 @@ from dotenv import load_dotenv
 
 import dj_database_url
 
-# Load .env.dev file from project root
+# Load .env file from project root
 BASE_DIR = Path(__file__).resolve().parent.parent
-ENV_PATH = BASE_DIR / '.env.dev'
+ENV_PATH = BASE_DIR / '.env'
 load_dotenv(ENV_PATH)
 
 

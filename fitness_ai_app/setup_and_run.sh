@@ -8,11 +8,11 @@ source ~/venv_dev2-cust1/bin/activate
 pip install -r requirements.txt
 
 # Create .env file if it doesn't exist
-if [ ! -f ./.env.dev ]; then
-  cp ./.env.example ./.env.dev
+if [ ! -f ./.env ]; then
+  cp ./.env.example ./.env
   echo "############################ Don't forget to set up the environment passwords ###########################"
 else
-  echo "✓ .env.dev file already exists"
+  echo "✓ .env file already exists"
 fi
 
 python manage.py migrate

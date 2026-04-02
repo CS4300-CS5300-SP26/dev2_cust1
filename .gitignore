@@ -10,7 +10,6 @@ env/
 venv/
 ENV/
 venv_*/
-fitness_ai_app/.env.dev
 
 # Django
 *.sqlite3
@@ -42,4 +41,7 @@ nosetests.xml
 
 # ssh
 .ssh/
+
+# Git Files
+.gitconfig
 
