@@ -3,6 +3,40 @@
 {% block title %}Get Started - Spotter.ai{% endblock %}
 
 {% block content %}
+<style>
+    .spinner {
+        display: none;
+        width: 18px;
+        height: 18px;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        border-top: 3px solid var(--white);
+        border-right: 3px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        animation: spinSmooth 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        margin-right: 10px;
+    }
+
+    .btn.loading {
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .btn.loading .spinner {
+        display: inline-block;
+    }
+
+    @keyframes spinSmooth {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .button-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
 <div class="title">Get Started</div>
 <div class="desc">Create your Spotter.ai account and begin your fitness journey!</div>
 {% if form.non_field_errors %}
@@ -14,7 +48,7 @@
     {% endfor %}
 </div>
 {% endif %}
-<form method="post" action="{% url 'user_get_started' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
+<form method="post" action="{% url 'user_get_started' %}" id="signupForm" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
     {% csrf_token %}
     <input type="email" name="email" placeholder="Email" value="{{ form.email.value|default:'' }}" required class="form-input">
     {% if form.email.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.email.errors.0 }}</div>{% endif %}
@@ -22,9 +56,24 @@
     {% if form.password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.password.errors.0 }}</div>{% endif %}
     <input type="password" name="confirm_password" placeholder="Confirm Password" required class="form-input">
     {% if form.confirm_password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.confirm_password.errors.0 }}</div>{% endif %}
-    <button type="submit" class="btn btn-primary" style="margin-top:12px;">Create Account</button>
+    <button type="submit" id="signupBtn" class="btn btn-primary" style="margin-top:12px;">
+        <div class="button-content">
+            <span class="spinner"></span>
+            <span id="signupBtnText">Create Account</span>
+        </div>
+    </button>
 </form>
 <a href="{% url 'user_login' %}" class="btn btn-primary" style="max-width:320px;background:transparent;border:2px solid var(--harvest-orange);color:var(--harvest-orange);">Already have an account? Log In</a>
 
 {% include "core/includes/social_auth_buttons.html" with divider_text="or sign up with" %}
+
+<script>
+    document.getElementById('signupForm').addEventListener('submit', function() {
+        const btn = document.getElementById('signupBtn');
+        const btnText = document.getElementById('signupBtnText');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        btnText.textContent = 'Creating account...';
+    });
+</script>
 {% endblock %}

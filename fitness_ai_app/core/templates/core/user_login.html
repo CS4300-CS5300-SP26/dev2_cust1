@@ -3,18 +3,67 @@
 {% block title %}Log In - Spotter.ai{% endblock %}
 
 {% block content %}
+<style>
+    .spinner {
+        display: none;
+        width: 18px;
+        height: 18px;
+        border: 3px solid rgba(255, 255, 255, 0.25);
+        border-top: 3px solid var(--white);
+        border-right: 3px solid rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        animation: spinSmooth 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        margin-right: 10px;
+    }
+
+    .btn.loading {
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .btn.loading .spinner {
+        display: inline-block;
+    }
+
+    @keyframes spinSmooth {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .button-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
 <div class="title">Log In</div>
 <div class="desc">Sign in to your Spotter.ai account to continue.</div>
-<form method="post" action="{% url 'user_login' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
+<form method="post" action="{% url 'user_login' %}" id="loginForm" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
     {% csrf_token %}
     <input type="email" name="email" placeholder="Email" required class="form-input">
     <div style="display:flex;flex-direction:column;gap:8px;">
         <input type="password" name="password" placeholder="Password" required class="form-input">
         <a href="{% url 'forgot_password' %}" style="color:var(--harvest-orange);font-size:0.85rem;text-decoration:none;align-self:flex-end;">Forgot password?</a>
     </div>
-    <button type="submit" class="btn btn-primary" style="margin-top:18px;">Log In</button>
+    <button type="submit" id="loginBtn" class="btn btn-primary" style="margin-top:18px;">
+        <div class="button-content">
+            <span class="spinner"></span>
+            <span id="btnText">Log In</span>
+        </div>
+    </button>
 </form>
 <a href="{% url 'user_get_started' %}" style="color:var(--harvest-orange);font-size:0.95rem;text-decoration:none;">Don't have an account? Sign Up</a>
 
 {% include "core/includes/social_auth_buttons.html" with divider_text="or continue with" %}
+
+<script>
+    document.getElementById('loginForm').addEventListener('submit', function() {
+        const btn = document.getElementById('loginBtn');
+        const btnText = document.getElementById('btnText');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        btnText.textContent = 'Signing in...';
+    });
+</script>
 {% endblock %}
