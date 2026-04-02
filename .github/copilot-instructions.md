@@ -54,6 +54,8 @@ Key conventions / patterns
   - Behave steps rely on Django models and the test database (use behave-django integration). Tests may mock environment variables using mock.patch.dict.
 - Management commands:
   - test_all is the canonical way to run both unit and BDD tests for CI parity; prefer it when reproducing CI locally.
+- Test-driven development:
+  - **Always add or update tests whenever implementing new features or modifying existing features.** Run `python manage.py test_all` after changes to ensure all tests pass and coverage is maintained.
 
 AI/assistant-specific notes
 - When suggesting code changes that affect runtime behavior (settings, env vars, DB), ensure changes are reflected in setup_and_run.sh, README.md, and .github workflows to keep parity.
