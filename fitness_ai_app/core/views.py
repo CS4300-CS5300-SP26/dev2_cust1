@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import random
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -183,6 +185,8 @@ def forgot_password(request):
         form = ForgotPasswordForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data['email']
+            start_time = time.time()
+            
             try:
                 user = User.objects.get(username=email)
                 
@@ -212,6 +216,12 @@ def forgot_password(request):
                 )
             except User.DoesNotExist:
                 logger.warning(f'Password reset requested for non-existent email: {email}')
+            
+            # Random delay between 0.5 and 3 seconds to prevent timing attacks
+            elapsed = time.time() - start_time
+            target_delay = random.uniform(0.5, 2.0)
+            if elapsed < target_delay:
+                time.sleep(target_delay - elapsed)
             
             messages.success(request, 'If an account exists with that email, you will receive a password reset link.')
             return redirect('user_login')
