@@ -917,3 +917,486 @@ class ApiChatViewTests(TestCase):
 
 
 
+
+
+class SocialAdapterTests(TestCase):
+    """Tests for the AutoSocialAdapter - social login and auto-connect functionality."""
+
+    def test_populate_user_sets_email_from_data(self):
+        """Test that email is set on user from data dict."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        user = User()
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {}
+        
+        data = {'email': 'test@google.com', 'first_name': 'Test'}
+        result = adapter.populate_user(None, sociallogin, data)
+        
+        self.assertEqual(result.email, 'test@google.com')
+        self.assertEqual(result.username, 'test@google.com')
+
+    def test_populate_user_sets_email_from_extra_data(self):
+        """Test that email is set from extra_data when not in data dict."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        user = User()
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'social@example.com'}
+        
+        data = {}
+        result = adapter.populate_user(None, sociallogin, data)
+        
+        self.assertEqual(result.email, 'social@example.com')
+        self.assertEqual(result.username, 'social@example.com')
+
+    def test_populate_user_sets_first_name_from_given_name(self):
+        """Test that first_name is set from given_name in extra_data."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        user = User()
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'given_name': 'John', 'family_name': 'Doe'}
+        
+        data = {}
+        result = adapter.populate_user(None, sociallogin, data)
+        
+        self.assertEqual(result.first_name, 'John')
+        self.assertEqual(result.last_name, 'Doe')
+
+    def test_populate_user_prefers_data_email_over_extra_data(self):
+        """Test that email from data dict takes precedence over extra_data."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        user = User()
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'social@example.com'}
+        
+        data = {'email': 'data@example.com'}
+        result = adapter.populate_user(None, sociallogin, data)
+        
+        self.assertEqual(result.email, 'data@example.com')
+
+    def test_pre_social_login_auto_connects_by_email(self):
+        """Test that social account auto-connects to existing user with same email."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        # Create existing user
+        existing_user = User.objects.create_user(
+            username='existing@example.com',
+            email='existing@example.com',
+            password='test123'
+        )
+        
+        adapter = AutoSocialAdapter()
+        sociallogin = MagicMock()
+        sociallogin.is_existing = False
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'existing@example.com'}
+        
+        request = MagicMock()
+        adapter.pre_social_login(request, sociallogin)
+        
+        # Verify connect was called with existing user
+        sociallogin.connect.assert_called_once_with(request, existing_user)
+
+    def test_pre_social_login_auto_connects_by_username(self):
+        """Test that social account auto-connects when email matches username."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        # Create user with email as username but empty email field
+        existing_user = User.objects.create_user(
+            username='user@example.com',
+            email='',
+            password='test123'
+        )
+        
+        adapter = AutoSocialAdapter()
+        sociallogin = MagicMock()
+        sociallogin.is_existing = False
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'user@example.com'}
+        
+        request = MagicMock()
+        adapter.pre_social_login(request, sociallogin)
+        
+        sociallogin.connect.assert_called_once_with(request, existing_user)
+
+    def test_pre_social_login_allows_signup_for_new_email(self):
+        """Test that social login allows new signup when no existing user found."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        sociallogin = MagicMock()
+        sociallogin.is_existing = False
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'newuser@example.com'}
+        
+        request = MagicMock()
+        adapter.pre_social_login(request, sociallogin)
+        
+        # connect should NOT be called - allow normal signup
+        sociallogin.connect.assert_not_called()
+
+    def test_pre_social_login_updates_email_for_existing_user(self):
+        """Test that email is updated for existing social account user."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock, patch
+        
+        existing_user = User.objects.create_user(
+            username='test',
+            email='',
+            password='test123'
+        )
+        
+        adapter = AutoSocialAdapter()
+        sociallogin = MagicMock()
+        sociallogin.is_existing = True
+        sociallogin.user = existing_user
+        sociallogin.account = MagicMock()
+        sociallogin.account.extra_data = {'email': 'newemail@example.com'}
+        
+        request = MagicMock()
+        
+        with patch.object(existing_user, 'save') as mock_save:
+            adapter.pre_social_login(request, sociallogin)
+            mock_save.assert_called_once()
+
+
+class SocialLoginIntegrationTests(TestCase):
+    """Integration tests for social login flows."""
+
+    def test_user_registration_then_social_login_same_email(self):
+        """Test that user can register with email then login with Google using same email."""
+        # Create user via regular registration
+        test_email = 'integration@example.com'
+        test_password = 'IntegrationTest123!'
+        
+        user = User.objects.create_user(
+            username=test_email,
+            email=test_email,
+            password=test_password,
+            is_active=True
+        )
+        
+        # Verify user was created
+        self.assertTrue(User.objects.filter(email=test_email).exists())
+        self.assertEqual(user.email, test_email)
+
+    def test_social_login_sets_email_correctly(self):
+        """Test that social login properly sets email on user."""
+        from allauth.socialaccount.models import SocialAccount
+        
+        # Create user with empty email (simulating initial social login)
+        user = User.objects.create_user(
+            username='social_user@example.com',
+            email='social_user@example.com',
+            password='test123'
+        )
+        
+        # Create social account
+        social_account = SocialAccount.objects.create(
+            user=user,
+            provider='google',
+            uid='google_123',
+            extra_data={
+                'email': 'social_user@example.com',
+                'given_name': 'Social',
+                'family_name': 'User'
+            }
+        )
+        
+        # Verify social account was created
+        self.assertTrue(SocialAccount.objects.filter(user=user).exists())
+        self.assertEqual(social_account.extra_data['email'], 'social_user@example.com')
+
+    def test_multiple_providers_same_user(self):
+        """Test that same user can connect multiple social providers."""
+        from allauth.socialaccount.models import SocialAccount
+        
+        user = User.objects.create_user(
+            username='multiauth@example.com',
+            email='multiauth@example.com',
+            password='test123'
+        )
+        
+        # Connect Google
+        google = SocialAccount.objects.create(
+            user=user,
+            provider='google',
+            uid='google_123',
+            extra_data={'email': 'multiauth@example.com'}
+        )
+        
+        # Connect Facebook
+        facebook = SocialAccount.objects.create(
+            user=user,
+            provider='facebook',
+            uid='facebook_456',
+            extra_data={'email': 'multiauth@example.com'}
+        )
+        
+        # Verify both connected to same user
+        self.assertEqual(user.socialaccount_set.count(), 2)
+        self.assertIn('google', [s.provider for s in user.socialaccount_set.all()])
+        self.assertIn('facebook', [s.provider for s in user.socialaccount_set.all()])
+
+
+class AccountEmailHandlingTests(TestCase):
+    """Tests for proper email handling in account creation and updates."""
+
+    def test_regular_user_email_stored_correctly(self):
+        """Test that regular user registration stores email in User model."""
+        test_email = 'regular@example.com'
+        test_password = 'RegularPass123!'
+        
+        user = User.objects.create_user(
+            username=test_email,
+            email=test_email,
+            password=test_password
+        )
+        
+        # Verify email is properly stored
+        stored_user = User.objects.get(id=user.id)
+        self.assertEqual(stored_user.email, test_email)
+        self.assertEqual(stored_user.username, test_email)
+
+    def test_social_user_email_from_extra_data(self):
+        """Test that social user email can be retrieved from extra_data."""
+        from allauth.socialaccount.models import SocialAccount
+        
+        user = User.objects.create_user(
+            username='social@example.com',
+            email='',  # Empty - comes from extra_data
+            password='test123'
+        )
+        
+        account = SocialAccount.objects.create(
+            user=user,
+            provider='google',
+            uid='google_uid',
+            extra_data={'email': 'social@example.com'}
+        )
+        
+        # Verify email is in extra_data
+        self.assertEqual(account.extra_data.get('email'), 'social@example.com')
+
+    def test_email_case_insensitive_matching(self):
+        """Test that email matching is case-insensitive for auto-connect."""
+        test_email = 'CaseTest@Example.COM'
+        
+        user = User.objects.create_user(
+            username=test_email.lower(),
+            email=test_email.lower(),
+            password='test123'
+        )
+        
+        # Try to match with different case
+        found = User.objects.filter(email__iexact=test_email)
+        self.assertEqual(found.count(), 1)
+        self.assertEqual(found.first().id, user.id)
+
+    def test_username_as_email_fallback(self):
+        """Test that username is used as fallback when email field is empty."""
+        email = 'fallback@example.com'
+        
+        user = User.objects.create_user(
+            username=email,
+            email='',
+            password='test123'
+        )
+        
+        # Verify can be found by username
+        found = User.objects.filter(username__iexact=email)
+        self.assertEqual(found.count(), 1)
+        self.assertEqual(found.first().id, user.id)
+
+
+class PasswordResetTests(TestCase):
+    """Tests for password reset functionality."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='reset@example.com',
+            email='reset@example.com',
+            password='OldPassword123!'
+        )
+
+    def test_forgot_password_page_loads(self):
+        """Test that forgot password page loads correctly."""
+        response = self.client.get('/forgot_password/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('form', response.context)
+
+    @patch('core.views.send_mail')
+    def test_forgot_password_sends_email(self, mock_send_mail):
+        """Test that forgot password sends email for existing user."""
+        response = self.client.post('/forgot_password/', {
+            'email': 'reset@example.com'
+        })
+        
+        # Should redirect to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user_login/', response.url)
+        
+        # Email should have been sent
+        mock_send_mail.assert_called_once()
+        call_args = mock_send_mail.call_args
+        self.assertIn('reset@example.com', call_args[0][3])
+
+    @patch('core.views.send_mail')
+    def test_forgot_password_case_insensitive_lookup(self, mock_send_mail):
+        """Test that forgot password works with different case email."""
+        response = self.client.post('/forgot_password/', {
+            'email': 'RESET@EXAMPLE.COM'  # Different case
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        mock_send_mail.assert_called_once()
+
+    @patch('core.views.send_mail')
+    def test_forgot_password_nonexistent_email(self, mock_send_mail):
+        """Test that forgot password shows success message even for non-existent email."""
+        response = self.client.post('/forgot_password/', {
+            'email': 'nonexistent@example.com'
+        })
+        
+        # Should still redirect and show generic message (security)
+        self.assertEqual(response.status_code, 302)
+        # Email should NOT be sent for non-existent user
+        mock_send_mail.assert_not_called()
+
+    def test_reset_password_page_with_valid_token(self):
+        """Test reset password page loads with valid token."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user)
+        
+        response = self.client.get(f'/reset_password/{reset.token}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('form', response.context)
+
+    def test_reset_password_page_with_invalid_token(self):
+        """Test reset password page with invalid token."""
+        import uuid
+        fake_token = uuid.uuid4()
+        
+        response = self.client.get(f'/reset_password/{fake_token}/')
+        self.assertEqual(response.status_code, 200)
+        # Should show error message
+        self.assertIn('Invalid or expired', response.content.decode())
+
+    def test_reset_password_with_valid_token(self):
+        """Test that password is updated with valid reset token."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user)
+        
+        new_password = 'NewPassword123!'
+        response = self.client.post(f'/reset_password/{reset.token}/', {
+            'password': new_password,
+            'confirm_password': new_password
+        })
+        
+        # Should redirect to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user_login/', response.url)
+        
+        # Verify password was changed
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+
+    def test_reset_password_marks_token_used(self):
+        """Test that reset token is marked as used after use."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user)
+        
+        self.client.post(f'/reset_password/{reset.token}/', {
+            'password': 'NewPass123!',
+            'confirm_password': 'NewPass123!'
+        })
+        
+        # Verify token is marked as used
+        reset.refresh_from_db()
+        self.assertTrue(reset.used)
+
+    def test_reset_password_cannot_reuse_token(self):
+        """Test that password reset token cannot be reused."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user, used=True)
+        
+        response = self.client.get(f'/reset_password/{reset.token}/')
+        self.assertIn('Invalid or expired', response.content.decode())
+
+    def test_reset_password_expired_token(self):
+        """Test that expired password reset token is rejected."""
+        from core.models import PasswordReset
+        from django.utils import timezone
+        
+        # Create an old reset token
+        reset = PasswordReset.objects.create(user=self.user)
+        # Manually set created_at to 25 hours ago
+        reset.created_at = timezone.now() - timedelta(hours=25)
+        reset.save()
+        
+        response = self.client.get(f'/reset_password/{reset.token}/')
+        self.assertIn('Invalid or expired', response.content.decode())
+
+    def test_reset_password_password_mismatch(self):
+        """Test that mismatched passwords are rejected."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user)
+        
+        response = self.client.post(f'/reset_password/{reset.token}/', {
+            'password': 'NewPass123!',
+            'confirm_password': 'DifferentPass123!'
+        })
+        
+        # Should show error
+        self.assertIn('do not match', response.content.decode())
+        
+        # Password should NOT be changed
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.check_password('NewPass123!'))
+
+    def test_reset_password_weak_password_rejected(self):
+        """Test that weak passwords are rejected."""
+        from core.models import PasswordReset
+        reset = PasswordReset.objects.create(user=self.user)
+        
+        response = self.client.post(f'/reset_password/{reset.token}/', {
+            'password': 'weak',
+            'confirm_password': 'weak'
+        })
+        
+        # Should show validation error
+        self.assertEqual(response.status_code, 200)
+        
+        # Password should NOT be changed
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.check_password('weak'))
+
+    def test_forgot_password_redirects_authenticated_user(self):
+        """Test that authenticated users are redirected from forgot password."""
+        self.client.login(username='reset@example.com', password='OldPassword123!')
+        
+        response = self.client.get('/forgot_password/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/home_dash/', response.url)

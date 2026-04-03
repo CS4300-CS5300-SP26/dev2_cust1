@@ -187,35 +187,37 @@ def forgot_password(request):
             email = form.cleaned_data['email']
             start_time = time.time()
             
-            try:
-                user = User.objects.get(username=email)
-                
-                # Create password reset token
-                reset = PasswordReset.objects.create(user=user)
-                reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
-                
-                # Send reset email
-                html_message = f"""
-                <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                    <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                    <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
-                    <div style="text-align:center;margin:32px 0;">
-                        <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
+            # Case-insensitive lookup on both email and username fields
+            user = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).first()
+            
+            if user:
+                try:
+                    # Create password reset token
+                    reset = PasswordReset.objects.create(user=user)
+                    reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
+                    
+                    # Send reset email
+                    html_message = f"""
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
+                        </div>
+                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
                     </div>
-                    <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
-                </div>
-                """
-                
-                send_mail(
-                    'Reset your Spotter.ai password',
-                    f'Click this link to reset your password: {reset_url}',
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
-            except User.DoesNotExist:
-                logger.warning(f'Password reset requested for non-existent email: {email}')
+                    """
+                    
+                    send_mail(
+                        'Reset your Spotter.ai password',
+                        f'Click this link to reset your password: {reset_url}',
+                        settings.DEFAULT_FROM_EMAIL,
+                        [user.email],
+                        html_message=html_message,
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
             
             # Random delay between 0.5 and 3 seconds to prevent timing attacks
             elapsed = time.time() - start_time
@@ -235,16 +237,23 @@ def reset_password(request, token):
     try:
         reset = PasswordReset.objects.get(token=token)
     except PasswordReset.DoesNotExist:
-        messages.error(request, 'Invalid reset link.')
-        return redirect('user_login')
+        # Show error on template instead of redirecting
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
 
     if reset.used:
-        messages.info(request, 'This reset link has already been used. Please request a new one.')
-        return redirect('forgot_password')
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
 
     if reset.is_expired():
-        messages.error(request, 'Password reset link has expired. Please request a new one.')
-        return redirect('forgot_password')
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
 
     if request.method == 'POST':
         form = ResetPasswordForm(request.POST)

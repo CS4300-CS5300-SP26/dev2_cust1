@@ -3,40 +3,6 @@
 {% block title %}Log In - Spotter.ai{% endblock %}
 
 {% block content %}
-<style>
-    .spinner {
-        display: none;
-        width: 18px;
-        height: 18px;
-        border: 3px solid rgba(255, 255, 255, 0.25);
-        border-top: 3px solid var(--white);
-        border-right: 3px solid rgba(255, 255, 255, 0.5);
-        border-radius: 50%;
-        animation: spinSmooth 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
-        margin-right: 10px;
-    }
-
-    .btn.loading {
-        opacity: 0.85;
-        pointer-events: none;
-    }
-
-    .btn.loading .spinner {
-        display: inline-block;
-    }
-
-    @keyframes spinSmooth {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .button-content {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-</style>
-
 <div class="title">Log In</div>
 <div class="desc">Sign in to your Spotter.ai account to continue.</div>
 <form method="post" action="{% url 'user_login' %}" id="loginForm" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
@@ -57,13 +23,5 @@
 
 {% include "core/includes/social_auth_buttons.html" with divider_text="or continue with" %}
 
-<script>
-    document.getElementById('loginForm').addEventListener('submit', function() {
-        const btn = document.getElementById('loginBtn');
-        const btnText = document.getElementById('btnText');
-        btn.classList.add('loading');
-        btn.disabled = true;
-        btnText.textContent = 'Signing in...';
-    });
-</script>
+{% include "core/includes/auth_form_loader.html" %}
 {% endblock %}

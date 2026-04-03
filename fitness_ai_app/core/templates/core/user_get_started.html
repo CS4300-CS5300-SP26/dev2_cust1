@@ -3,40 +3,6 @@
 {% block title %}Get Started - Spotter.ai{% endblock %}
 
 {% block content %}
-<style>
-    .spinner {
-        display: none;
-        width: 18px;
-        height: 18px;
-        border: 3px solid rgba(255, 255, 255, 0.25);
-        border-top: 3px solid var(--white);
-        border-right: 3px solid rgba(255, 255, 255, 0.5);
-        border-radius: 50%;
-        animation: spinSmooth 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
-        margin-right: 10px;
-    }
-
-    .btn.loading {
-        opacity: 0.85;
-        pointer-events: none;
-    }
-
-    .btn.loading .spinner {
-        display: inline-block;
-    }
-
-    @keyframes spinSmooth {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .button-content {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-</style>
-
 <div class="title">Get Started</div>
 <div class="desc">Create your Spotter.ai account and begin your fitness journey!</div>
 {% if form.non_field_errors %}
@@ -67,13 +33,5 @@
 
 {% include "core/includes/social_auth_buttons.html" with divider_text="or sign up with" %}
 
-<script>
-    document.getElementById('signupForm').addEventListener('submit', function() {
-        const btn = document.getElementById('signupBtn');
-        const btnText = document.getElementById('signupBtnText');
-        btn.classList.add('loading');
-        btn.disabled = true;
-        btnText.textContent = 'Creating account...';
-    });
-</script>
+{% include "core/includes/auth_form_loader.html" %}
 {% endblock %}
