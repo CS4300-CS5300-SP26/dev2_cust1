@@ -45,3 +45,5 @@ nosetests.xml
 # Git Files
 .gitconfig
 
+# Copilot instructions
+copilot-instructions.md

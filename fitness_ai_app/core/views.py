@@ -21,7 +21,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm
-from .models import Meal, FoodItem
+from .models import Meal, FoodItem, Workout, Exercise
 
 
 
@@ -188,7 +188,149 @@ def home_dash(request):
 
 @login_required
 def train_page(request):
-    return render(request, 'train_dir/train_page.html', {'active_tab': 'train'})
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+
+    workouts = (
+        Workout.objects.filter(user=request.user, date=selected_date)
+        .prefetch_related('exercises')
+    )
+
+    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    context = {
+        'active_tab': 'train',
+        'selected_date': selected_date,
+        'date_string': selected_date.strftime('%Y-%m-%d'),
+        'prev_date': prev_date,
+        'next_date': next_date,
+        'workouts': workouts,
+    }
+    return render(request, 'train_dir/train_page.html', context)
+
+
+@login_required
+@require_POST
+def add_workout(request):
+    workout_name = request.POST.get('workout_name', '').strip()
+    goal = request.POST.get('goal', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_name or not goal or not date_param:
+        messages.error(request, 'Workout name, goal, and date are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    try:
+        workout_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Invalid date format.')
+        return redirect(reverse('train_page'))
+
+    Workout.objects.create(user=request.user, name=workout_name, goal=goal, status=status, date=workout_date)
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def delete_workout(request):
+    workout_id = request.POST.get('workout_id')
+    date_param = request.POST.get('date')
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+    workout.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def add_exercise(request):
+    workout_id = request.POST.get('workout_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+
+    Exercise.objects.create(
+        workout=workout,
+        name=exercise_name,
+        muscle_group=muscle_group,
+        sets=int(sets) if sets else None,
+        reps=int(reps) if reps else None,
+        weight=int(weight) if weight else None,
+        completed=(status == 'completed'),
+    )
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def edit_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not exercise_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.name = exercise_name
+    exercise.muscle_group = muscle_group
+    exercise.sets = int(sets) if sets else None
+    exercise.reps = int(reps) if reps else None
+    exercise.weight = int(weight) if weight else None
+    exercise.completed = (status == 'completed')
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def toggle_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.completed = not exercise.completed
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def delete_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
 
 @login_required
