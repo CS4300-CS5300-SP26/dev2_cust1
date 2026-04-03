@@ -282,7 +282,25 @@ def user_logout(request):
 
 @login_required
 def home_dash(request):
-    return render(request, 'home_dash_dir/home_dash.html', {'active_tab': 'home'})
+    from datetime import date
+    from django.db.models import Sum
+    
+    today = date.today()
+    total_calories = FoodItem.objects.filter(
+        meal__user=request.user,
+        meal__date=today,
+        completed=True
+    ).aggregate(total=Sum('calories'))['total'] or 0
+    
+    calorie_goal = 2400
+    calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
+    
+    return render(request, 'home_dash_dir/home_dash.html', {
+        'active_tab': 'home',
+        'total_calories': total_calories,
+        'calorie_goal': calorie_goal,
+        'calories_percentage': calories_percentage
+    })
 
 
 @login_required
