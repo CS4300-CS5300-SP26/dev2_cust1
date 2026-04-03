@@ -1,6 +1,56 @@
 {% extends "core/base_app.html" %}
+{% load static %}
 
 {% block title %}Train - Spotter.ai{% endblock %}
+
+{% block page_css %}
+{{ block.super }}
+<style>
+  .top-logo {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-logo img {
+    width: 48px;
+    height: auto;
+  }
+  .top-logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .top-logo-text h1 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin: 0;
+    color: #f67d26;
+    letter-spacing: -0.5px;
+  }
+  .top-logo-text p {
+    font-size: 0.6rem;
+    margin: 0;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+{% endblock %}
+
+{% block pre_content %}
+<!-- Logo on same line as profile bubble -->
+<div class="top-logo">
+  <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai">
+  <div class="top-logo-text">
+    <h1>Training</h1>
+    <p>Workout</p>
+  </div>
+</div>
+{{ block.super }}
+{% endblock %}
 
 {% block content %}
 <div style="text-align:center;padding-top:40px;">
