@@ -353,6 +353,13 @@ class LogoutViewTests(TestCase):
         r = self.client.get('/home_dash/')
         self.assertEqual(r.status_code, 302)
 
+    def test_logout_shows_success_message(self):
+        """Test that logout shows success message."""
+        self.client.login(username='logout@spotter.ai', password='testpass123')
+        response = self.client.get('/user_logout/', follow=True)
+        messages = list(response.context['messages'])
+        self.assertTrue(any('logged out' in str(m).lower() for m in messages))
+
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class ProtectedPageTests(TestCase):
@@ -1081,6 +1088,111 @@ class SocialAdapterTests(TestCase):
             adapter.pre_social_login(request, sociallogin)
             mock_save.assert_called_once()
 
+    def test_save_user_sets_email_from_extra_data(self):
+        """Test that save_user sets email from extra_data when not on user."""
+        from core.adapter import AutoSocialAdapter
+        from allauth.socialaccount.models import SocialAccount
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        
+        # Create user without email
+        user = User(username='noname')
+        
+        # Create social account with email in extra_data
+        social_account = SocialAccount(
+            provider='google',
+            uid='123',
+            extra_data={'email': 'fromextra@example.com'}
+        )
+        
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = social_account
+        
+        request = MagicMock()
+        
+        # Call save_user (it calls super().save_user which may create user)
+        with patch.object(adapter.__class__.__bases__[0], 'save_user', return_value=user):
+            result = adapter.save_user(request, sociallogin, form=None)
+        
+        # Email should be set from extra_data
+        self.assertEqual(user.email, 'fromextra@example.com')
+    
+    def test_save_user_sets_username_from_email_when_no_username(self):
+        """Test that save_user sets username from email when user has no username."""
+        from core.adapter import AutoSocialAdapter
+        from allauth.socialaccount.models import SocialAccount
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        
+        # Create user without email OR username
+        user = User()
+        user.email = ''
+        user.username = ''
+        
+        # Create social account with email in extra_data
+        social_account = SocialAccount(
+            provider='google',
+            uid='456',
+            extra_data={'email': 'setusername@example.com'}
+        )
+        
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = social_account
+        
+        request = MagicMock()
+        
+        # Call save_user
+        with patch.object(adapter.__class__.__bases__[0], 'save_user', return_value=user):
+            result = adapter.save_user(request, sociallogin, form=None)
+        
+        # Username should be set from email
+        self.assertEqual(user.username, 'setusername@example.com')
+    
+    def test_pre_social_login_no_email_returns_early(self):
+        """Test that pre_social_login returns early when no email available."""
+        from core.adapter import AutoSocialAdapter
+        from allauth.socialaccount.models import SocialAccount
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        
+        user = User(username='test')
+        
+        social_account = SocialAccount(
+            provider='google',
+            uid='123',
+            extra_data={}  # No email
+        )
+        
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        sociallogin.account = social_account
+        sociallogin.is_existing = False
+        
+        request = MagicMock()
+        
+        # Should not raise and should return without connecting
+        adapter.pre_social_login(request, sociallogin)
+        
+        # connect should not have been called
+        sociallogin.connect.assert_not_called()
+    
+    def test_is_auto_signup_allowed_returns_true(self):
+        """Test that is_auto_signup_allowed returns True."""
+        from core.adapter import AutoSocialAdapter
+        from unittest.mock import MagicMock
+        
+        adapter = AutoSocialAdapter()
+        request = MagicMock()
+        sociallogin = MagicMock()
+        
+        result = adapter.is_auto_signup_allowed(request, sociallogin)
+        self.assertTrue(result)
+
 
 class SocialLoginIntegrationTests(TestCase):
     """Integration tests for social login flows."""
@@ -1400,3 +1512,517 @@ class PasswordResetTests(TestCase):
         response = self.client.get('/forgot_password/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/home_dash/', response.url)
+
+
+# ==================================================================================
+# ADDITIONAL COVERAGE TESTS - Views and Management Commands
+# ==================================================================================
+
+class ChatPageViewTests(TestCase):
+    """Tests for the chat_page view."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='chatuser@example.com',
+            email='chatuser@example.com',
+            password='TestPass123!'
+        )
+        self.user.is_active = True
+        self.user.save()
+    
+    def test_chat_page_requires_login(self):
+        """Test that chat page requires authentication."""
+        response = self.client.get('/ai/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('user_login', response.url)
+    
+    def test_chat_page_loads_for_authenticated_user(self):
+        """Test that chat page loads for logged in user."""
+        self.client.login(username='chatuser@example.com', password='TestPass123!')
+        response = self.client.get('/ai/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/chat.html')
+
+
+class HomeDashViewTests(TestCase):
+    """Tests for the home_dash view."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='dashuser@example.com',
+            email='dashuser@example.com',
+            password='TestPass123!'
+        )
+        self.user.is_active = True
+        self.user.save()
+    
+    def test_home_dash_requires_login(self):
+        """Test that home_dash requires authentication."""
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('user_login', response.url)
+    
+    def test_home_dash_loads_for_authenticated_user(self):
+        """Test that home_dash loads for logged in user."""
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['active_tab'], 'home')
+
+
+class TrainPageViewTests(TestCase):
+    """Tests for the train_page view."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='trainuser@example.com',
+            email='trainuser@example.com',
+            password='TestPass123!'
+        )
+        self.user.is_active = True
+        self.user.save()
+    
+    def test_train_page_requires_login(self):
+        """Test that train page requires authentication."""
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('user_login', response.url)
+    
+    def test_train_page_loads_for_authenticated_user(self):
+        """Test that train page loads for logged in user."""
+        self.client.login(username='trainuser@example.com', password='TestPass123!')
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['active_tab'], 'train')
+
+
+class SocialPageViewTests(TestCase):
+    """Tests for the social_page view."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='socialuser@example.com',
+            email='socialuser@example.com',
+            password='TestPass123!'
+        )
+        self.user.is_active = True
+        self.user.save()
+    
+    def test_social_page_requires_login(self):
+        """Test that social page requires authentication."""
+        response = self.client.get('/social/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('user_login', response.url)
+    
+    def test_social_page_loads_for_authenticated_user(self):
+        """Test that social page loads for logged in user."""
+        self.client.login(username='socialuser@example.com', password='TestPass123!')
+        response = self.client.get('/social/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['active_tab'], 'social')
+
+
+class VerifyEmailViewDetailedTests(TestCase):
+    """Additional detailed tests for verify_email view."""
+    
+    def setUp(self):
+        from .models import EmailVerification
+        
+        self.user = User.objects.create_user(
+            username='verifydetail@example.com',
+            email='verifydetail@example.com',
+            password='TestPass123!',
+            is_active=False
+        )
+        self.verification = EmailVerification.objects.create(user=self.user)
+    
+    def test_verify_email_already_verified(self):
+        """Test that already verified email shows info message."""
+        self.verification.verified = True
+        self.verification.save()
+        
+        response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('already verified' in str(m).lower() for m in messages))
+    
+    def test_verify_email_expired(self):
+        """Test that expired verification link is handled."""
+        # Expire the verification by setting created_at to 25 hours ago
+        self.verification.created_at = timezone.now() - timedelta(hours=25)
+        self.verification.save()
+        
+        response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('expired' in str(m).lower() for m in messages))
+        
+        # User should be deleted
+        self.assertFalse(User.objects.filter(username='verifydetail@example.com').exists())
+    
+    def test_verify_email_invalid_token(self):
+        """Test that invalid token shows error."""
+        invalid_token = uuid.uuid4()
+        
+        response = self.client.get(f'/verify_email/{invalid_token}/', follow=True)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('invalid' in str(m).lower() for m in messages))
+    
+    def test_verify_email_success_activates_user(self):
+        """Test that successful verification activates user."""
+        response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
+        
+        # User should be active now
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
+        
+        # Verification should be marked as verified
+        self.verification.refresh_from_db()
+        self.assertTrue(self.verification.verified)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('verified' in str(m).lower() for m in messages))
+
+
+class UserLoginViewDetailedTests(TestCase):
+    """Additional detailed tests for user_login view."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='logindetail@example.com',
+            email='logindetail@example.com',
+            password='TestPass123!'
+        )
+        self.user.is_active = True
+        self.user.save()
+    
+    def test_login_redirects_authenticated_user(self):
+        """Test that authenticated user is redirected from login page."""
+        self.client.login(username='logindetail@example.com', password='TestPass123!')
+        
+        response = self.client.get('/user_login/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/home_dash/', response.url)
+    
+    def test_login_with_next_parameter(self):
+        """Test that login redirects to next parameter after success."""
+        response = self.client.post('/user_login/?next=/nutrition/', {
+            'email': 'logindetail@example.com',
+            'password': 'TestPass123!'
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/nutrition/', response.url)
+    
+    def test_login_invalid_credentials_shows_error(self):
+        """Test that invalid credentials show error message."""
+        response = self.client.post('/user_login/', {
+            'email': 'logindetail@example.com',
+            'password': 'WrongPassword'
+        }, follow=True)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('invalid' in str(m).lower() for m in messages))
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class UserGetStartedViewDetailedTests(TestCase):
+    """Additional detailed tests for user_get_started view."""
+    
+    def test_get_started_redirects_authenticated_user(self):
+        """Test that authenticated user is redirected from signup page."""
+        user = User.objects.create_user(
+            username='existinguser@example.com',
+            email='existinguser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='existinguser@example.com', password='TestPass123!')
+        
+        response = self.client.get('/user_get_started/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/home_dash/', response.url)
+    
+    @override_settings(EMAIL_VERIFICATION_ENABLED=False)
+    def test_signup_without_email_verification(self):
+        """Test signup flow when email verification is disabled."""
+        response = self.client.post('/user_get_started/', {
+            'email': 'newuser@example.com',
+            'password': 'SecurePass123!',
+            'confirm_password': 'SecurePass123!'
+        }, follow=True)
+        
+        # User should be created and active
+        user = User.objects.get(username='newuser@example.com')
+        self.assertTrue(user.is_active)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('created' in str(m).lower() for m in messages))
+    
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    @patch('core.views.send_mail')
+    def test_signup_with_email_verification(self, mock_send_mail):
+        """Test signup flow when email verification is enabled."""
+        mock_send_mail.return_value = 1
+        
+        response = self.client.post('/user_get_started/', {
+            'email': 'verifyuser@example.com',
+            'password': 'SecurePass123!',
+            'confirm_password': 'SecurePass123!'
+        }, follow=True)
+        
+        # User should be created but NOT active
+        user = User.objects.get(username='verifyuser@example.com')
+        self.assertFalse(user.is_active)
+        
+        # Email should have been sent
+        self.assertTrue(mock_send_mail.called)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('verify' in str(m).lower() or 'check' in str(m).lower() for m in messages))
+    
+    @override_settings(EMAIL_VERIFICATION_ENABLED=True)
+    @patch('core.views.send_mail')
+    def test_signup_email_failure_shows_error(self, mock_send_mail):
+        """Test that email failure during signup is handled."""
+        mock_send_mail.side_effect = smtplib.SMTPException('SMTP error')
+        
+        response = self.client.post('/user_get_started/', {
+            'email': 'emailfail@example.com',
+            'password': 'SecurePass123!',
+            'confirm_password': 'SecurePass123!'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('form', response.context)
+
+
+class ForgotPasswordEmailErrorTests(TestCase):
+    """Tests for forgot_password email sending error handling."""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='emailerror@example.com',
+            email='emailerror@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+    
+    @patch('core.views.send_mail')
+    def test_forgot_password_email_failure_is_logged(self, mock_send_mail):
+        """Test that email failure during password reset is handled gracefully."""
+        mock_send_mail.side_effect = smtplib.SMTPException('SMTP unavailable')
+        
+        response = self.client.post('/forgot_password/', {
+            'email': 'emailerror@example.com'
+        }, follow=True)
+        
+        # Should still show success message (security - don't reveal if account exists)
+        messages = list(response.context['messages'])
+        self.assertTrue(any('if an account exists' in str(m).lower() for m in messages))
+
+
+class SetupSocialAppsCommandTests(TestCase):
+    """Tests for the setup_social_apps management command."""
+    
+    def test_command_runs_without_credentials(self):
+        """Test that command runs successfully even without credentials."""
+        from django.core.management import call_command
+        from io import StringIO
+        
+        out = StringIO()
+        
+        # Clear any existing env vars
+        with patch.dict('os.environ', {}, clear=True):
+            call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('Setting up social authentication', output)
+        self.assertIn('complete', output.lower())
+    
+    @patch.dict('os.environ', {
+        'GOOGLE_CLIENT_ID': 'test-google-id',
+        'GOOGLE_CLIENT_SECRET': 'test-google-secret'
+    })
+    def test_command_creates_google_app(self):
+        """Test that command creates Google social app."""
+        from django.core.management import call_command
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('Google', output)
+        
+        # Verify SocialApp was created
+        self.assertTrue(SocialApp.objects.filter(provider='google').exists())
+        app = SocialApp.objects.get(provider='google')
+        self.assertEqual(app.client_id, 'test-google-id')
+    
+    @patch.dict('os.environ', {
+        'GOOGLE_CLIENT_ID': 'updated-google-id',
+        'GOOGLE_CLIENT_SECRET': 'updated-google-secret'
+    })
+    def test_command_updates_existing_app(self):
+        """Test that command updates existing social app."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        # Create existing app
+        site = Site.objects.get_or_create(id=1)[0]
+        existing_app = SocialApp.objects.create(
+            provider='google',
+            name='Google',
+            client_id='old-id',
+            secret='old-secret'
+        )
+        existing_app.sites.set([site])
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('updated', output.lower())
+        
+        # Verify app was updated
+        existing_app.refresh_from_db()
+        self.assertEqual(existing_app.client_id, 'updated-google-id')
+    
+    @patch.dict('os.environ', {
+        'APPLE_CLIENT_ID': 'test-apple-id',
+        'APPLE_CLIENT_SECRET': 'test-apple-secret'
+    })
+    def test_command_creates_apple_app(self):
+        """Test that command creates Apple social app."""
+        from django.core.management import call_command
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('Apple', output)
+        
+        self.assertTrue(SocialApp.objects.filter(provider='apple').exists())
+    
+    @patch.dict('os.environ', {
+        'FACEBOOK_CLIENT_ID': 'test-fb-id',
+        'FACEBOOK_CLIENT_SECRET': 'test-fb-secret'
+    })
+    def test_command_creates_facebook_app(self):
+        """Test that command creates Facebook social app."""
+        from django.core.management import call_command
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('Facebook', output)
+        
+        self.assertTrue(SocialApp.objects.filter(provider='facebook').exists())
+    
+    @patch.dict('os.environ', {
+        'INSTAGRAM_CLIENT_ID': 'test-insta-id',
+        'INSTAGRAM_CLIENT_SECRET': 'test-insta-secret'
+    })
+    def test_command_creates_instagram_app(self):
+        """Test that command creates Instagram social app."""
+        from django.core.management import call_command
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('Instagram', output)
+        
+        self.assertTrue(SocialApp.objects.filter(provider='instagram').exists())
+    
+    @patch.dict('os.environ', {
+        'APPLE_CLIENT_ID': 'updated-apple-id',
+        'APPLE_CLIENT_SECRET': 'updated-apple-secret'
+    })
+    def test_command_updates_existing_apple_app(self):
+        """Test that command updates existing Apple social app."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        site = Site.objects.get_or_create(id=1)[0]
+        existing_app = SocialApp.objects.create(
+            provider='apple',
+            name='Apple',
+            client_id='old-apple-id',
+            secret='old-apple-secret'
+        )
+        existing_app.sites.set([site])
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        existing_app.refresh_from_db()
+        self.assertEqual(existing_app.client_id, 'updated-apple-id')
+    
+    @patch.dict('os.environ', {
+        'FACEBOOK_CLIENT_ID': 'updated-fb-id',
+        'FACEBOOK_CLIENT_SECRET': 'updated-fb-secret'
+    })
+    def test_command_updates_existing_facebook_app(self):
+        """Test that command updates existing Facebook social app."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        site = Site.objects.get_or_create(id=1)[0]
+        existing_app = SocialApp.objects.create(
+            provider='facebook',
+            name='Facebook',
+            client_id='old-fb-id',
+            secret='old-fb-secret'
+        )
+        existing_app.sites.set([site])
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        existing_app.refresh_from_db()
+        self.assertEqual(existing_app.client_id, 'updated-fb-id')
+    
+    @patch.dict('os.environ', {
+        'INSTAGRAM_CLIENT_ID': 'updated-insta-id',
+        'INSTAGRAM_CLIENT_SECRET': 'updated-insta-secret'
+    })
+    def test_command_updates_existing_instagram_app(self):
+        """Test that command updates existing Instagram social app."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from allauth.socialaccount.models import SocialApp
+        from io import StringIO
+        
+        site = Site.objects.get_or_create(id=1)[0]
+        existing_app = SocialApp.objects.create(
+            provider='instagram',
+            name='Instagram',
+            client_id='old-insta-id',
+            secret='old-insta-secret'
+        )
+        existing_app.sites.set([site])
+        
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+        
+        existing_app.refresh_from_db()
+        self.assertEqual(existing_app.client_id, 'updated-insta-id')
+
+
