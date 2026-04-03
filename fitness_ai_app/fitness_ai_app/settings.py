@@ -210,7 +210,12 @@ SOCIALACCOUNT_ADAPTER = 'core.adapter.AutoSocialAdapter'
 LOGIN_REDIRECT_URL = '/home_dash/'
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-SOCIALACCOUNT_PROVIDERS = {}
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
 
 # Email verification setting for development
 EMAIL_VERIFICATION_ENABLED = env_bool('EMAIL_VERIFICATION_ENABLED', False)

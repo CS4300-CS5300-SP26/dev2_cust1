@@ -914,3 +914,6 @@ class ApiChatViewTests(TestCase):
         )
         self.assertEqual(r.status_code, 502)
         self.assertIn('error', r.json())
+
+
+
