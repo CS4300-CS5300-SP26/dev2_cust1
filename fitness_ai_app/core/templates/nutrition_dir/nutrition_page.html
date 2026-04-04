@@ -44,6 +44,12 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 <link rel="stylesheet" href="{% static 'css/nutrition_page.css' %}">
+<style>
+input[type="text"]::placeholder,
+input[type="number"]::placeholder {
+    color: rgba(255, 255, 255, 0.65) !important;
+}
+</style>
 {% endblock %}
 
 {% block pre_content %}
@@ -152,10 +158,10 @@
             </div>
 
             <div id="addMealForm" style="display:none; margin-bottom:16px;">
-                <form method="POST" action="{% url 'add_meal' %}" style="background-color:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">
+                <form method="POST" action="{% url 'add_meal' %}" style="background-color:var(--card);border:1px solid #444;border-radius:12px;padding:16px;">
                     {% csrf_token %}
                     <input type="hidden" name="date" value="{{ date_string }}">
-                    <input type="text" name="meal_name" placeholder="Meal name (e.g., Breakfast)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
+                    <input type="text" name="meal_name" placeholder="Meal name (e.g., Breakfast)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #444;border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
                     <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:8px;color:white;font-weight:600;cursor:pointer;">Add Meal</button>
                 </form>
             </div>
@@ -181,7 +187,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="item_id" value="{{ item.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid #666;border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
                                         {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
@@ -202,12 +208,12 @@
                             {% endfor %}
                         </div>
                         <div class="add-food-form" style="display:none;">
-                            <form method="POST" action="{% url 'add_food_item' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
+                            <form method="POST" action="{% url 'add_food_item' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid #444;">
                                 {% csrf_token %}
                                 <input type="hidden" name="meal_id" value="{{ meal.id }}">
                                 <input type="hidden" name="date" value="{{ date_string }}">
-                                <input type="text" name="food_name" placeholder="Food name" required style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                <input type="number" name="food_calories" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <input type="text" name="food_name" placeholder="Food name" required style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #444;border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <input type="number" name="food_calories" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #444;border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
                             </form>
                         </div>
