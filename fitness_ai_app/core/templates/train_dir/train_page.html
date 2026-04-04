@@ -94,9 +94,9 @@
                                 <span class="workout-name">{{ workout.name }}</span>
                                 <div class="workout-meta">
                                     <span class="workout-goal">{{ workout.get_goal_display }}</span>
-                                    <span class="workout-status {% if workout.status == 'completed' %}status-completed{% else %}status-planned{% endif %}">{{ workout.get_status_display }}</span>
                                 </div>
                             </div>
+                            {% if not is_past_date %}
                             <div class="workout-actions">
                                 <button class="workout-edit-btn" type="button" data-toggle-sibling="add-exercise-form" title="Add exercise">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -116,10 +116,16 @@
                                     </button>
                                 </form>
                             </div>
+                            {% endif %}
                         </div>
                         <div class="exercise-items-list">
                             {% for exercise in workout.exercises.all %}
                             <div class="exercise-item {% if exercise.completed %}completed{% endif %}">
+                                {% if is_past_date %}
+                                <div class="checkbox {% if exercise.completed %}checked{% endif %}" style="width:16px;height:16px;border:1px solid var(--border);border-radius:3px;flex-shrink:0;{% if exercise.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                    {% if exercise.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
+                                </div>
+                                {% else %}
                                 <form method="POST" action="{% url 'toggle_exercise' %}" style="display:flex;align-items:center;">
                                     {% csrf_token %}
                                     <input type="hidden" name="exercise_id" value="{{ exercise.id }}">
@@ -128,6 +134,7 @@
                                         {% if exercise.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
+                                {% endif %}
                                 <div class="exercise-details">
                                     <span class="exercise-name">{{ exercise.name }}</span>
                                     <span class="exercise-muscle">{{ exercise.get_muscle_group_display }}</span>
@@ -137,6 +144,7 @@
                                     {% if exercise.reps %}<span class="stat">{{ exercise.reps }} Reps</span>{% endif %}
                                     {% if exercise.weight %}<span class="stat">{{ exercise.weight }} lb</span>{% endif %}
                                 </div>
+                                {% if not is_past_date %}
                                 <button type="button" class="edit-exercise-btn" data-exercise-id="{{ exercise.id }}" title="Edit exercise">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M12 20h9"></path>
@@ -154,7 +162,9 @@
                                         </svg>
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
+                            {% if not is_past_date %}
                             <!-- Edit form for this exercise (hidden by default) -->
                             <div class="edit-exercise-form" id="editExercise{{ exercise.id }}" style="display:none;">
                                 <form method="POST" action="{% url 'edit_exercise' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-bottom:1px solid var(--border);">
@@ -185,12 +195,14 @@
                                     </div>
                                 </form>
                             </div>
+                            {% endif %}
                             {% empty %}
                             <div class="no-exercises">
                                 <p>No exercises added yet</p>
                             </div>
                             {% endfor %}
                         </div>
+                        {% if not is_past_date %}
                         <div class="add-exercise-form" style="display:none;">
                             <form method="POST" action="{% url 'add_exercise' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
                                 {% csrf_token %}
@@ -211,13 +223,10 @@
                                     <input type="number" name="reps" placeholder="Reps" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                     <input type="number" name="weight" placeholder="Weight (lb)" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 </div>
-                                <select name="status" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;cursor:pointer;">
-                                    <option value="planned" selected>Planned</option>
-                                    <option value="completed">Completed</option>
-                                </select>
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Exercise</button>
                             </form>
                         </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 {% else %}
@@ -228,6 +237,7 @@
             </div>
 
             <!-- Log a Workout Button -->
+            {% if not is_past_date %}
             <button class="log-workout-btn" type="button" data-toggle-target="addWorkoutForm" title="Log a new workout">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -235,6 +245,7 @@
                 </svg>
                 <span>Log a workout</span>
             </button>
+            {% endif %}
         </div>
     </div>
 </div>

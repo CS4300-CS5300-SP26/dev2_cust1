@@ -204,6 +204,7 @@ def train_page(request):
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    is_past_date = selected_date < date.today()
 
     context = {
         'active_tab': 'train',
@@ -212,6 +213,7 @@ def train_page(request):
         'prev_date': prev_date,
         'next_date': next_date,
         'workouts': workouts,
+        'is_past_date': is_past_date,
     }
     return render(request, 'train_dir/train_page.html', context)
 
