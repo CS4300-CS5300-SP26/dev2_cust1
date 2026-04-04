@@ -914,3 +914,188 @@ class ApiChatViewTests(TestCase):
         )
         self.assertEqual(r.status_code, 502)
         self.assertIn('error', r.json())
+
+
+# ---------------------------------------------------------------------------
+#  Food Database Views – Coverage Tests
+# ---------------------------------------------------------------------------
+from datetime import date
+from django.urls import reverse
+from .models import Meal, FoodItem
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class FoodDatabaseViewsCoverageTests(TestCase):
+    """Tests for search_foods, get_all_foods, and save_food_to_database views"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='foodtest@spotter.ai',
+            email='foodtest@spotter.ai',
+            password='testpass123'
+        )
+        self.meal = Meal.objects.create(
+            user=self.user,
+            name='Test Meal',
+            date=date.today()
+        )
+        self.client.login(username='foodtest@spotter.ai', password='testpass123')
+
+    # -------------------------------------------------------------------------
+    # search_foods tests
+    # -------------------------------------------------------------------------
+    def test_search_foods_empty_for_short_query(self):
+        """search_foods returns empty results when query is less than 2 characters"""
+        # Create a food item to ensure it's not returned
+        FoodItem.objects.create(meal=self.meal, name='Apple', calories=95)
+
+        # Query with 0 characters
+        r = self.client.get(reverse('search_foods'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['results'], [])
+
+        # Query with 1 character
+        r = self.client.get(reverse('search_foods'), {'q': 'A'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['results'], [])
+
+    def test_search_foods_deduplicates_by_name_prefers_more_macros(self):
+        """search_foods deduplicates by name (case-insensitive) and prefers entry with more macros"""
+        # Create two items with same name (different case), one with more macros
+        FoodItem.objects.create(
+            meal=self.meal, name='chicken breast', calories=165,
+            protein=0, carbs=0, fats=0
+        )
+        FoodItem.objects.create(
+            meal=self.meal, name='Chicken Breast', calories=165,
+            protein=31, carbs=0, fats=3
+        )
+
+        r = self.client.get(reverse('search_foods'), {'q': 'chicken'})
+        self.assertEqual(r.status_code, 200)
+        results = r.json()['results']
+
+        # Should return only one result (deduplicated)
+        self.assertEqual(len(results), 1)
+        # Should prefer the one with more macros filled in
+        self.assertEqual(results[0]['protein'], 31)
+        self.assertEqual(results[0]['fats'], 3)
+
+    # -------------------------------------------------------------------------
+    # get_all_foods tests
+    # -------------------------------------------------------------------------
+    def test_get_all_foods_deduplicates_and_sorts_alphabetically(self):
+        """get_all_foods deduplicates and returns results sorted alphabetically"""
+        # Create foods in non-alphabetical order with duplicates
+        FoodItem.objects.create(meal=self.meal, name='Zebra Meat', calories=100)
+        FoodItem.objects.create(meal=self.meal, name='Apple', calories=95, protein=0)
+        FoodItem.objects.create(meal=self.meal, name='apple', calories=95, protein=1)  # duplicate, more macros
+        FoodItem.objects.create(meal=self.meal, name='Banana', calories=105)
+
+        r = self.client.get(reverse('get_all_foods'))
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+
+        # Should have 3 unique foods (apple deduplicated)
+        self.assertEqual(data['count'], 3)
+
+        # Should be sorted alphabetically (case-insensitive)
+        names = [f['name'].lower() for f in data['foods']]
+        self.assertEqual(names, sorted(names))
+
+        # The apple entry should have protein=1 (the one with more macros)
+        apple_entry = next(f for f in data['foods'] if f['name'].lower() == 'apple')
+        self.assertEqual(apple_entry['protein'], 1)
+
+    # -------------------------------------------------------------------------
+    # save_food_to_database tests
+    # -------------------------------------------------------------------------
+    def test_save_food_rejects_invalid_json(self):
+        """save_food_to_database rejects invalid JSON with 400"""
+        r = self.client.post(
+            reverse('save_food_to_database'),
+            data='not valid json',
+            content_type='application/json'
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json())
+
+    def test_save_food_rejects_missing_name(self):
+        """save_food_to_database rejects missing name with 400"""
+        r = self.client.post(
+            reverse('save_food_to_database'),
+            data=json.dumps({'calories': 100}),
+            content_type='application/json'
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json())
+        self.assertIn('name', r.json()['error'].lower())
+
+    def test_save_food_rejects_non_numeric_calories(self):
+        """save_food_to_database rejects non-numeric calorie values with 400"""
+        r = self.client.post(
+            reverse('save_food_to_database'),
+            data=json.dumps({'name': 'Test Food', 'calories': 'not-a-number'}),
+            content_type='application/json'
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json())
+
+    def test_save_food_creates_new_food_item(self):
+        """save_food_to_database creates a new FoodItem"""
+        r = self.client.post(
+            reverse('save_food_to_database'),
+            data=json.dumps({
+                'name': 'New Test Food',
+                'calories': 200,
+                'protein': 15,
+                'carbs': 20,
+                'fats': 10
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertIn('Added', data['message'])
+
+        # Verify food was created
+        self.assertTrue(FoodItem.objects.filter(name='New Test Food').exists())
+        food = FoodItem.objects.get(name='New Test Food')
+        self.assertEqual(food.calories, 200)
+        self.assertEqual(food.protein, 15)
+        self.assertEqual(food.carbs, 20)
+        self.assertEqual(food.fats, 10)
+
+    def test_save_food_updates_existing_food_item(self):
+        """save_food_to_database updates an existing FoodItem when id is provided"""
+        # Create initial food item
+        food = FoodItem.objects.create(
+            meal=self.meal, name='Original Name', calories=100,
+            protein=5, carbs=10, fats=2
+        )
+
+        r = self.client.post(
+            reverse('save_food_to_database'),
+            data=json.dumps({
+                'id': food.id,
+                'name': 'Updated Name',
+                'calories': 250,
+                'protein': 20,
+                'carbs': 30,
+                'fats': 8
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertIn('Updated', data['message'])
+
+        # Verify food was updated
+        food.refresh_from_db()
+        self.assertEqual(food.name, 'Updated Name')
+        self.assertEqual(food.calories, 250)
+        self.assertEqual(food.protein, 20)
+        self.assertEqual(food.carbs, 30)
+        self.assertEqual(food.fats, 8)
