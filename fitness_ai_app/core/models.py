@@ -30,6 +30,9 @@ class FoodItem(models.Model):
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=200)
     calories = models.PositiveIntegerField()
+    protein = models.PositiveIntegerField(default=0)
+    carbs = models.PositiveIntegerField(default=0)
+    fats = models.PositiveIntegerField(default=0)
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
 
