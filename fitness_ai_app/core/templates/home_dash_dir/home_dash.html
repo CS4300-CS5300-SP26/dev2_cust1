@@ -33,7 +33,7 @@
   .top-logo-text p {
     font-size: 0.6rem;
     margin: 0;
-    color: #888;
+    color: #bbb;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -55,14 +55,14 @@
 {% block content %}
 <div style="text-align:center;padding-top:40px;">
     <div style="font-size:1.5rem;font-weight:700;margin-bottom:6px;">Welcome, {{ request.user.first_name|default:request.user.email }}!</div>
-    <div style="font-size:1rem;color:rgba(255,255,255,0.65);margin-bottom:40px;">Your Spotter.ai dashboard</div>
+    <div style="font-size:1rem;color:rgba(255,255,255,0.85);margin-bottom:40px;">Your Spotter.ai dashboard</div>
     
     <!-- Today's Progress Container -->
     <div style="max-width:400px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;">
-        <div style="font-size:0.9rem;color:#888;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Today's Progress</div>
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Today's Progress</div>
         <div style="font-size:3rem;font-weight:700;color:#f67d26;margin-bottom:6px;">{{ total_calories }}</div>
-        <div style="font-size:0.9rem;color:#888;margin-bottom:10px;">Calories</div>
-        <div style="font-size:0.8rem;color:#555;">Goal: {{ calorie_goal }} kcal • {{ calories_percentage|floatformat:0 }}%</div>
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;">Calories</div>
+        <div style="font-size:0.8rem;color:#bbb;">Goal: {{ calorie_goal }} kcal • {{ calories_percentage|floatformat:0 }}%</div>
     </div>
     
     <!-- Quick Links -->
