@@ -8,23 +8,25 @@ source ~/venv_dev2-cust1/bin/activate
 pip install -r requirements.txt
 
 # Create .env file if it doesn't exist
-if [ ! -f ./.env ]; then
-  cp ./.env.example ./.env
-  echo ""
-  echo "🔑 New .env file created from .env.example"
-  echo "⚠️  IMPORTANT: Add your OAuth credentials to .env:"
-  echo "   - GOOGLE_CLIENT_ID"
-  echo "   - GOOGLE_CLIENT_SECRET"
-  echo "   - (and any other provider secrets)"
-  echo ""
-  echo "Then run this script again to register them."
-  echo "################################################################################"
-  exit 0
+if [ ! -f ../.env ]; then
+  cat > ../.env << 'EOF'
+# Gmail SMTP Configuration for Email Verification
+# Get these credentials from: https://myaccount.google.com/apppasswords
+# Steps:
+# 1. Enable 2-Step Verification in your Google Account
+# 2. Go to App passwords and generate a password for "Mail"
+# 3. Copy the 16-character password below (without spaces)
+
+EMAIL_HOST_USER=spotter.ai2026@gmail.com
+EMAIL_HOST_PASSWORD=your-16-character-app-password-here (ask Ranis)
+DEFAULT_FROM_EMAIL="Spotter.ai <spotter.ai2026@gmail.com>"
+EOF
+  echo "📧 Created .env file - Please add your Gmail App Password!"
+  echo "   Edit ../.env and replace EMAIL_HOST_PASSWORD with your actual password"
 else
   echo "✓ .env file already exists"
 fi
 
 python manage.py migrate
 python manage.py collectstatic --noinput
-python manage.py setup_social_apps
 python manage.py runserver 0.0.0.0:3000

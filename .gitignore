@@ -42,8 +42,3 @@ nosetests.xml
 # ssh
 .ssh/
 
-# Git Files
-.gitconfig
-
-# Copilot instructions
-copilot-instructions.md

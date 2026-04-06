@@ -21,80 +21,8 @@
         <div class="tab-bar">
             <button class="tab-button active" data-tab="today">Today</button>
             <button class="tab-button" data-tab="history">History</button>
-            <button class="tab-button" data-tab="search" id="searchTabBtn">Search</button>
+            <button class="tab-button" data-tab="search">Search</button>
             <button class="tab-button" data-tab="supplements">Supplements</button>
-        </div>
-    </div>
-
-    <!-- Food Search Modal -->
-    <div id="foodSearchModal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">
-        <div class="modal-content" style="background:#1a1a1a;border-radius:16px;width:90%;max-width:400px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
-            <!-- Modal Header -->
-            <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-                <h2 style="margin:0;font-size:18px;color:white;">Food Database</h2>
-                <button id="closeSearchModal" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;padding:0;line-height:1;">&times;</button>
-            </div>
-            
-            <!-- Search Input -->
-            <div style="padding:16px 20px;">
-                <div style="position:relative;">
-                    <input type="text" id="modalFoodSearch" placeholder="Search foods..." style="width:100%;padding:12px 40px 12px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);opacity:0.5;">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.35-4.35"></path>
-                    </svg>
-                </div>
-            </div>
-            
-            <!-- Search Results -->
-            <div id="modalSearchResults" style="flex:1;overflow-y:auto;padding:0 20px 16px;">
-                <p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>
-            </div>
-            
-            <!-- Edit Form (hidden by default) -->
-            <div id="foodEditForm" style="display:none;padding:16px 20px;border-top:1px solid var(--border);">
-                <input type="hidden" id="editFoodId">
-                <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Food Name</label>
-                    <input type="text" id="editFoodName" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                </div>
-                <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
-                    <input type="number" id="editFoodCalories" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
-                    <div>
-                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
-                        <input type="number" id="editFoodProtein" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Carbs (g)</label>
-                        <input type="number" id="editFoodCarbs" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
-                        <input type="number" id="editFoodFats" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
-                    </div>
-                </div>
-                <div style="display:flex;gap:8px;">
-                    <button id="cancelEditBtn" style="flex:1;padding:12px;background:transparent;border:1px solid var(--border);border-radius:8px;color:white;font-size:14px;cursor:pointer;">Cancel</button>
-                    <button id="saveFoodBtn" style="flex:1;padding:12px;background:var(--accent);border:none;border-radius:8px;color:white;font-size:14px;font-weight:600;cursor:pointer;">Save to Database</button>
-                </div>
-            </div>
-            
-            <!-- Add New Food Button -->
-            <div id="addNewFoodSection" style="padding:12px 20px 16px;border-top:1px solid var(--border);">
-                <button id="addNewFoodBtn" style="width:100%;padding:12px;background:transparent;border:2px dashed var(--border);border-radius:8px;color:var(--accent);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Add New Food to Database
-                </button>
-            </div>
-            
-            <!-- Status Message -->
-            <div id="modalStatusMessage" style="display:none;padding:12px 20px;text-align:center;font-size:13px;"></div>
         </div>
     </div>
 
@@ -145,19 +73,19 @@
             <label class="card-label">MACROS</label>
             <div class="macros-grid">
                 <div class="macro-pill protein-pill">
-                    <div class="macro-percentage" id="proteinPercent">{{ total_protein }}%</div>
+                    <div class="macro-percentage" id="proteinPercent">—</div>
                     <div class="macro-name">PROTEIN</div>
-                    <div class="macro-grams" id="proteinGrams">{{ total_protein }}g</div>
+                    <div class="macro-grams" id="proteinGrams">—g</div>
                 </div>
                 <div class="macro-pill carbs-pill">
-                    <div class="macro-percentage" id="carbsPercent">{{ total_carbs }}%</div>
+                    <div class="macro-percentage" id="carbsPercent">—</div>
                     <div class="macro-name">CARBS</div>
-                    <div class="macro-grams" id="carbsGrams">{{ total_carbs }}g</div>
+                    <div class="macro-grams" id="carbsGrams">—g</div>
                 </div>
                 <div class="macro-pill fat-pill">
-                    <div class="macro-percentage" id="fatPercent">{{ total_fats }}%</div>
+                    <div class="macro-percentage" id="fatPercent">—</div>
                     <div class="macro-name">FAT</div>
-                    <div class="macro-grams" id="fatGrams">{{ total_fats }}g</div>
+                    <div class="macro-grams" id="fatGrams">—g</div>
                 </div>
             </div>
         </div>
@@ -225,25 +153,12 @@
                             {% endfor %}
                         </div>
                         <div class="add-food-form" style="display:none;">
-                            <form method="POST" action="{% url 'add_food_item' %}" class="food-form" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
+                            <form method="POST" action="{% url 'add_food_item' %}" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
                                 {% csrf_token %}
                                 <input type="hidden" name="meal_id" value="{{ meal.id }}">
                                 <input type="hidden" name="date" value="{{ date_string }}">
-                                <!-- Search input with autocomplete -->
-                                <div class="food-search-container" style="position:relative;margin-bottom:8px;">
-                                    <input type="text" name="food_name" class="food-search-input" placeholder="Search or enter food name" required autocomplete="off" style="width:100%;padding:8px 32px 8px 8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;">
-                                        <circle cx="11" cy="11" r="8"></circle>
-                                        <path d="m21 21-4.35-4.35"></path>
-                                    </svg>
-                                    <div class="food-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background-color:#1a1a1a;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px;"></div>
-                                </div>
-                                <input type="number" name="food_calories" class="food-calories-input" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-                                    <input type="number" name="protein" class="food-protein-input" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <input type="number" name="carbs" class="food-carbs-input" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <input type="number" name="fats" class="food-fats-input" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                </div>
+                                <input type="text" name="food_name" placeholder="Food name" required style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <input type="number" name="food_calories" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
                             </form>
                         </div>
@@ -265,91 +180,14 @@
                 <span>Log a meal / supplement</span>
             </button>
         </div>
-
-        <!-- Food Database Card (Read-only list of all foods) -->
-        <div class="card food-database-card" style="margin-top:24px;">
-            <div class="section-header" style="margin-bottom:12px;">
-                <label class="card-label">FOOD DATABASE</label>
-                <span id="foodDatabaseCount" style="color:var(--textMuted);font-size:12px;margin-left:8px;">Loading...</span>
-            </div>
-            <div id="foodDatabaseList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);">
-                <div style="padding:20px;text-align:center;color:var(--textMuted);">
-                    <div class="loading-spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
-                    <p style="margin-top:8px;">Loading foods...</p>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
-
-<style>
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-.food-db-item {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:10px 12px;
-    border-bottom:1px solid var(--border);
-    transition:background-color 0.2s;
-}
-.food-db-item:last-child {
-    border-bottom:none;
-}
-.food-db-item:hover {
-    background-color:rgba(255,255,255,0.05);
-}
-.food-db-name {
-    font-weight:500;
-    color:white;
-    font-size:13px;
-    flex:1;
-}
-.food-db-macros {
-    font-size:11px;
-    color:var(--textMuted);
-    text-align:right;
-    white-space:nowrap;
-}
-</style>
 
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // Function to load all foods into the Food Database card
-    function loadFoodDatabase() {
-        const listEl = document.getElementById('foodDatabaseList');
-        const countEl = document.getElementById('foodDatabaseCount');
-        
-        fetch('/api/all_foods/')
-            .then(response => response.json())
-            .then(data => {
-                if (data.foods && data.foods.length > 0) {
-                    countEl.textContent = `(${data.count} items)`;
-                    listEl.innerHTML = data.foods.map(function(food) {
-                        return `<div class="food-db-item">
-                            <span class="food-db-name">${food.name}</span>
-                            <span class="food-db-macros">${food.calories} cal | P: ${food.protein || 0}g | C: ${food.carbs || 0}g | F: ${food.fats || 0}g</span>
-                        </div>`;
-                    }).join('');
-                } else {
-                    countEl.textContent = '(0 items)';
-                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No foods in database yet. Add foods using the Search tab!</div>';
-                }
-            })
-            .catch(function(err) {
-                console.error('Failed to load food database:', err);
-                countEl.textContent = '';
-                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load food database</div>';
-            });
-    }
-
-    // Load food database on page load
-    document.addEventListener('DOMContentLoaded', loadFoodDatabase);
-
     // Initialize flatpickr calendar picker
     var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
@@ -385,285 +223,6 @@
             if (form) {
                 form.style.display = form.style.display === 'none' ? 'block' : 'none';
             }
-        });
-    });
-
-    // Food search functionality (inline in meal cards)
-    let searchTimeout = null;
-    
-    document.querySelectorAll('.food-search-input').forEach(function(input) {
-        const container = input.closest('.food-search-container');
-        const resultsDiv = container.querySelector('.food-search-results');
-        const form = input.closest('.food-form');
-        
-        input.addEventListener('input', function() {
-            const query = this.value.trim();
-            
-            // Clear previous timeout
-            if (searchTimeout) clearTimeout(searchTimeout);
-            
-            if (query.length < 2) {
-                resultsDiv.style.display = 'none';
-                return;
-            }
-            
-            // Debounce search
-            searchTimeout = setTimeout(function() {
-                fetch('/api/search_foods/?q=' + encodeURIComponent(query))
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.results && data.results.length > 0) {
-                            resultsDiv.innerHTML = data.results.map(function(item) {
-                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
-                                    <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
-                                    <div style="font-size:11px;color:#888;margin-top:2px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
-                                </div>`;
-                            }).join('');
-                            resultsDiv.style.display = 'block';
-                            
-                            // Add click handlers for results
-                            resultsDiv.querySelectorAll('.food-search-item').forEach(function(item) {
-                                item.addEventListener('click', function() {
-                                    // Fill in the form fields
-                                    form.querySelector('.food-search-input').value = this.dataset.name;
-                                    form.querySelector('.food-calories-input').value = this.dataset.calories;
-                                    form.querySelector('.food-protein-input').value = this.dataset.protein;
-                                    form.querySelector('.food-carbs-input').value = this.dataset.carbs;
-                                    form.querySelector('.food-fats-input').value = this.dataset.fats;
-                                    resultsDiv.style.display = 'none';
-                                });
-                                
-                                // Hover effect
-                                item.addEventListener('mouseenter', function() {
-                                    this.style.backgroundColor = 'rgba(232, 92, 0, 0.15)';
-                                });
-                                item.addEventListener('mouseleave', function() {
-                                    this.style.backgroundColor = 'transparent';
-                                });
-                            });
-                        } else {
-                            resultsDiv.style.display = 'none';
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('Search error:', err);
-                        resultsDiv.style.display = 'none';
-                    });
-            }, 300);
-        });
-        
-        // Hide results when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!container.contains(e.target)) {
-                resultsDiv.style.display = 'none';
-            }
-        });
-    });
-
-    // ==================== FOOD SEARCH MODAL ====================
-    const modal = document.getElementById('foodSearchModal');
-    const searchTabBtn = document.getElementById('searchTabBtn');
-    const closeModalBtn = document.getElementById('closeSearchModal');
-    const modalSearchInput = document.getElementById('modalFoodSearch');
-    const modalSearchResults = document.getElementById('modalSearchResults');
-    const foodEditForm = document.getElementById('foodEditForm');
-    const addNewFoodSection = document.getElementById('addNewFoodSection');
-    const addNewFoodBtn = document.getElementById('addNewFoodBtn');
-    const cancelEditBtn = document.getElementById('cancelEditBtn');
-    const saveFoodBtn = document.getElementById('saveFoodBtn');
-    const statusMessage = document.getElementById('modalStatusMessage');
-    
-    let modalSearchTimeout = null;
-
-    // Open modal when Search tab is clicked
-    searchTabBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        modal.style.display = 'flex';
-        modalSearchInput.focus();
-    });
-
-    // Close modal
-    closeModalBtn.addEventListener('click', function() {
-        modal.style.display = 'none';
-        resetModalState();
-    });
-
-    // Close modal when clicking overlay
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-            resetModalState();
-        }
-    });
-
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.style.display === 'flex') {
-            modal.style.display = 'none';
-            resetModalState();
-        }
-    });
-
-    function resetModalState() {
-        modalSearchInput.value = '';
-        modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>';
-        foodEditForm.style.display = 'none';
-        addNewFoodSection.style.display = 'block';
-        statusMessage.style.display = 'none';
-    }
-
-    function showStatus(message, isError = false) {
-        statusMessage.textContent = message;
-        statusMessage.style.display = 'block';
-        statusMessage.style.color = isError ? '#e85c5c' : '#5ce85c';
-        setTimeout(() => {
-            statusMessage.style.display = 'none';
-        }, 3000);
-    }
-
-    // Modal search functionality
-    modalSearchInput.addEventListener('input', function() {
-        const query = this.value.trim();
-        
-        if (modalSearchTimeout) clearTimeout(modalSearchTimeout);
-        
-        if (query.length < 2) {
-            modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>';
-            return;
-        }
-        
-        modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Searching...</p>';
-        
-        modalSearchTimeout = setTimeout(function() {
-            fetch('/api/search_foods/?q=' + encodeURIComponent(query))
-                .then(response => response.json())
-                .then(data => {
-                    if (data.results && data.results.length > 0) {
-                        modalSearchResults.innerHTML = data.results.map(function(item) {
-                            return `<div class="modal-food-item" data-id="${item.id || ''}" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
-                                    <button class="edit-food-btn" style="background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">Edit</button>
-                                </div>
-                                <div style="font-size:12px;color:#888;margin-top:6px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
-                            </div>`;
-                        }).join('');
-                        
-                        // Add click handlers for edit buttons
-                        modalSearchResults.querySelectorAll('.edit-food-btn').forEach(function(btn) {
-                            btn.addEventListener('click', function(e) {
-                                e.stopPropagation();
-                                const item = this.closest('.modal-food-item');
-                                openEditForm(
-                                    item.dataset.id,
-                                    item.dataset.name,
-                                    item.dataset.calories,
-                                    item.dataset.protein,
-                                    item.dataset.carbs,
-                                    item.dataset.fats
-                                );
-                            });
-                        });
-                        
-                        // Hover effects
-                        modalSearchResults.querySelectorAll('.modal-food-item').forEach(function(item) {
-                            item.addEventListener('mouseenter', function() {
-                                this.style.borderColor = 'var(--accent)';
-                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.1)';
-                            });
-                            item.addEventListener('mouseleave', function() {
-                                this.style.borderColor = 'var(--border)';
-                                this.style.backgroundColor = 'transparent';
-                            });
-                        });
-                    } else {
-                        modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">No foods found. Add a new one below!</p>';
-                    }
-                })
-                .catch(function(err) {
-                    console.error('Search error:', err);
-                    modalSearchResults.innerHTML = '<p style="color:#e85c5c;text-align:center;padding:20px 0;">Search failed. Please try again.</p>';
-                });
-        }, 300);
-    });
-
-    function openEditForm(id, name, calories, protein, carbs, fats) {
-        document.getElementById('editFoodId').value = id || '';
-        document.getElementById('editFoodName').value = name || '';
-        document.getElementById('editFoodCalories').value = calories || '';
-        document.getElementById('editFoodProtein').value = protein || '';
-        document.getElementById('editFoodCarbs').value = carbs || '';
-        document.getElementById('editFoodFats').value = fats || '';
-        
-        foodEditForm.style.display = 'block';
-        addNewFoodSection.style.display = 'none';
-        document.getElementById('editFoodName').focus();
-    }
-
-    // Add new food button
-    addNewFoodBtn.addEventListener('click', function() {
-        openEditForm('', '', '', '', '', '');
-    });
-
-    // Cancel edit
-    cancelEditBtn.addEventListener('click', function() {
-        foodEditForm.style.display = 'none';
-        addNewFoodSection.style.display = 'block';
-    });
-
-    // Save food to database
-    saveFoodBtn.addEventListener('click', function() {
-        const foodData = {
-            id: document.getElementById('editFoodId').value || null,
-            name: document.getElementById('editFoodName').value.trim(),
-            calories: document.getElementById('editFoodCalories').value || 0,
-            protein: document.getElementById('editFoodProtein').value || 0,
-            carbs: document.getElementById('editFoodCarbs').value || 0,
-            fats: document.getElementById('editFoodFats').value || 0
-        };
-        
-        if (!foodData.name) {
-            showStatus('Food name is required', true);
-            return;
-        }
-        
-        saveFoodBtn.disabled = true;
-        saveFoodBtn.textContent = 'Saving...';
-        
-        fetch('/api/save_food/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify(foodData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            saveFoodBtn.disabled = false;
-            saveFoodBtn.textContent = 'Save to Database';
-            
-            if (data.success) {
-                showStatus(data.message);
-                foodEditForm.style.display = 'none';
-                addNewFoodSection.style.display = 'block';
-                
-                // Refresh search results if there's a query
-                if (modalSearchInput.value.trim().length >= 2) {
-                    modalSearchInput.dispatchEvent(new Event('input'));
-                }
-                
-                // Refresh the Food Database card
-                loadFoodDatabase();
-            } else {
-                showStatus(data.error || 'Failed to save', true);
-            }
-        })
-        .catch(function(err) {
-            console.error('Save error:', err);
-            saveFoodBtn.disabled = false;
-            saveFoodBtn.textContent = 'Save to Database';
-            showStatus('Failed to save. Please try again.', true);
         });
     });
 </script>
