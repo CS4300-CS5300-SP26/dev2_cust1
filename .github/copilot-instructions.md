@@ -60,3 +60,13 @@ Keep these files in sync:
 - `fitness_ai_app/.env.example`
 - `fitness_ai_app/setup_and_run.sh`
 - `.github/workflows/tests.yml`
+
+## Additional Conventions & Patterns
+
+- **Single-test targeting:** Use `python manage.py test core.tests.SomeTestClass.test_method` (Django test discovery) to run a single test.
+- **Coverage-first test flow:** Commands and hooks prefer running tests under coverage (`coverage run`) and appending BDD results with `--append`.
+- **Env file location:** `.env` is expected at repository root (`fitness_ai_app/settings.py` loads `BASE_DIR/.env`). Do not assume `fitness_ai_app/.env.dev`.
+- **Pre-commit behavior:** A repository pre-commit hook exists under `fitness_ai_app/hooks/pre-commit`. Use `install_hooks.sh` to copy it into `.git/hooks`.
+- **BDD step design:** Behave steps rely on Django models and the test database (use behave-django integration). Tests may mock environment variables using `mock.patch.dict`.
+- **Management commands:** `test_all` is the canonical way to run both unit and BDD tests for CI parity; prefer it when reproducing CI locally.
+- **Test-driven development:** **Always add or update tests whenever implementing new features or modifying existing features.** Run `python manage.py test_all` after changes to ensure all tests pass and coverage is maintained.

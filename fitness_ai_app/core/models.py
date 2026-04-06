@@ -13,6 +13,16 @@ class EmailVerification(models.Model):
         return timezone.now() > self.created_at + timezone.timedelta(hours=24)
 
 
+class PasswordReset(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_resets')
+    token = models.UUIDField(default=uuid.uuid4, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    used = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timezone.timedelta(hours=24)
+
+
 class Meal(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meals')
     name = models.CharField(max_length=100)
