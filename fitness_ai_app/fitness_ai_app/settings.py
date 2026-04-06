@@ -17,9 +17,9 @@ from dotenv import load_dotenv
 
 import dj_database_url
 
-# Load .env.dev file from project root
+# Load .env file from project root
 BASE_DIR = Path(__file__).resolve().parent.parent
-ENV_PATH = BASE_DIR / '.env.dev'
+ENV_PATH = BASE_DIR / '.env'
 load_dotenv(ENV_PATH)
 
 
@@ -214,32 +214,7 @@ SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
-        'APP': {
-            'client_id': os.getenv('GOOGLE_CLIENT_ID', ''),
-            'secret': os.getenv('GOOGLE_CLIENT_SECRET', ''),
-        },
-    },
-    'apple': {
-        'APP': {
-            'client_id': os.getenv('APPLE_CLIENT_ID', ''),
-            'secret': os.getenv('APPLE_CLIENT_SECRET', ''),
-            'key': os.getenv('APPLE_KEY_ID', ''),
-        },
-    },
-    'facebook': {
-        'METHOD': 'oauth2',
-        'SCOPE': ['email', 'public_profile'],
-        'APP': {
-            'client_id': os.getenv('FACEBOOK_CLIENT_ID', ''),
-            'secret': os.getenv('FACEBOOK_CLIENT_SECRET', ''),
-        },
-    },
-    'instagram': {
-        'APP': {
-            'client_id': os.getenv('INSTAGRAM_CLIENT_ID', ''),
-            'secret': os.getenv('INSTAGRAM_CLIENT_SECRET', ''),
-        },
-    },
+    }
 }
 
 # Email verification setting for development

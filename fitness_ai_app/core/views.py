@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import random
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -12,6 +14,7 @@ from datetime import datetime, date, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
@@ -20,9 +23,8 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.urls import reverse
 
-from .forms import RegistrationForm
-from .models import Meal, FoodItem
-
+from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset
 
 
 def splash(request):
@@ -63,6 +65,7 @@ def api_chat(request):
         return JsonResponse({"reply": reply})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
 from django.core.mail import send_mail
 from .models import EmailVerification
 
@@ -131,7 +134,6 @@ def user_get_started(request):
 
 
 def verify_email(request, token):
-    from django.contrib.auth.models import User
     try:
         verification = EmailVerification.objects.get(token=token)
     except EmailVerification.DoesNotExist:
@@ -175,6 +177,103 @@ def user_login(request):
     return render(request, 'core/user_login.html')
 
 
+def forgot_password(request):
+    if request.user.is_authenticated:
+        return redirect('home_dash')
+
+    if request.method == 'POST':
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            start_time = time.time()
+            
+            # Case-insensitive lookup on both email and username fields
+            user = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).first()
+            
+            if user:
+                try:
+                    # Create password reset token
+                    reset = PasswordReset.objects.create(user=user)
+                    reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
+                    
+                    # Send reset email
+                    html_message = f"""
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
+                        </div>
+                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
+                    </div>
+                    """
+                    
+                    send_mail(
+                        'Reset your Spotter.ai password',
+                        f'Click this link to reset your password: {reset_url}',
+                        settings.DEFAULT_FROM_EMAIL,
+                        [user.email],
+                        html_message=html_message,
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
+            
+            # Random delay between 0.5 and 3 seconds to prevent timing attacks
+            elapsed = time.time() - start_time
+            target_delay = random.uniform(0.5, 2.0)
+            if elapsed < target_delay:
+                time.sleep(target_delay - elapsed)
+            
+            messages.success(request, 'If an account exists with that email, you will receive a password reset link.')
+            return redirect('user_login')
+    else:
+        form = ForgotPasswordForm()
+
+    return render(request, 'core/forgot_password.html', {'form': form})
+
+
+def reset_password(request, token):
+    try:
+        reset = PasswordReset.objects.get(token=token)
+    except PasswordReset.DoesNotExist:
+        # Show error on template instead of redirecting
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
+
+    if reset.used:
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
+
+    if reset.is_expired():
+        return render(request, 'core/reset_password.html', {
+            'form': ResetPasswordForm(),
+            'error_message': 'Invalid or expired reset link. Please request a new one.'
+        })
+
+    if request.method == 'POST':
+        form = ResetPasswordForm(request.POST)
+        if form.is_valid():
+            password = form.cleaned_data['password']
+            user = reset.user
+            user.set_password(password)
+            user.save()
+            
+            reset.used = True
+            reset.save()
+            
+            messages.success(request, 'Your password has been reset. You can now log in.')
+            return redirect('user_login')
+    else:
+        form = ResetPasswordForm()
+
+    return render(request, 'core/reset_password.html', {'form': form})
+
+
 def user_logout(request):
     logout(request)
     messages.success(request, 'You have been logged out.')
@@ -188,7 +287,151 @@ def home_dash(request):
 
 @login_required
 def train_page(request):
-    return render(request, 'train_dir/train_page.html', {'active_tab': 'train'})
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+
+    workouts = (
+        Workout.objects.filter(user=request.user, date=selected_date)
+        .prefetch_related('exercises')
+    )
+
+    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    is_past_date = selected_date < date.today()
+
+    context = {
+        'active_tab': 'train',
+        'selected_date': selected_date,
+        'date_string': selected_date.strftime('%Y-%m-%d'),
+        'prev_date': prev_date,
+        'next_date': next_date,
+        'workouts': workouts,
+        'is_past_date': is_past_date,
+    }
+    return render(request, 'train_dir/train_page.html', context)
+
+
+@login_required
+@require_POST
+def add_workout(request):
+    workout_name = request.POST.get('workout_name', '').strip()
+    goal = request.POST.get('goal', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_name or not goal or not date_param:
+        messages.error(request, 'Workout name, goal, and date are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    try:
+        workout_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Invalid date format.')
+        return redirect(reverse('train_page'))
+
+    Workout.objects.create(user=request.user, name=workout_name, goal=goal, status=status, date=workout_date)
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def delete_workout(request):
+    workout_id = request.POST.get('workout_id')
+    date_param = request.POST.get('date')
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+    workout.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def add_exercise(request):
+    workout_id = request.POST.get('workout_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+
+    Exercise.objects.create(
+        workout=workout,
+        name=exercise_name,
+        muscle_group=muscle_group,
+        sets=int(sets) if sets else None,
+        reps=int(reps) if reps else None,
+        weight=int(weight) if weight else None,
+        completed=(status == 'completed'),
+    )
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def edit_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not exercise_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.name = exercise_name
+    exercise.muscle_group = muscle_group
+    exercise.sets = int(sets) if sets else None
+    exercise.reps = int(reps) if reps else None
+    exercise.weight = int(weight) if weight else None
+    exercise.completed = (status == 'completed')
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def toggle_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.completed = not exercise.completed
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def delete_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
 
 @login_required

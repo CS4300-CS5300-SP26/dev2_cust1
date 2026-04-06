@@ -13,6 +13,16 @@ class EmailVerification(models.Model):
         return timezone.now() > self.created_at + timezone.timedelta(hours=24)
 
 
+class PasswordReset(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_resets')
+    token = models.UUIDField(default=uuid.uuid4, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    used = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timezone.timedelta(hours=24)
+
+
 class Meal(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meals')
     name = models.CharField(max_length=100)
@@ -41,3 +51,56 @@ class FoodItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.calories} kcal)"
+
+
+class Workout(models.Model):
+    GOAL_CHOICES = [
+        ('strength', 'Strength Training'),
+        ('weight_loss', 'Weight Loss'),
+        ('flexibility', 'Flexibility'),
+        ('cardio', 'Cardio Health'),
+    ]
+
+    STATUS_CHOICES = [
+        ('planned', 'Planned'),
+        ('completed', 'Completed'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workouts')
+    name = models.CharField(max_length=100)
+    goal = models.CharField(max_length=20, choices=GOAL_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
+    date = models.DateField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.get_goal_display()} - {self.date}"
+
+
+class Exercise(models.Model):
+    MUSCLE_GROUP_CHOICES = [
+        ('arms', 'Arms'),
+        ('chest', 'Chest'),
+        ('back', 'Back'),
+        ('shoulders', 'Shoulders'),
+        ('legs', 'Legs'),
+        ('core', 'Core'),
+    ]
+
+    workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name='exercises')
+    name = models.CharField(max_length=200)
+    muscle_group = models.CharField(max_length=20, choices=MUSCLE_GROUP_CHOICES)
+    sets = models.PositiveIntegerField(null=True, blank=True)
+    reps = models.PositiveIntegerField(null=True, blank=True)
+    weight = models.PositiveIntegerField(null=True, blank=True)
+    completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.get_muscle_group_display()}"
