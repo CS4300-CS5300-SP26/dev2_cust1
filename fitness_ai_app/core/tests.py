@@ -923,6 +923,464 @@ class ApiChatViewTests(TestCase):
         self.assertIn('error', r.json())
 
 
+###########################################################################################################################################################################
+# Train Page Tests
+###########################################################################################################################################################################
+
+from datetime import date
+from .models import Workout, Exercise
+
+
+class TrainPageViewTests(TestCase):
+    """Tests for the train_page view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='trainuser',
+            email='train@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='trainuser', password='testpass123')
+
+    def test_train_page_requires_login(self):
+        """Test that train page requires authentication"""
+        self.client.logout()
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user_login', response.url)
+
+    def test_train_page_loads_today_by_default(self):
+        """Test that train page loads with today's date by default"""
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_date'], date.today())
+        self.assertFalse(response.context['is_past_date'])
+
+    def test_train_page_with_specific_date(self):
+        """Test that train page loads with a specific date parameter"""
+        response = self.client.get('/train/?date=2026-04-01')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['date_string'], '2026-04-01')
+
+    def test_train_page_invalid_date_falls_back_to_today(self):
+        """Test that invalid date parameter falls back to today"""
+        response = self.client.get('/train/?date=invalid-date')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_date'], date.today())
+
+    def test_train_page_past_date_is_flagged(self):
+        """Test that past dates are flagged with is_past_date=True"""
+        yesterday = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+        response = self.client.get(f'/train/?date={yesterday}')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_past_date'])
+
+    def test_train_page_future_date_not_flagged_as_past(self):
+        """Test that future dates have is_past_date=False"""
+        tomorrow = (date.today() + timedelta(days=1)).strftime('%Y-%m-%d')
+        response = self.client.get(f'/train/?date={tomorrow}')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['is_past_date'])
+
+    def test_train_page_displays_workouts_for_selected_date(self):
+        """Test that workouts are filtered by selected date"""
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        workout_today = Workout.objects.create(
+            user=self.user, name='Today Workout', goal='strength', date=today
+        )
+        workout_yesterday = Workout.objects.create(
+            user=self.user, name='Yesterday Workout', goal='cardio', date=yesterday
+        )
+
+        response = self.client.get('/train/')
+        workouts = list(response.context['workouts'])
+        self.assertEqual(len(workouts), 1)
+        self.assertEqual(workouts[0].name, 'Today Workout')
+
+    def test_train_page_prev_next_date_navigation(self):
+        """Test that prev_date and next_date are correctly calculated"""
+        response = self.client.get('/train/?date=2026-04-15')
+        self.assertEqual(response.context['prev_date'], '2026-04-14')
+        self.assertEqual(response.context['next_date'], '2026-04-16')
+
+
+class TrainPagePastDateReadOnlyTests(TestCase):
+    """Tests for read-only behavior on past dates"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='trainuser2',
+            email='train2@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='trainuser2', password='testpass123')
+        self.yesterday = date.today() - timedelta(days=1)
+        self.yesterday_str = self.yesterday.strftime('%Y-%m-%d')
+
+        self.past_workout = Workout.objects.create(
+            user=self.user, name='Past Workout', goal='strength', date=self.yesterday
+        )
+        self.past_exercise = Exercise.objects.create(
+            workout=self.past_workout,
+            name='Past Exercise',
+            muscle_group='arms',
+            sets=3,
+            reps=10
+        )
+
+    def test_past_date_hides_edit_buttons_in_template(self):
+        """Test that edit buttons are not rendered for past dates"""
+        response = self.client.get(f'/train/?date={self.yesterday_str}')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_past_date'])
+        # The edit button element should not appear in the HTML for past dates
+        self.assertNotContains(response, 'class="edit-exercise-btn"')
+
+    def test_past_date_hides_delete_buttons_in_template(self):
+        """Test that delete workout button is not rendered for past dates"""
+        response = self.client.get(f'/train/?date={self.yesterday_str}')
+        self.assertNotContains(response, 'workout-delete-btn')
+
+    def test_past_date_hides_add_exercise_button(self):
+        """Test that add exercise button is not rendered for past dates"""
+        response = self.client.get(f'/train/?date={self.yesterday_str}')
+        self.assertNotContains(response, 'workout-edit-btn')
+
+    def test_past_date_hides_log_workout_button(self):
+        """Test that log workout button is not rendered for past dates"""
+        response = self.client.get(f'/train/?date={self.yesterday_str}')
+        self.assertNotContains(response, 'log-workout-btn')
+
+    def test_current_date_shows_edit_buttons(self):
+        """Test that edit buttons are shown for current date"""
+        today = date.today()
+        workout = Workout.objects.create(
+            user=self.user, name='Today Workout', goal='strength', date=today
+        )
+        Exercise.objects.create(
+            workout=workout, name='Today Exercise', muscle_group='chest'
+        )
+
+        response = self.client.get('/train/')
+        self.assertFalse(response.context['is_past_date'])
+        self.assertContains(response, 'edit-exercise-btn')
+        self.assertContains(response, 'log-workout-btn')
+
+
+class AddWorkoutTests(TestCase):
+    """Tests for add_workout view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='workoutuser',
+            email='workout@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='workoutuser', password='testpass123')
+
+    def test_add_workout_requires_login(self):
+        """Test that add_workout requires authentication"""
+        self.client.logout()
+        response = self.client.post('/train/add_workout/', {})
+        self.assertEqual(response.status_code, 302)
+
+    def test_add_workout_requires_post(self):
+        """Test that add_workout only accepts POST requests"""
+        response = self.client.get('/train/add_workout/')
+        self.assertEqual(response.status_code, 405)
+
+    def test_add_workout_success(self):
+        """Test successful workout creation"""
+        response = self.client.post('/train/add_workout/', {
+            'workout_name': 'Morning Routine',
+            'goal': 'strength',
+            'status': 'planned',
+            'date': '2026-04-04',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Workout.objects.filter(name='Morning Routine').exists())
+
+    def test_add_workout_missing_fields(self):
+        """Test workout creation fails with missing fields"""
+        response = self.client.post('/train/add_workout/', {
+            'workout_name': '',
+            'goal': 'strength',
+            'date': '2026-04-04',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Workout.objects.filter(goal='strength').exists())
+
+    def test_add_workout_invalid_date(self):
+        """Test workout creation fails with invalid date"""
+        response = self.client.post('/train/add_workout/', {
+            'workout_name': 'Test Workout',
+            'goal': 'strength',
+            'date': 'invalid',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Workout.objects.filter(name='Test Workout').exists())
+
+
+class DeleteWorkoutTests(TestCase):
+    """Tests for delete_workout view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deleteuser',
+            email='delete@test.com',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            email='other@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deleteuser', password='testpass123')
+        self.workout = Workout.objects.create(
+            user=self.user, name='To Delete', goal='cardio', date=date.today()
+        )
+
+    def test_delete_workout_success(self):
+        """Test successful workout deletion"""
+        response = self.client.post('/train/delete_workout/', {
+            'workout_id': self.workout.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Workout.objects.filter(id=self.workout.id).exists())
+
+    def test_delete_workout_not_owned(self):
+        """Test cannot delete another user's workout"""
+        other_workout = Workout.objects.create(
+            user=self.other_user, name='Other Workout', goal='strength', date=date.today()
+        )
+        response = self.client.post('/train/delete_workout/', {
+            'workout_id': other_workout.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Workout.objects.filter(id=other_workout.id).exists())
+
+
+class AddExerciseTests(TestCase):
+    """Tests for add_exercise view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='exerciseuser',
+            email='exercise@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='exerciseuser', password='testpass123')
+        self.workout = Workout.objects.create(
+            user=self.user, name='Test Workout', goal='strength', date=date.today()
+        )
+
+    def test_add_exercise_success(self):
+        """Test successful exercise creation"""
+        response = self.client.post('/train/add_exercise/', {
+            'workout_id': self.workout.id,
+            'exercise_name': 'Bench Press',
+            'muscle_group': 'chest',
+            'sets': '3',
+            'reps': '10',
+            'weight': '135',
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        exercise = Exercise.objects.get(name='Bench Press')
+        self.assertEqual(exercise.sets, 3)
+        self.assertEqual(exercise.reps, 10)
+        self.assertEqual(exercise.weight, 135)
+        self.assertFalse(exercise.completed)
+
+    def test_add_exercise_minimal_fields(self):
+        """Test exercise creation with only required fields"""
+        response = self.client.post('/train/add_exercise/', {
+            'workout_id': self.workout.id,
+            'exercise_name': 'Pushups',
+            'muscle_group': 'chest',
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        exercise = Exercise.objects.get(name='Pushups')
+        self.assertIsNone(exercise.sets)
+        self.assertIsNone(exercise.reps)
+        self.assertIsNone(exercise.weight)
+
+    def test_add_exercise_missing_required(self):
+        """Test exercise creation fails without required fields"""
+        response = self.client.post('/train/add_exercise/', {
+            'workout_id': self.workout.id,
+            'exercise_name': '',
+            'muscle_group': 'chest',
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Exercise.objects.count(), 0)
+
+
+class EditExerciseTests(TestCase):
+    """Tests for edit_exercise view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='editexuser',
+            email='editex@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='editexuser', password='testpass123')
+        self.workout = Workout.objects.create(
+            user=self.user, name='Test Workout', goal='strength', date=date.today()
+        )
+        self.exercise = Exercise.objects.create(
+            workout=self.workout,
+            name='Original Exercise',
+            muscle_group='arms',
+            sets=3,
+            reps=10
+        )
+
+    def test_edit_exercise_success(self):
+        """Test successful exercise edit"""
+        response = self.client.post('/train/edit_exercise/', {
+            'exercise_id': self.exercise.id,
+            'exercise_name': 'Updated Exercise',
+            'muscle_group': 'chest',
+            'sets': '4',
+            'reps': '12',
+            'weight': '100',
+            'status': 'completed',
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.exercise.refresh_from_db()
+        self.assertEqual(self.exercise.name, 'Updated Exercise')
+        self.assertEqual(self.exercise.muscle_group, 'chest')
+        self.assertEqual(self.exercise.sets, 4)
+        self.assertEqual(self.exercise.reps, 12)
+        self.assertEqual(self.exercise.weight, 100)
+        self.assertTrue(self.exercise.completed)
+
+    def test_edit_exercise_not_owned(self):
+        """Test cannot edit another user's exercise"""
+        other_user = User.objects.create_user(
+            username='otherexuser', email='otherex@test.com', password='testpass123'
+        )
+        other_workout = Workout.objects.create(
+            user=other_user, name='Other Workout', goal='cardio', date=date.today()
+        )
+        other_exercise = Exercise.objects.create(
+            workout=other_workout, name='Other Exercise', muscle_group='legs'
+        )
+        response = self.client.post('/train/edit_exercise/', {
+            'exercise_id': other_exercise.id,
+            'exercise_name': 'Hacked Exercise',
+            'muscle_group': 'arms',
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 404)
+
+
+class ToggleExerciseTests(TestCase):
+    """Tests for toggle_exercise view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='toggleuser',
+            email='toggle@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='toggleuser', password='testpass123')
+        self.workout = Workout.objects.create(
+            user=self.user, name='Test Workout', goal='strength', date=date.today()
+        )
+        self.exercise = Exercise.objects.create(
+            workout=self.workout,
+            name='Toggle Exercise',
+            muscle_group='arms',
+            completed=False
+        )
+
+    def test_toggle_exercise_to_completed(self):
+        """Test toggling exercise from incomplete to completed"""
+        response = self.client.post('/train/toggle_exercise/', {
+            'exercise_id': self.exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.exercise.refresh_from_db()
+        self.assertTrue(self.exercise.completed)
+
+    def test_toggle_exercise_to_incomplete(self):
+        """Test toggling exercise from completed to incomplete"""
+        self.exercise.completed = True
+        self.exercise.save()
+
+        response = self.client.post('/train/toggle_exercise/', {
+            'exercise_id': self.exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.exercise.refresh_from_db()
+        self.assertFalse(self.exercise.completed)
+
+
+class DeleteExerciseTests(TestCase):
+    """Tests for delete_exercise view"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='delexuser',
+            email='delex@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='delexuser', password='testpass123')
+        self.workout = Workout.objects.create(
+            user=self.user, name='Test Workout', goal='strength', date=date.today()
+        )
+        self.exercise = Exercise.objects.create(
+            workout=self.workout,
+            name='To Delete',
+            muscle_group='arms'
+        )
+
+    def test_delete_exercise_success(self):
+        """Test successful exercise deletion"""
+        response = self.client.post('/train/delete_exercise/', {
+            'exercise_id': self.exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Exercise.objects.filter(id=self.exercise.id).exists())
+
+    def test_delete_exercise_not_owned(self):
+        """Test cannot delete another user's exercise"""
+        other_user = User.objects.create_user(
+            username='otherdeluser', email='otherdel@test.com', password='testpass123'
+        )
+        other_workout = Workout.objects.create(
+            user=other_user, name='Other Workout', goal='cardio', date=date.today()
+        )
+        other_exercise = Exercise.objects.create(
+            workout=other_workout, name='Other Exercise', muscle_group='legs'
+        )
+        response = self.client.post('/train/delete_exercise/', {
+            'exercise_id': other_exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Exercise.objects.filter(id=other_exercise.id).exists())
 
 
 
