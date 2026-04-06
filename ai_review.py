@@ -41,7 +41,7 @@ try:
         model="gpt-5.1-codex-mini",
         instructions=(
             "You are an expert software engineer performing a code review "
-            "on a Django project. Provide concise, actionable feedback."
+            "on a Django project. Provide concise, actionable feedback for students. Use wording that juniors in college can understand and teach concepts."
         ),
         input=(
             "Provide concise, actionable feedback in Markdown format, "
