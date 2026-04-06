@@ -5,6 +5,9 @@ from . import views
 urlpatterns = [
     path('', views.splash, name='splash'),
     path('api/chat', views.api_chat, name='api_chat'),
+    path('api/search_foods/', views.search_foods, name='search_foods'),
+    path('api/save_food/', views.save_food_to_database, name='save_food_to_database'),
+    path('api/all_foods/', views.get_all_foods, name='get_all_foods'),
     path('user_get_started/', views.user_get_started, name='user_get_started'),
     path('user_login/', views.user_login, name='user_login'),
     path('user_logout/', views.user_logout, name='user_logout'),
