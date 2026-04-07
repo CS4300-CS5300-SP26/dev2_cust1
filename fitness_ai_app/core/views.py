@@ -33,7 +33,7 @@ def splash(request):
 
 @login_required
 def chat_page(request):
-    return render(request, 'core/chat.html')
+    return render(request, 'core/chat.html', {'active_tab': 'ai'})
 
 
 @csrf_exempt
@@ -54,10 +54,21 @@ def api_chat(request):
 
     client = OpenAI(api_key=api_key)
 
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You are an AI chatbot for a fitness app called Spotter.ai. "
+            "Only discuss health, food, and fitness with the user. "
+            "If the user asks about anything else, politely redirect them "
+            "back to health, food, or fitness topics. "
+            "Keep your responses short — no more than 2-3 sentences for usability."
+        ),
+    }
+
     try:
         response = client.chat.completions.create(
             model="gpt-4.1",
-            messages=messages,
+            messages=[system_prompt] + messages,
         )
         reply = response.choices[0].message.content
         return JsonResponse({"reply": reply})
