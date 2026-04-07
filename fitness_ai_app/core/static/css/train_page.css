@@ -7,12 +7,12 @@
     --textPrimary: #ffffff;
     --textSecondary: #cccccc;
     --textMuted: #999999;
-    --proteinColor: #e85c00;
-    --carbColor: #e83355;
-    --fatColor: #888888;
+    --durationColor: #e85c00;
+    --exerciseColor: #22c55e;
+    --caloriesColor: #e83355;
 }
 
-.nutrition-screen {
+.train-screen {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -319,7 +319,7 @@
 }
 
 span.flatpickr-weekday {
-    color: #aaa;
+    color: #888888 !important;
     background: #1c1c1c !important;
     font-size: 11px !important;
     font-weight: 600 !important;
@@ -382,7 +382,7 @@ span.flatpickr-weekday {
 
 .flatpickr-day.prevMonthDay,
 .flatpickr-day.nextMonthDay {
-    color: #888 !important;
+    color: #555555 !important;
 }
 
 .flatpickr-day.prevMonthDay:hover,
@@ -443,38 +443,38 @@ span.flatpickr-weekday {
     letter-spacing: 0.5px;
 }
 
-/* Calories Card */
-.calories-card {
+/* Summary Card */
+.summary-card {
     padding: 20px;
 }
 
-.calories-display {
+.summary-display {
     display: flex;
     align-items: baseline;
     gap: 4px;
     margin-bottom: 16px;
 }
 
-.calories-consumed {
+.summary-value {
     font-size: 36px;
     font-weight: 700;
     color: var(--textPrimary);
     font-family: 'Courier New', monospace;
 }
 
-.calories-separator {
+.summary-separator {
     font-size: 22px;
     color: var(--textMuted);
     font-family: 'Courier New', monospace;
 }
 
-.calories-goal {
+.summary-goal {
     font-size: 22px;
     color: var(--textMuted);
     font-family: 'Courier New', monospace;
 }
 
-.calories-unit {
+.summary-unit {
     font-size: 12px;
     color: var(--textMuted);
     font-family: 'Courier New', monospace;
@@ -495,18 +495,18 @@ span.flatpickr-weekday {
     transition: width 0.3s ease;
 }
 
-/* Macros Card */
-.macros-card {
+/* Stats Card */
+.stats-card {
     padding: 20px;
 }
 
-.macros-grid {
+.stats-grid {
     display: flex;
     gap: 10px;
     flex-direction: row;
 }
 
-.macro-pill {
+.stat-pill {
     flex: 1;
     border: 1.5px solid;
     border-radius: 12px;
@@ -515,22 +515,22 @@ span.flatpickr-weekday {
     background-color: transparent;
 }
 
-.macro-pill.protein-pill {
-    border-color: var(--proteinColor);
+.stat-pill.duration-pill {
+    border-color: var(--durationColor);
     background-color: rgba(232, 92, 0, 0.07);
 }
 
-.macro-pill.carbs-pill {
-    border-color: var(--carbColor);
+.stat-pill.exercises-pill {
+    border-color: var(--exerciseColor);
+    background-color: rgba(34, 197, 94, 0.07);
+}
+
+.stat-pill.calories-pill {
+    border-color: var(--caloriesColor);
     background-color: rgba(232, 51, 85, 0.07);
 }
 
-.macro-pill.fat-pill {
-    border-color: #888;
-    background-color: rgba(80, 80, 80, 0.1);
-}
-
-.macro-percentage {
+.stat-value {
     font-size: 18px;
     font-weight: 700;
     font-family: 'Courier New', monospace;
@@ -538,19 +538,19 @@ span.flatpickr-weekday {
     margin-bottom: 4px;
 }
 
-.macro-pill.protein-pill .macro-percentage {
-    color: var(--proteinColor);
+.stat-pill.duration-pill .stat-value {
+    color: var(--durationColor);
 }
 
-.macro-pill.carbs-pill .macro-percentage {
-    color: var(--carbColor);
+.stat-pill.exercises-pill .stat-value {
+    color: var(--exerciseColor);
 }
 
-.macro-pill.fat-pill .macro-percentage {
-    color: var(--fatColor);
+.stat-pill.calories-pill .stat-value {
+    color: var(--caloriesColor);
 }
 
-.macro-name {
+.stat-name {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -558,14 +558,14 @@ span.flatpickr-weekday {
     margin-bottom: 4px;
 }
 
-.macro-grams {
+.stat-detail {
     font-size: 10px;
     font-family: 'Courier New', monospace;
-    color: #bbb;
+    color: #444;
 }
 
-/* Meals Section */
-.meals-section {
+/* Workouts Section */
+.workouts-section {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -586,7 +586,7 @@ span.flatpickr-weekday {
     letter-spacing: 1.2px;
 }
 
-.add-meal-btn {
+.add-workout-btn {
     background-color: rgba(232, 92, 0, 0.15);
     border: 1px solid rgba(232, 92, 0, 0.3);
     color: var(--accent);
@@ -601,27 +601,27 @@ span.flatpickr-weekday {
     transition: all 0.2s ease;
 }
 
-.add-meal-btn:hover {
+.add-workout-btn:hover {
     background-color: rgba(232, 92, 0, 0.25);
     border-color: rgba(232, 92, 0, 0.5);
 }
 
-/* Meals List */
-.meals-list {
+/* Workouts List */
+.workouts-list {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-/* Meal Card */
-.meal-card {
+/* Workout Card */
+.workout-card {
     background-color: var(--card);
     border: 1px solid var(--border);
     border-radius: 14px;
     overflow: hidden;
 }
 
-.meal-header {
+.workout-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -629,47 +629,113 @@ span.flatpickr-weekday {
     border-bottom: 1px solid #2a2a2a;
 }
 
-.meal-name {
+.workout-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.workout-name {
     font-size: 14px;
     font-weight: 600;
-    color: var(--textSecondary);
+    color: var(--textPrimary);
 }
 
-.meal-calories {
+.workout-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.workout-goal {
     font-size: 11px;
-    color: var(--textMuted);
-    font-family: 'Courier New', monospace;
-    flex: 1;
-    text-align: right;
-    margin-right: 12px;
+    color: var(--accent);
+    font-weight: 500;
 }
 
-.meal-edit-btn {
+.workout-status {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.workout-status.status-planned {
+    background-color: rgba(100, 100, 100, 0.2);
+    color: #888;
+    border: 1px solid #444;
+}
+
+.workout-status.status-completed {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.workout-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.workout-edit-btn {
+    background-color: rgba(232, 92, 0, 0.15);
+    border: 1px solid rgba(232, 92, 0, 0.3);
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+.workout-edit-btn:hover {
+    background-color: rgba(232, 92, 0, 0.25);
+    border-color: rgba(232, 92, 0, 0.5);
+}
+
+.workout-delete-btn {
     background-color: transparent;
-    border: none;
+    border: 1px solid #666;
     color: var(--textMuted);
     cursor: pointer;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease;
-    width: 18px;
-    height: 18px;
+    transition: all 0.2s ease;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
 }
 
-.meal-edit-btn:hover {
-    color: var(--accent);
+.workout-delete-btn:hover {
+    background-color: rgba(231, 76, 60, 0.15);
+    border-color: #e74c3c;
+    color: #e74c3c;
 }
 
-/* Food Items List */
-.food-items-list {
+/* Exercise Items List */
+.exercise-items-list {
     display: flex;
     flex-direction: column;
 }
 
-/* Food Item */
-.food-item {
+.no-exercises {
+    padding: 16px;
+    text-align: center;
+    color: var(--textMuted);
+    font-size: 12px;
+}
+
+/* Exercise Item */
+.exercise-item {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -678,17 +744,68 @@ span.flatpickr-weekday {
     transition: background-color 0.2s ease;
 }
 
-.food-item:last-child {
+.exercise-item:last-child {
     border-bottom: none;
 }
 
-.food-item:hover {
+.exercise-item:hover {
     background-color: rgba(0, 0, 0, 0.2);
 }
 
-.food-item.completed .food-name {
+.exercise-item.completed .exercise-name {
     text-decoration: line-through;
     color: var(--textMuted);
+}
+
+.exercise-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.exercise-name {
+    font-size: 13px;
+    color: #aaa;
+}
+
+.exercise-muscle {
+    font-size: 10px;
+    color: var(--textMuted);
+    text-transform: uppercase;
+}
+
+.exercise-stats {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.exercise-stats .stat {
+    font-size: 10px;
+    color: #ffffff;
+    font-family: 'Courier New', monospace;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.edit-exercise-btn {
+    background-color: transparent;
+    border: none;
+    color: var(--textMuted);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.edit-exercise-btn:hover {
+    color: var(--accent);
 }
 
 .checkbox {
@@ -716,20 +833,6 @@ span.flatpickr-weekday {
     color: #fff;
 }
 
-.food-name {
-    font-size: 13px;
-    color: #ccc;
-    flex: 1;
-}
-
-.food-calories {
-    font-size: 11px;
-    color: #888;
-    font-family: 'Courier New', monospace;
-    min-width: 40px;
-    text-align: right;
-}
-
 .delete-btn {
     background-color: transparent;
     border: none;
@@ -749,26 +852,8 @@ span.flatpickr-weekday {
     color: #e74c3c;
 }
 
-/* Add Food Button */
-.add-food-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background-color: transparent;
-    border: none;
-    color: var(--textMuted);
-    font-size: 13px;
-    cursor: pointer;
-    transition: color 0.2s ease;
-}
-
-.add-food-btn:hover {
-    color: var(--accent);
-}
-
-/* Log a Meal Button */
-.log-meal-btn {
+/* Log a Workout Button */
+.log-workout-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -785,15 +870,15 @@ span.flatpickr-weekday {
     margin-top: 8px;
 }
 
-.log-meal-btn:hover {
+.log-workout-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
 }
 
 /* Responsive */
 @media (max-width: 480px) {
-    .macros-grid {
-        grid-template-columns: 1fr;
+    .stats-grid {
+        flex-direction: column;
     }
 }
 

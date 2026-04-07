@@ -1,0 +1,52 @@
+<style>
+    .spinner {
+        display: none;
+        width: 18px;
+        height: 18px;
+        border: 3px solid rgba(255, 255, 255, 0.5);
+        border-top: 3px solid var(--white);
+        border-right: 3px solid rgba(255, 255, 255, 0.75);
+        border-radius: 50%;
+        animation: spinSmooth 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        margin-right: 10px;
+    }
+
+    .btn.loading {
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .btn.loading .spinner {
+        display: inline-block;
+    }
+
+    @keyframes spinSmooth {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .button-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        if (!form) return;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (!submitBtn) return;
+
+        form.addEventListener('submit', function() {
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
+            const btnText = submitBtn.querySelector('#btnText');
+            if (btnText) {
+                btnText.textContent = 'Processing...';
+            }
+        });
+    });
+</script>
