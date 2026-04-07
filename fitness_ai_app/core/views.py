@@ -24,7 +24,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, PasswordReset
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset
 
 
 def splash(request):
@@ -305,7 +305,151 @@ def home_dash(request):
 
 @login_required
 def train_page(request):
-    return render(request, 'train_dir/train_page.html', {'active_tab': 'train'})
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+
+    workouts = (
+        Workout.objects.filter(user=request.user, date=selected_date)
+        .prefetch_related('exercises')
+    )
+
+    prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    is_past_date = selected_date < date.today()
+
+    context = {
+        'active_tab': 'train',
+        'selected_date': selected_date,
+        'date_string': selected_date.strftime('%Y-%m-%d'),
+        'prev_date': prev_date,
+        'next_date': next_date,
+        'workouts': workouts,
+        'is_past_date': is_past_date,
+    }
+    return render(request, 'train_dir/train_page.html', context)
+
+
+@login_required
+@require_POST
+def add_workout(request):
+    workout_name = request.POST.get('workout_name', '').strip()
+    goal = request.POST.get('goal', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_name or not goal or not date_param:
+        messages.error(request, 'Workout name, goal, and date are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    try:
+        workout_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Invalid date format.')
+        return redirect(reverse('train_page'))
+
+    Workout.objects.create(user=request.user, name=workout_name, goal=goal, status=status, date=workout_date)
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def delete_workout(request):
+    workout_id = request.POST.get('workout_id')
+    date_param = request.POST.get('date')
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+    workout.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def add_exercise(request):
+    workout_id = request.POST.get('workout_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not workout_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+
+    Exercise.objects.create(
+        workout=workout,
+        name=exercise_name,
+        muscle_group=muscle_group,
+        sets=int(sets) if sets else None,
+        reps=int(reps) if reps else None,
+        weight=int(weight) if weight else None,
+        completed=(status == 'completed'),
+    )
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def edit_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    exercise_name = request.POST.get('exercise_name', '').strip()
+    muscle_group = request.POST.get('muscle_group', '').strip()
+    sets = request.POST.get('sets', '').strip()
+    reps = request.POST.get('reps', '').strip()
+    weight = request.POST.get('weight', '').strip()
+    status = request.POST.get('status', 'planned').strip()
+    date_param = request.POST.get('date')
+
+    if not exercise_id or not exercise_name or not muscle_group:
+        messages.error(request, 'Exercise name and muscle group are required.')
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.name = exercise_name
+    exercise.muscle_group = muscle_group
+    exercise.sets = int(sets) if sets else None
+    exercise.reps = int(reps) if reps else None
+    exercise.weight = int(weight) if weight else None
+    exercise.completed = (status == 'completed')
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def toggle_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.completed = not exercise.completed
+    exercise.save()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
+
+@login_required
+@require_POST
+def delete_exercise(request):
+    exercise_id = request.POST.get('exercise_id')
+    date_param = request.POST.get('date')
+
+    exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    exercise.delete()
+
+    return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
 
 @login_required
@@ -325,11 +469,25 @@ def nutrition_page(request):
         .annotate(meal_total=Sum('items__calories'))
     )
 
-    total_calories = FoodItem.objects.filter(
+    # Get all completed food items for the day
+    completed_items = FoodItem.objects.filter(
         meal__user=request.user,
         meal__date=selected_date,
         completed=True,
-    ).aggregate(total=Sum('calories'))['total'] or 0
+    )
+
+    # Calculate totals
+    totals = completed_items.aggregate(
+        total_calories=Sum('calories'),
+        total_protein=Sum('protein'),
+        total_carbs=Sum('carbs'),
+        total_fats=Sum('fats')
+    )
+
+    total_calories = totals['total_calories'] or 0
+    total_protein = totals['total_protein'] or 0
+    total_carbs = totals['total_carbs'] or 0
+    total_fats = totals['total_fats'] or 0
 
     calorie_goal = 2400
     calories_percentage = min(
@@ -348,6 +506,9 @@ def nutrition_page(request):
         'prev_date': prev_date,
         'next_date': next_date,
         'total_calories': total_calories,
+        'total_protein': total_protein,
+        'total_carbs': total_carbs,
+        'total_fats': total_fats,
         'calorie_goal': calorie_goal,
         'calories_percentage': calories_percentage,
     }
@@ -395,7 +556,26 @@ def add_food_item(request):
         messages.error(request, 'Calories must be a number.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}")
     
-    FoodItem.objects.create(meal=meal, name=food_name, calories=calories)
+    # Optional macro fields
+    protein = request.POST.get('protein', '0')
+    carbs = request.POST.get('carbs', '0')
+    fats = request.POST.get('fats', '0')
+    
+    try:
+        protein = int(protein) if protein else 0
+        carbs = int(carbs) if carbs else 0
+        fats = int(fats) if fats else 0
+    except ValueError:
+        protein = carbs = fats = 0
+    
+    FoodItem.objects.create(
+        meal=meal,
+        name=food_name,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        fats=fats
+    )
     messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
@@ -429,3 +609,152 @@ def delete_food_item(request):
 @login_required
 def social_page(request):
     return render(request, 'socal_dir/social_page.html', {'active_tab': 'social'})
+
+
+@login_required
+def search_foods(request):
+    """Search existing FoodItems by name and return unique results with nutritional data."""
+    query = request.GET.get('q', '').strip()
+    if not query or len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    # Search for food items matching the query (case-insensitive)
+    food_items = (
+        FoodItem.objects
+        .filter(name__icontains=query)
+        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
+        .order_by('name')[:20]
+    )
+    
+    # Deduplicate by name (keep entry with best macro data)
+    seen_names = {}
+    for item in food_items:
+        name_lower = item['name'].lower()
+        if name_lower not in seen_names:
+            seen_names[name_lower] = item
+        else:
+            existing = seen_names[name_lower]
+            existing_score = (existing['protein'] or 0) + (existing['carbs'] or 0) + (existing['fats'] or 0)
+            new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
+            if new_score > existing_score:
+                seen_names[name_lower] = item
+    
+    results = list(seen_names.values())
+    return JsonResponse({'results': results})
+
+
+@login_required
+def get_all_foods(request):
+    """Get all unique foods from the database for display in the Food Database card."""
+    # Get all food items, deduplicated by name
+    food_items = (
+        FoodItem.objects
+        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
+        .order_by('name')
+    )
+    
+    # Deduplicate by name (keep entry with best macro data)
+    seen_names = {}
+    for item in food_items:
+        name_lower = item['name'].lower()
+        if name_lower not in seen_names:
+            seen_names[name_lower] = item
+        else:
+            existing = seen_names[name_lower]
+            existing_score = (existing['protein'] or 0) + (existing['carbs'] or 0) + (existing['fats'] or 0)
+            new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
+            if new_score > existing_score:
+                seen_names[name_lower] = item
+    
+    # Sort by name alphabetically
+    results = sorted(seen_names.values(), key=lambda x: x['name'].lower())
+    return JsonResponse({'foods': results, 'count': len(results)})
+
+
+@login_required
+@require_POST
+def save_food_to_database(request):
+    """Save a new food or update existing food in the nutrition database."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    
+    food_id = data.get('id')
+    name = data.get('name', '').strip()
+    calories = data.get('calories', 0)
+    protein = data.get('protein', 0)
+    carbs = data.get('carbs', 0)
+    fats = data.get('fats', 0)
+    
+    if not name:
+        return JsonResponse({'error': 'Food name is required'}, status=400)
+    
+    try:
+        calories = int(calories) if calories else 0
+        protein = int(protein) if protein else 0
+        carbs = int(carbs) if carbs else 0
+        fats = int(fats) if fats else 0
+    except ValueError:
+        return JsonResponse({'error': 'Invalid numeric values'}, status=400)
+    
+    # Get or create a system meal for storing database foods
+    from django.contrib.auth.models import User
+    system_user, _ = User.objects.get_or_create(
+        username='system@spotter.ai',
+        defaults={'email': 'system@spotter.ai', 'is_active': False}
+    )
+    system_meal, _ = Meal.objects.get_or_create(
+        user=system_user,
+        name='Food Database',
+        date=date(2000, 1, 1)
+    )
+    
+    if food_id:
+        # Update existing food
+        try:
+            food_item = FoodItem.objects.get(id=food_id)
+            food_item.name = name
+            food_item.calories = calories
+            food_item.protein = protein
+            food_item.carbs = carbs
+            food_item.fats = fats
+            food_item.save()
+            return JsonResponse({
+                'success': True,
+                'message': f'Updated "{name}" in database',
+                'food': {
+                    'id': food_item.id,
+                    'name': food_item.name,
+                    'calories': food_item.calories,
+                    'protein': food_item.protein,
+                    'carbs': food_item.carbs,
+                    'fats': food_item.fats,
+                }
+            })
+        except FoodItem.DoesNotExist:
+            pass  # Fall through to create new
+    
+    # Create new food item in database
+    food_item = FoodItem.objects.create(
+        meal=system_meal,
+        name=name,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        fats=fats,
+        completed=False
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'message': f'Added "{name}" to database',
+        'food': {
+            'id': food_item.id,
+            'name': food_item.name,
+            'calories': food_item.calories,
+            'protein': food_item.protein,
+            'carbs': food_item.carbs,
+            'fats': food_item.fats,
+        }
+    })
