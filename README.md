@@ -1,4 +1,4 @@
-# Fitness AI App
+### Fitness AI App
 
 A Django-based fitness AI web application.
 
@@ -9,9 +9,52 @@ A Django-based fitness AI web application.
 
 Visit http://localhost:3000 to see the app running
 
+## Social Authentication Setup
 
+The app supports social authentication via Google, Facebook, Apple, and Instagram.
 
-# Run tests
+### Environment Variables Required
+
+To enable social authentication, add the following variables to your `.env` file:
+
+```
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Facebook OAuth (optional)
+FACEBOOK_APP_ID=your_facebook_app_id
+FACEBOOK_SECRET=your_facebook_secret
+
+# Apple OAuth (optional)
+APPLE_CLIENT_ID=your_apple_client_id
+APPLE_SECRET=your_apple_secret
+
+# Instagram OAuth (optional)
+INSTAGRAM_APP_ID=your_instagram_app_id
+INSTAGRAM_SECRET=your_instagram_secret
+```
+
+### Setting Up Social Apps
+
+After populating your `.env` file with OAuth credentials, run:
+
+```bash
+python manage.py setup_social_apps
+```
+
+This command registers your OAuth applications with Django's socialaccount framework. The setup script reads credentials from your `.env` file and creates the necessary SocialApp objects in the database.
+
+**Note:** If you already have a `.env` file and add new social auth credentials, simply run the `setup_social_apps` command again to register them.
+
+## Email verification for development 
+1. Open the file .env at the repository root
+2. At the bottom where it says "EMAIL_VERIFICATION_ENABLED" change "False" to "True" to enable the email verifications.
+   If you don't want email verification for testing purposes, keep it on "False"
+NOTE: Make sure you rerun the server manually when switching between False and True, and vice versa. Also
+   make sure your .env file already exists. If not then run the setup_and_run.sh in the fitness_ai_app directory.
+
+## Run tests
 
 1. Activate the virtual environment:
 ```

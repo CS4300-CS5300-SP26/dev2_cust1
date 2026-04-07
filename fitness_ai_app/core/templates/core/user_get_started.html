@@ -14,7 +14,7 @@
     {% endfor %}
 </div>
 {% endif %}
-<form method="post" action="{% url 'user_get_started' %}" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
+<form method="post" action="{% url 'user_get_started' %}" id="signupForm" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
     {% csrf_token %}
     <input type="email" name="email" placeholder="Email" value="{{ form.email.value|default:'' }}" required class="form-input">
     {% if form.email.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.email.errors.0 }}</div>{% endif %}
@@ -22,9 +22,16 @@
     {% if form.password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.password.errors.0 }}</div>{% endif %}
     <input type="password" name="confirm_password" placeholder="Confirm Password" required class="form-input">
     {% if form.confirm_password.errors %}<div style="color:var(--classic-crimson);font-size:0.85rem;margin-top:-8px;">{{ form.confirm_password.errors.0 }}</div>{% endif %}
-    <button type="submit" class="btn btn-primary" style="margin-top:12px;">Create Account</button>
+    <button type="submit" id="signupBtn" class="btn btn-primary" style="margin-top:12px;">
+        <div class="button-content">
+            <span class="spinner"></span>
+            <span id="signupBtnText">Create Account</span>
+        </div>
+    </button>
 </form>
 <a href="{% url 'user_login' %}" class="btn btn-primary" style="max-width:320px;background:transparent;border:2px solid var(--harvest-orange);color:var(--harvest-orange);">Already have an account? Log In</a>
 
 {% include "core/includes/social_auth_buttons.html" with divider_text="or sign up with" %}
+
+{% include "core/includes/auth_form_loader.html" %}
 {% endblock %}
