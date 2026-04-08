@@ -18,6 +18,12 @@ PYTHON_VERSION="python3.12"
 
 echo "==> Installing system packages..."
 apt-get update -qq
+apt-get install -y software-properties-common
+
+# Python 3.12 is not in Ubuntu 22.04's default repos — add the deadsnakes PPA
+add-apt-repository -y ppa:deadsnakes/ppa
+apt-get update -qq
+
 apt-get install -y git nginx "$PYTHON_VERSION" "$PYTHON_VERSION"-venv "$PYTHON_VERSION"-dev \
     build-essential libpq-dev
 
