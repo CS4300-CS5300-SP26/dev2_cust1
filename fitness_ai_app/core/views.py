@@ -198,6 +198,11 @@ def get_started_profile(request):
         if experience_level:
             profile.experience_level = experience_level
         
+        # Save dietary preference
+        dietary_preference = request.POST.get('dietary_preference', '').strip()
+        if dietary_preference:
+            profile.dietary_preference = dietary_preference
+        
         # Save bio
         bio = request.POST.get('bio', '').strip()
         if bio:

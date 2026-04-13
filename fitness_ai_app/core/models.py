@@ -19,6 +19,15 @@ class UserProfile(models.Model):
         ('advanced', 'Advanced'),
     ]
     
+    DIETARY_PREFERENCE_CHOICES = [
+        ('omnivore', 'Omnivore'),
+        ('vegetarian', 'Vegetarian'),
+        ('vegan', 'Vegan'),
+        ('keto', 'Keto'),
+        ('paleo', 'Paleo'),
+        ('gluten_free', 'Gluten-Free'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
     height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
@@ -26,6 +35,7 @@ class UserProfile(models.Model):
     age = models.PositiveIntegerField(null=True, blank=True, help_text="Age in years")
     primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES, null=True, blank=True)
     experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, null=True, blank=True)
+    dietary_preference = models.CharField(max_length=20, choices=DIETARY_PREFERENCE_CHOICES, null=True, blank=True)
     bio = models.TextField(null=True, blank=True, help_text="About you and your fitness journey")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

@@ -358,6 +358,37 @@
         {% if errors.experience_level %}<div class="form-error">{{ errors.experience_level.0 }}</div>{% endif %}
       </div>
 
+      <div class="form-group">
+        <label>Dietary Preference</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.dietary_preference == 'omnivore' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="omnivore"{% if profile.dietary_preference == 'omnivore' %} checked{% endif %}>
+            Omnivore
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'vegetarian' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="vegetarian"{% if profile.dietary_preference == 'vegetarian' %} checked{% endif %}>
+            Vegetarian
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'vegan' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="vegan"{% if profile.dietary_preference == 'vegan' %} checked{% endif %}>
+            Vegan
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'keto' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="keto"{% if profile.dietary_preference == 'keto' %} checked{% endif %}>
+            Keto
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'paleo' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="paleo"{% if profile.dietary_preference == 'paleo' %} checked{% endif %}>
+            Paleo
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'gluten_free' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="gluten_free"{% if profile.dietary_preference == 'gluten_free' %} checked{% endif %}>
+            Gluten-Free
+          </label>
+        </div>
+        {% if errors.dietary_preference %}<div class="form-error">{{ errors.dietary_preference.0 }}</div>{% endif %}
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label for="height">Height (cm)</label>
