@@ -188,6 +188,23 @@ def get_started_profile(request):
             except (ValueError, TypeError):
                 pass
         
+        # Save primary goal
+        primary_goal = request.POST.get('primary_goal', '').strip()
+        if primary_goal:
+            profile.primary_goal = primary_goal
+        
+        # Save experience level
+        experience_level = request.POST.get('experience_level', '').strip()
+        if experience_level:
+            profile.experience_level = experience_level
+        
+        # Save bio
+        bio = request.POST.get('bio', '').strip()
+        if bio:
+            profile.bio = bio
+        else:
+            profile.bio = None
+        
         profile.save()
         
         messages.success(request, 'Profile updated successfully!')

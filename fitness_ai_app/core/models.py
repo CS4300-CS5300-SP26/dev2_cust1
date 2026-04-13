@@ -4,11 +4,29 @@ from django.utils import timezone
 import uuid
 
 class UserProfile(models.Model):
+    PRIMARY_GOAL_CHOICES = [
+        ('weight_loss', 'Weight Loss'),
+        ('muscle_gain', 'Muscle Gain'),
+        ('strength', 'Strength Training'),
+        ('endurance', 'Endurance & Cardio'),
+        ('flexibility', 'Flexibility & Mobility'),
+        ('general_health', 'General Health & Wellness'),
+    ]
+    
+    EXPERIENCE_LEVEL_CHOICES = [
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
     height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
     weight = models.PositiveIntegerField(null=True, blank=True, help_text="Weight in kg")
     age = models.PositiveIntegerField(null=True, blank=True, help_text="Age in years")
+    primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES, null=True, blank=True)
+    experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, null=True, blank=True)
+    bio = models.TextField(null=True, blank=True, help_text="About you and your fitness journey")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

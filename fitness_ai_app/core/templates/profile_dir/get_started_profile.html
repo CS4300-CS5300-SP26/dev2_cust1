@@ -311,28 +311,28 @@
       <div class="form-group">
         <label>Primary Fitness Goal</label>
         <div class="bubble-group">
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="weight_loss">
+          <label class="bubble-option{% if profile.primary_goal == 'weight_loss' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="weight_loss"{% if profile.primary_goal == 'weight_loss' %} checked{% endif %}>
             Weight Loss
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="muscle_gain">
+          <label class="bubble-option{% if profile.primary_goal == 'muscle_gain' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="muscle_gain"{% if profile.primary_goal == 'muscle_gain' %} checked{% endif %}>
             Muscle Gain
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="strength">
+          <label class="bubble-option{% if profile.primary_goal == 'strength' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="strength"{% if profile.primary_goal == 'strength' %} checked{% endif %}>
             Strength Training
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="endurance">
+          <label class="bubble-option{% if profile.primary_goal == 'endurance' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="endurance"{% if profile.primary_goal == 'endurance' %} checked{% endif %}>
             Endurance & Cardio
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="flexibility">
+          <label class="bubble-option{% if profile.primary_goal == 'flexibility' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="flexibility"{% if profile.primary_goal == 'flexibility' %} checked{% endif %}>
             Flexibility & Mobility
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="primary_goal" value="general_health">
+          <label class="bubble-option{% if profile.primary_goal == 'general_health' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="general_health"{% if profile.primary_goal == 'general_health' %} checked{% endif %}>
             General Health & Wellness
           </label>
         </div>
@@ -342,16 +342,16 @@
       <div class="form-group">
         <label>Experience Level</label>
         <div class="bubble-group">
-          <label class="bubble-option">
-            <input type="radio" name="experience_level" value="beginner">
+          <label class="bubble-option{% if profile.experience_level == 'beginner' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="beginner"{% if profile.experience_level == 'beginner' %} checked{% endif %}>
             Beginner
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="experience_level" value="intermediate">
+          <label class="bubble-option{% if profile.experience_level == 'intermediate' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="intermediate"{% if profile.experience_level == 'intermediate' %} checked{% endif %}>
             Intermediate
           </label>
-          <label class="bubble-option">
-            <input type="radio" name="experience_level" value="advanced">
+          <label class="bubble-option{% if profile.experience_level == 'advanced' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="advanced"{% if profile.experience_level == 'advanced' %} checked{% endif %}>
             Advanced
           </label>
         </div>
@@ -392,7 +392,7 @@
       
       <div class="form-group">
         <label for="bio">About You</label>
-        <textarea id="bio" name="bio" placeholder="Tell us about your fitness journey, interests, or any health considerations..."></textarea>
+        <textarea id="bio" name="bio" placeholder="Tell us about your fitness journey, interests, or any health considerations...">{{ profile.bio|default:'' }}</textarea>
         {% if errors.bio %}<div class="form-error">{{ errors.bio.0 }}</div>{% endif %}
       </div>
     </div>
