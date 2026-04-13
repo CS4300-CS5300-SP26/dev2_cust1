@@ -140,6 +140,17 @@ def step_no_meals(context):
     assert Meal.objects.filter(user=user).count() == 0, 'Expected no meals'
 
 
+@then('a meal with an auto-generated name should exist for date "{date_str}"')
+def step_auto_generated_meal_exists(context, date_str):
+    """Verify a meal was auto-generated with Breakfast/Lunch/Dinner name."""
+    user = User.objects.get(username='nutrition@spotter.ai')
+    meal = Meal.objects.filter(user=user, date=date_str).first()
+    assert meal is not None, f'No meal found for {date_str}'
+    assert meal.name in ['Breakfast', 'Lunch', 'Dinner'], (
+        f'Meal name "{meal.name}" is not auto-generated (expected Breakfast/Lunch/Dinner)'
+    )
+
+
 @then('a food item named "{name}" with {calories:d} calories should exist')
 def step_food_item_exists_check(context, name, calories):
     assert FoodItem.objects.filter(name=name, calories=calories).exists(), (

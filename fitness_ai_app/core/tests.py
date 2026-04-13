@@ -8,7 +8,7 @@ from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import EmailVerification
+from .models import EmailVerification, SupplementDatabase, SupplementEntry
 from .forms import RegistrationForm
 
 
@@ -631,12 +631,17 @@ class AddMealViewTests(TestCase):
         self.assertIn('date=2025-06-15', r.url)
 
     def test_add_meal_missing_name(self):
+        """Test that meal is auto-generated with a name when none is provided."""
         r = self.client.post('/nutrition/add_meal/', {
             'meal_name': '',
             'date': '2025-06-15',
         })
         self.assertEqual(r.status_code, 302)
-        self.assertFalse(Meal.objects.exists())
+        # Meal should be created with an auto-generated name
+        self.assertTrue(Meal.objects.exists())
+        meal = Meal.objects.first()
+        # Auto-generated names are based on time of day
+        self.assertIn(meal.name, ['Breakfast', 'Lunch', 'Dinner'])
 
     def test_add_meal_missing_date(self):
         r = self.client.post('/nutrition/add_meal/', {
@@ -2665,5 +2670,254 @@ class SetupSocialAppsCommandTests(TestCase):
         
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-insta-id')
+
+
+# ==================== SUPPLEMENT TESTS ====================
+
+class SupplementDatabaseModelTests(TestCase):
+    """Tests for the SupplementDatabase model"""
+    
+    def test_create_supplement(self):
+        """Test creating a supplement in the database"""
+        supplement = SupplementDatabase.objects.create(
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg'
+        )
+        self.assertEqual(supplement.name, 'Vitamin C')
+        self.assertEqual(supplement.supplement_type, 'vitamin')
+        self.assertEqual(supplement.dosage, '1000')
+        self.assertEqual(supplement.unit, 'mg')
+    
+    def test_supplement_str(self):
+        """Test string representation of supplement"""
+        supplement = SupplementDatabase.objects.create(
+            name='Vitamin D',
+            supplement_type='vitamin',
+            dosage='600',
+            unit='IU'
+        )
+        self.assertEqual(str(supplement), 'Vitamin D (Vitamin)')
+    
+    def test_unique_supplement_name(self):
+        """Test that supplement names are unique"""
+        SupplementDatabase.objects.create(
+            name='Calcium',
+            supplement_type='mineral',
+            dosage='1000',
+            unit='mg'
+        )
+        with self.assertRaises(Exception):
+            SupplementDatabase.objects.create(
+                name='Calcium',
+                supplement_type='mineral',
+                dosage='500',
+                unit='mg'
+            )
+    
+    def test_supplement_ordering(self):
+        """Test that supplements are ordered by name"""
+        SupplementDatabase.objects.create(name='Zinc', supplement_type='mineral', dosage='11', unit='mg')
+        SupplementDatabase.objects.create(name='Vitamin A', supplement_type='vitamin', dosage='1000', unit='mcg')
+        SupplementDatabase.objects.create(name='Iron', supplement_type='mineral', dosage='18', unit='mg')
+        
+        supplements = SupplementDatabase.objects.all()
+        names = [s.name for s in supplements]
+        self.assertEqual(names, sorted(names))
+
+
+class SupplementEntryModelTests(TestCase):
+    """Tests for the SupplementEntry model"""
+    
+    def setUp(self):
+        """Set up test user and supplement"""
+        self.user = User.objects.create_user(email='test@spotter.ai', password='testpass123')
+        self.supplement = SupplementDatabase.objects.create(
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg'
+        )
+    
+    def test_create_supplement_entry(self):
+        """Test creating a supplement entry for a user"""
+        from datetime import date
+        
+        entry = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=self.supplement,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False
+        )
+        self.assertEqual(entry.user, self.user)
+        self.assertEqual(entry.supplement, self.supplement)
+        self.assertFalse(entry.taken)
+    
+    def test_supplement_entry_str(self):
+        """Test string representation of supplement entry"""
+        from datetime import date
+        
+        entry = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=self.supplement,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False
+        )
+        self.assertIn('Vitamin C', str(entry))
+        self.assertIn(self.user.email, str(entry))
+    
+    def test_toggle_supplement_taken(self):
+        """Test toggling the taken status of a supplement"""
+        from datetime import date
+        
+        entry = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=self.supplement,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False
+        )
+        self.assertFalse(entry.taken)
+        
+        entry.taken = True
+        entry.save()
+        entry.refresh_from_db()
+        self.assertTrue(entry.taken)
+    
+    def test_supplement_entry_without_supplement_link(self):
+        """Test creating a supplement entry without linking to database supplement"""
+        from datetime import date
+        
+        entry = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Custom Supplement',
+            supplement_type='other',
+            dosage='1',
+            unit='serving',
+            date=date.today(),
+            taken=False
+        )
+        self.assertIsNone(entry.supplement)
+        self.assertEqual(entry.name, 'Custom Supplement')
+    
+    def test_supplement_entries_filtered_by_date_and_user(self):
+        """Test filtering supplement entries by user and date"""
+        from datetime import date, timedelta
+        
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        # Create entries for today
+        entry1 = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=self.supplement,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg',
+            date=today,
+            taken=False
+        )
+        
+        # Create entry for yesterday
+        entry2 = SupplementEntry.objects.create(
+            user=self.user,
+            supplement=self.supplement,
+            name='Vitamin D',
+            supplement_type='vitamin',
+            dosage='600',
+            unit='IU',
+            date=yesterday,
+            taken=False
+        )
+        
+        # Query today's entries
+        today_entries = SupplementEntry.objects.filter(user=self.user, date=today)
+        self.assertEqual(today_entries.count(), 1)
+        self.assertEqual(today_entries.first().name, 'Vitamin C')
+
+
+class SupplementAPITests(TestCase):
+    """Tests for supplement API endpoints"""
+    
+    def setUp(self):
+        """Set up test user and supplements"""
+        self.user = User.objects.create_user(email='test@spotter.ai', password='testpass123')
+        self.client.login(email='test@spotter.ai', password='testpass123')
+        
+        # Create some test supplements
+        SupplementDatabase.objects.create(name='Vitamin C', supplement_type='vitamin', dosage='1000', unit='mg')
+        SupplementDatabase.objects.create(name='Vitamin D', supplement_type='vitamin', dosage='600', unit='IU')
+        SupplementDatabase.objects.create(name='Calcium', supplement_type='mineral', dosage='1000', unit='mg')
+    
+    def test_search_supplements_api(self):
+        """Test the supplement search API"""
+        response = self.client.get('/api/search_supplements/?q=vitamin')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('results', data)
+        self.assertGreater(len(data['results']), 0)
+    
+    def test_search_supplements_requires_min_length(self):
+        """Test that supplement search requires at least 2 characters"""
+        response = self.client.get('/api/search_supplements/?q=v')
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+    
+    def test_supplement_entries_list_api(self):
+        """Test getting supplement entries for a date"""
+        from datetime import date
+        
+        # Create an entry
+        SupplementEntry.objects.create(
+            user=self.user,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False
+        )
+        
+        response = self.client.get('/api/supplement_entries/?date=' + str(date.today()))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('entries', data)
+    
+    def test_supplement_entries_create_api(self):
+        """Test creating a supplement entry via API"""
+        from datetime import date
+        import json
+        
+        payload = {
+            'name': 'Vitamin C',
+            'supplement_type': 'vitamin',
+            'dosage': '1000',
+            'unit': 'mg',
+            'date': str(date.today())
+        }
+        
+        response = self.client.post(
+            '/api/supplement_entries/',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertIn('entry', data)
 
 

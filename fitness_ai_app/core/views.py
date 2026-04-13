@@ -24,7 +24,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, Workout, Exercise, PasswordReset
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, SupplementDatabase, SupplementEntry
 
 
 def splash(request):
@@ -479,6 +479,9 @@ def nutrition_page(request):
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    # Get supplements for the selected date
+    supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
     context = {
         'active_tab': 'nutrition',
@@ -493,6 +496,7 @@ def nutrition_page(request):
         'total_fats': total_fats,
         'calorie_goal': calorie_goal,
         'calories_percentage': calories_percentage,
+        'supplements': supplements,
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
@@ -500,18 +504,33 @@ def nutrition_page(request):
 @login_required
 @require_POST
 def add_meal(request):
-    meal_name = request.POST.get('meal_name', '').strip()
     date_param = request.POST.get('date')
+    meal_name = request.POST.get('meal_name', '').strip()
     
-    if not meal_name or not date_param:
-        messages.error(request, 'Meal name and date are required.')
-        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+    if not date_param:
+        messages.error(request, 'Date is required.')
+        return redirect(reverse('nutrition_page'))
     
     try:
         meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
     except ValueError:
         messages.error(request, 'Invalid date format.')
         return redirect(reverse('nutrition_page'))
+    
+    # If no meal name provided, auto-generate based on time of day
+    if not meal_name:
+        current_hour = datetime.now().hour
+        if current_hour < 12:
+            meal_name = 'Breakfast'
+        elif current_hour < 17:
+            meal_name = 'Lunch'
+        else:
+            meal_name = 'Dinner'
+        
+        # Check if this meal already exists for today, if so add a number
+        existing_meals = Meal.objects.filter(user=request.user, date=meal_date, name=meal_name).count()
+        if existing_meals > 0:
+            meal_name = f'{meal_name} {existing_meals + 1}'
     
     Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
     messages.success(request, f'Meal "{meal_name}" added successfully.')
@@ -739,4 +758,123 @@ def save_food_to_database(request):
             'carbs': food_item.carbs,
             'fats': food_item.fats,
         }
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["GET"])
+def search_supplements(request):
+    """Search SupplementDatabase by name and return results."""
+    query = request.GET.get('q', '').strip()
+    if not query or len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    supplements = (
+        SupplementDatabase.objects
+        .filter(name__icontains=query)
+        .values('id', 'name', 'supplement_type', 'dosage', 'unit')
+        .order_by('name')[:20]
+    )
+    
+    results = list(supplements)
+    return JsonResponse({'results': results})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def supplement_entries(request):
+    """Get or create supplement entries for the logged-in user."""
+    if request.method == 'GET':
+        date_str = request.GET.get('date')
+        if date_str:
+            try:
+                entry_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                entry_date = date.today()
+        else:
+            entry_date = date.today()
+        
+        entries = SupplementEntry.objects.filter(
+            user=request.user,
+            date=entry_date
+        ).values('id', 'name', 'supplement_type', 'dosage', 'unit', 'taken')
+        
+        return JsonResponse({'entries': list(entries)})
+    
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        
+        name = data.get('name', '').strip()
+        supplement_type = data.get('supplement_type', 'other')
+        dosage = data.get('dosage', '1')
+        unit = data.get('unit', 'serving')
+        entry_date = data.get('date', str(date.today()))
+        supplement_id = data.get('supplement_id')
+        
+        if not name:
+            return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
+        
+        try:
+            entry_date = datetime.strptime(entry_date, '%Y-%m-%d').date()
+        except ValueError:
+            entry_date = date.today()
+        
+        supplement_obj = None
+        if supplement_id:
+            try:
+                supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
+            except SupplementDatabase.DoesNotExist:
+                pass
+        
+        entry = SupplementEntry.objects.create(
+            user=request.user,
+            supplement=supplement_obj,
+            name=name,
+            supplement_type=supplement_type,
+            dosage=dosage,
+            unit=unit,
+            date=entry_date,
+            taken=False
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'entry': {
+                'id': entry.id,
+                'name': entry.name,
+                'supplement_type': entry.supplement_type,
+                'dosage': entry.dosage,
+                'unit': entry.unit,
+                'taken': entry.taken,
+            }
+        })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def toggle_supplement_taken(request, entry_id):
+    """Toggle the 'taken' status of a supplement entry."""
+    try:
+        entry = SupplementEntry.objects.get(id=entry_id, user=request.user)
+    except SupplementEntry.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Entry not found'}, status=404)
+    
+    try:
+        data = json.loads(request.body)
+        taken = data.get('taken', not entry.taken)
+    except json.JSONDecodeError:
+        taken = not entry.taken
+    
+    entry.taken = taken
+    entry.save()
+    
+    return JsonResponse({
+        'success': True,
+        'taken': entry.taken,
     })
