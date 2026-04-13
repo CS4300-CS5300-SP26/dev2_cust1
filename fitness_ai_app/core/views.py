@@ -144,6 +144,21 @@ def user_get_started(request):
     return render(request, 'core/user_get_started.html', {'form': form})
 
 
+@login_required
+def get_started_profile(request):
+    if request.method == 'POST':
+        # Update user profile information
+        user = request.user
+        user.first_name = request.POST.get('first_name', user.first_name)
+        user.last_name = request.POST.get('last_name', user.last_name)
+        user.save()
+        
+        messages.success(request, 'Profile updated successfully!')
+        return redirect('home_dash')
+    
+    return render(request, 'profile_dir/get_started_profile.html', {'active_tab': 'profile'})
+
+
 def verify_email(request, token):
     try:
         verification = EmailVerification.objects.get(token=token)
