@@ -3,6 +3,16 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 import uuid
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    calorie_goal = models.PositiveIntegerField(default=2400)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.email} - Profile"
+
+
 class EmailVerification(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     token = models.UUIDField(default=uuid.uuid4, unique=True)

@@ -366,7 +366,8 @@
         </div>
         <div class="form-group">
           <label for="calorieGoal">Daily Calorie Goal (kcal)</label>
-          <input type="number" id="calorieGoal" name="calorie_goal" placeholder="e.g., 2000" min="1000" max="5000">
+          <input type="number" id="calorieGoal" name="calorie_goal" placeholder="e.g. 2400 kcal" min="1000" max="5000">
+          <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Leave blank for default: 2400 kcal</div>
           {% if errors.calorie_goal %}<div class="form-error">{{ errors.calorie_goal.0 }}</div>{% endif %}
         </div>
       </div>

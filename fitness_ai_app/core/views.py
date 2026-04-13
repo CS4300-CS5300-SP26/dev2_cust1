@@ -152,6 +152,18 @@ def get_started_profile(request):
         user.first_name = request.POST.get('name', user.first_name)
         user.save()
         
+        # Update or create user profile with calorie goal
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        calorie_goal = request.POST.get('calorie_goal', '').strip()
+        if calorie_goal:
+            try:
+                profile.calorie_goal = int(calorie_goal)
+                profile.save()
+            except (ValueError, TypeError):
+                pass
+        
         messages.success(request, 'Profile updated successfully!')
         return redirect('home_dash')
     
@@ -317,7 +329,14 @@ def home_dash(request):
         completed=True
     ).aggregate(total=Sum('calories'))['total'] or 0
     
-    calorie_goal = 2400
+    # Get calorie goal from user profile or use default
+    from core.models import UserProfile
+    try:
+        profile = UserProfile.objects.get(user=request.user)
+        calorie_goal = profile.calorie_goal or 2400
+    except UserProfile.DoesNotExist:
+        calorie_goal = 2400
+    
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
     
     return render(request, 'home_dash_dir/home_dash.html', {
@@ -514,7 +533,14 @@ def nutrition_page(request):
     total_carbs = totals['total_carbs'] or 0
     total_fats = totals['total_fats'] or 0
 
-    calorie_goal = 2400
+    # Get calorie goal from user profile or use default
+    from core.models import UserProfile
+    try:
+        profile = UserProfile.objects.get(user=request.user)
+        calorie_goal = profile.calorie_goal or 2400
+    except UserProfile.DoesNotExist:
+        calorie_goal = 2400
+    
     calories_percentage = min(
         round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
         100,
