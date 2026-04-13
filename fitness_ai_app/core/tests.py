@@ -2732,7 +2732,7 @@ class SupplementEntryModelTests(TestCase):
     
     def setUp(self):
         """Set up test user and supplement"""
-        self.user = User.objects.create_user(email='test@spotter.ai', password='testpass123')
+        self.user = User.objects.create_user(username='supplement_entry_test_user', email='test@spotter.ai', password='testpass123')
         self.supplement = SupplementDatabase.objects.create(
             name='Vitamin C',
             supplement_type='vitamin',
@@ -2855,8 +2855,8 @@ class SupplementAPITests(TestCase):
     
     def setUp(self):
         """Set up test user and supplements"""
-        self.user = User.objects.create_user(email='test@spotter.ai', password='testpass123')
-        self.client.login(email='test@spotter.ai', password='testpass123')
+        self.user = User.objects.create_user(username='supplement_test_user', email='test@spotter.ai', password='testpass123')
+        self.client.login(username='supplement_test_user', password='testpass123')
         
         # Create some test supplements
         SupplementDatabase.objects.create(name='Vitamin C', supplement_type='vitamin', dosage='1000', unit='mg')

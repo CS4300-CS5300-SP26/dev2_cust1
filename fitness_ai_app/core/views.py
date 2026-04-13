@@ -24,7 +24,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, SupplementDatabase, SupplementEntry
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, SupplementDatabase, SupplementEntry, MealSupplement
 
 
 def splash(request):
@@ -447,7 +447,7 @@ def nutrition_page(request):
 
     meals = (
         Meal.objects.filter(user=request.user, date=selected_date)
-        .prefetch_related('items')
+        .prefetch_related('items', 'supplements')
         .annotate(meal_total=Sum('items__calories'))
     )
 
@@ -608,6 +608,68 @@ def delete_food_item(request):
 
 
 @login_required
+@require_POST
+def add_supplement_to_meal(request):
+    meal_id = request.POST.get('meal_id')
+    supplement_name = request.POST.get('supplement_name', '').strip()
+    supplement_type = request.POST.get('supplement_type', 'other')
+    dosage = request.POST.get('dosage', '1')
+    unit = request.POST.get('unit', 'serving')
+    supplement_id = request.POST.get('supplement_id')
+    date_param = request.POST.get('date')
+    
+    if not meal_id or not supplement_name:
+        messages.error(request, 'Meal and supplement name are required.')
+        return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+    
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    
+    supplement_obj = None
+    if supplement_id:
+        try:
+            supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
+        except SupplementDatabase.DoesNotExist:
+            pass
+    
+    MealSupplement.objects.create(
+        meal=meal,
+        supplement=supplement_obj,
+        name=supplement_name,
+        supplement_type=supplement_type,
+        dosage=dosage,
+        unit=unit
+    )
+    messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def toggle_meal_supplement(request):
+    supplement_id = request.POST.get('supplement_id')
+    date_param = request.POST.get('date')
+    
+    supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
+    supplement.taken = not supplement.taken
+    supplement.save()
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
+def delete_meal_supplement(request):
+    supplement_id = request.POST.get('supplement_id')
+    date_param = request.POST.get('date')
+    
+    supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
+    supplement.delete()
+    messages.success(request, 'Supplement deleted.')
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
 def social_page(request):
     return render(request, 'socal_dir/social_page.html', {'active_tab': 'social'})
 
@@ -759,6 +821,20 @@ def save_food_to_database(request):
             'fats': food_item.fats,
         }
     })
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_all_supplements(request):
+    """Get all supplements from the SupplementDatabase for display."""
+    supplements = (
+        SupplementDatabase.objects
+        .all()
+        .values('id', 'name', 'supplement_type', 'dosage', 'unit')
+        .order_by('name')
+    )
+    
+    return JsonResponse({'supplements': list(supplements)})
 
 
 @login_required

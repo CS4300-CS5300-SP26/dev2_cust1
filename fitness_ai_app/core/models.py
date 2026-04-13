@@ -152,3 +152,20 @@ class SupplementEntry(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.user.email} - {self.date}"
+
+
+class MealSupplement(models.Model):
+    meal = models.ForeignKey(Meal, on_delete=models.CASCADE, related_name='supplements')
+    supplement = models.ForeignKey(SupplementDatabase, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=200)
+    supplement_type = models.CharField(max_length=20, choices=SupplementDatabase.TYPE_CHOICES)
+    dosage = models.CharField(max_length=100)
+    unit = models.CharField(max_length=50)
+    taken = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.meal.name}"

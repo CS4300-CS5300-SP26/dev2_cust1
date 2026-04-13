@@ -3,10 +3,13 @@
 ## Build, Test, and Lint
 
 ```bash
-# Setup & run dev server (from fitness_ai_app/)
+# Navigate to the Django app directory
+cd fitness_ai_app
+
+# Setup & run dev server (creates venv and starts on port 3000)
 ./setup_and_run.sh
 
-# Run full test suite with coverage (recommended)
+# Run full test suite with coverage (RECOMMENDED)
 python manage.py test_all
 
 # Run a single test (unit tests)
@@ -18,7 +21,7 @@ python manage.py test core -v2
 # Run BDD tests only
 python manage.py behave
 
-# Run Playwright integration tests
+# Run Playwright integration tests (requires running dev server)
 python test_nutrition_macro_playwright.py
 
 # Generate HTML coverage report (after test_all)
@@ -132,3 +135,26 @@ When changing environment variables, tests, or Django configuration, keep these 
 - If tests fail, commit is rejected
 - Use `SKIP_TESTS=1 git commit -m "..."` to bypass (rarely needed)
 - All code commits must include: `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>` (if AI-generated)
+
+## Code Patterns & Architecture Details
+
+### View Pattern
+- Views are function-based (not class-based)
+- Render templates with `render()` or return JSON for API endpoints
+- API endpoints check `request.method` for GET/POST/PATCH/DELETE
+- Protected views should check `request.user.is_authenticated`
+
+### Models & Migrations
+- Always run `python manage.py makemigrations && python manage.py migrate` after model changes
+- Migration files are auto-generated but should be reviewed before committing
+- Test migrations with BDD scenarios to ensure data persists correctly
+
+### Custom Adapters
+- Social login uses custom `AutoSocialAdapter` in `core/adapter.py`
+- Handles email extraction, user population, and pre-login validation
+- Configured in `settings.py` via `SOCIALACCOUNT_ADAPTER`
+
+### API Response Pattern
+- Use `JsonResponse` for API endpoints
+- Always include status codes (200, 400, 404, etc.)
+- BDD/Playwright tests validate both response data and status codes

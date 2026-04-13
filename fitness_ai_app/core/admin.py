@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Meal, FoodItem, Workout, Exercise, SupplementDatabase, SupplementEntry
+from .models import Meal, FoodItem, Workout, Exercise, SupplementDatabase, SupplementEntry, MealSupplement
 
 @admin.register(Meal)
 class MealAdmin(admin.ModelAdmin):
@@ -37,3 +37,9 @@ class SupplementEntryAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'supplement_type', 'date', 'taken', 'created_at')
     list_filter = ('taken', 'date', 'supplement_type')
     search_fields = ('name', 'user__email')
+
+@admin.register(MealSupplement)
+class MealSupplementAdmin(admin.ModelAdmin):
+    list_display = ('name', 'meal', 'supplement_type', 'taken', 'created_at')
+    list_filter = ('taken', 'supplement_type')
+    search_fields = ('name', 'meal__user__email')

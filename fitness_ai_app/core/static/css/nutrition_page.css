@@ -749,6 +749,49 @@ span.flatpickr-weekday {
     color: #e74c3c;
 }
 
+/* Supplements List */
+.supplements-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Supplement Item */
+.supplement-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    border-bottom: 1px solid #1c1c1c;
+    transition: background-color 0.2s ease;
+}
+
+.supplement-item:last-child {
+    border-bottom: none;
+}
+
+.supplement-item:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.supplement-item.completed .supplement-name {
+    text-decoration: line-through;
+    color: var(--textMuted);
+}
+
+.supplement-name {
+    font-size: 13px;
+    color: #aaa;
+    flex: 1;
+}
+
+.supplement-dosage {
+    font-size: 11px;
+    color: #444;
+    font-family: 'Courier New', monospace;
+    min-width: 50px;
+    text-align: right;
+}
+
 /* Add Food Button */
 .add-food-btn {
     display: flex;
