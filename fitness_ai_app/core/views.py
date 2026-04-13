@@ -181,7 +181,7 @@ def verify_email(request, token):
     verification.user.save()
     login(request, verification.user, backend='django.contrib.auth.backends.ModelBackend')
     messages.success(request, 'Your email has been verified! Welcome to Spotter.ai.')
-    return redirect('home_dash')
+    return redirect('get_started_profile')
 
 
 def user_login(request):
