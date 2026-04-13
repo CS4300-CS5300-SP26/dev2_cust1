@@ -152,22 +152,58 @@ def get_started_profile(request):
         user.first_name = request.POST.get('name', user.first_name)
         user.save()
         
-        # Update or create user profile with calorie goal
+        # Update or create user profile with fitness metrics
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=user)
         
+        # Save calorie goal
         calorie_goal = request.POST.get('calorie_goal', '').strip()
         if calorie_goal:
             try:
                 profile.calorie_goal = int(calorie_goal)
-                profile.save()
             except (ValueError, TypeError):
                 pass
+        
+        # Save height
+        height = request.POST.get('height', '').strip()
+        if height:
+            try:
+                profile.height = int(height)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save weight
+        weight = request.POST.get('weight', '').strip()
+        if weight:
+            try:
+                profile.weight = int(weight)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save age
+        age = request.POST.get('age', '').strip()
+        if age:
+            try:
+                profile.age = int(age)
+            except (ValueError, TypeError):
+                pass
+        
+        profile.save()
         
         messages.success(request, 'Profile updated successfully!')
         return redirect('home_dash')
     
-    return render(request, 'profile_dir/get_started_profile.html', {'active_tab': 'profile'})
+    # GET request - pass profile data to template
+    from core.models import UserProfile
+    try:
+        profile = UserProfile.objects.get(user=request.user)
+    except UserProfile.DoesNotExist:
+        profile = None
+    
+    return render(request, 'profile_dir/get_started_profile.html', {
+        'active_tab': 'profile',
+        'profile': profile
+    })
 
 
 def verify_email(request, token):

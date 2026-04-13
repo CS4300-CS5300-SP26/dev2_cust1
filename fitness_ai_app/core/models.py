@@ -6,6 +6,9 @@ import uuid
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
+    height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
+    weight = models.PositiveIntegerField(null=True, blank=True, help_text="Weight in kg")
+    age = models.PositiveIntegerField(null=True, blank=True, help_text="Age in years")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
