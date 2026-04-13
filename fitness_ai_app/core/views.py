@@ -149,8 +149,7 @@ def get_started_profile(request):
     if request.method == 'POST':
         # Update user profile information
         user = request.user
-        user.first_name = request.POST.get('first_name', user.first_name)
-        user.last_name = request.POST.get('last_name', user.last_name)
+        user.first_name = request.POST.get('name', user.first_name)
         user.save()
         
         messages.success(request, 'Profile updated successfully!')
