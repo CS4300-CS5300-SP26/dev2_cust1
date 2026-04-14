@@ -189,6 +189,57 @@
     display: none;
   }
 
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .checkbox-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(246, 125, 38, 0.08);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .checkbox-option:hover {
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.15);
+  }
+
+  .checkbox-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--harvest-orange);
+  }
+
+  .checkbox-option input[type="checkbox"]:checked + .checkbox-label {
+    color: #fff;
+  }
+
+  .checkbox-option input[type="checkbox"]:checked {
+    accent-color: var(--harvest-orange);
+  }
+
+  .checkbox-option:has(input:checked) {
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.2);
+  }
+
+  .checkbox-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    user-select: none;
+  }
+
   .button-group {
     display: flex;
     gap: 12px;
@@ -389,6 +440,68 @@
         {% if errors.dietary_preference %}<div class="form-error">{{ errors.dietary_preference.0 }}</div>{% endif %}
       </div>
 
+      <div class="form-group">
+        <label>Fitness at Home?</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.has_home_gym == True %} active{% endif %}">
+            <input type="radio" name="has_home_gym" value="yes"{% if profile.has_home_gym == True %} checked{% endif %}>
+            Yes
+          </label>
+          <label class="bubble-option{% if profile.has_home_gym == False %} active{% endif %}">
+            <input type="radio" name="has_home_gym" value="no"{% if profile.has_home_gym == False %} checked{% endif %}>
+            No
+          </label>
+        </div>
+        {% if errors.has_home_gym %}<div class="form-error">{{ errors.has_home_gym.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-group" id="equipment-section" style="display: {% if profile.has_home_gym %}block{% else %}none{% endif %};">
+        <label>Available Home Equipment</label>
+        <div class="checkbox-group">
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="dumbbells"{% if 'dumbbells' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Dumbbells</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="resistance_bands"{% if 'resistance_bands' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Resistance Bands</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="kettlebell"{% if 'kettlebell' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Kettlebell</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="yoga_mat"{% if 'yoga_mat' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Yoga Mat</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="pull_up_bar"{% if 'pull_up_bar' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Pull-up Bar</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="bench"{% if 'bench' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Weight Bench</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="treadmill"{% if 'treadmill' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Treadmill</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="stationary_bike"{% if 'stationary_bike' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Stationary Bike</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="jump_rope"{% if 'jump_rope' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Jump Rope</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="medicine_ball"{% if 'medicine_ball' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Medicine Ball</span>
+          </label>
+        </div>
+        {% if errors.home_equipment %}<div class="form-error">{{ errors.home_equipment.0 }}</div>{% endif %}
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label for="height">Height (cm)</label>
@@ -456,6 +569,20 @@ document.querySelectorAll('.bubble-option input').forEach(input => {
   if (input.checked) {
     input.closest('.bubble-option').classList.add('active');
   }
+});
+
+// Show/hide equipment section based on home gym selection
+const homeGymRadios = document.querySelectorAll('input[name="has_home_gym"]');
+const equipmentSection = document.getElementById('equipment-section');
+
+homeGymRadios.forEach(radio => {
+  radio.addEventListener('change', function() {
+    if (this.value === 'yes') {
+      equipmentSection.style.display = 'block';
+    } else {
+      equipmentSection.style.display = 'none';
+    }
+  });
 });
 
 document.getElementById('profileForm').addEventListener('submit', function(e) {

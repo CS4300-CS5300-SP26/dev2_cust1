@@ -203,6 +203,15 @@ def get_started_profile(request):
         if dietary_preference:
             profile.dietary_preference = dietary_preference
         
+        # Save home gym status
+        has_home_gym = request.POST.get('has_home_gym', '').strip()
+        if has_home_gym:
+            profile.has_home_gym = has_home_gym == 'yes'
+        
+        # Save home equipment (multiple selections)
+        home_equipment = request.POST.getlist('home_equipment')
+        profile.home_equipment = [eq for eq in home_equipment if eq]
+        
         # Save bio
         bio = request.POST.get('bio', '').strip()
         if bio:

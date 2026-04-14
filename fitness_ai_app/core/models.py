@@ -28,6 +28,19 @@ class UserProfile(models.Model):
         ('gluten_free', 'Gluten-Free'),
     ]
     
+    HOME_EQUIPMENT_CHOICES = [
+        ('dumbbells', 'Dumbbells'),
+        ('resistance_bands', 'Resistance Bands'),
+        ('kettlebell', 'Kettlebell'),
+        ('yoga_mat', 'Yoga Mat'),
+        ('pull_up_bar', 'Pull-up Bar'),
+        ('bench', 'Weight Bench'),
+        ('treadmill', 'Treadmill'),
+        ('stationary_bike', 'Stationary Bike'),
+        ('jump_rope', 'Jump Rope'),
+        ('medicine_ball', 'Medicine Ball'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
     height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
@@ -36,6 +49,8 @@ class UserProfile(models.Model):
     primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES, null=True, blank=True)
     experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, null=True, blank=True)
     dietary_preference = models.CharField(max_length=20, choices=DIETARY_PREFERENCE_CHOICES, null=True, blank=True)
+    has_home_gym = models.BooleanField(null=True, blank=True, help_text="Does user have home gym setup")
+    home_equipment = models.JSONField(default=list, blank=True, help_text="Available home exercise equipment")
     bio = models.TextField(null=True, blank=True, help_text="About you and your fitness journey")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
