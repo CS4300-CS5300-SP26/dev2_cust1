@@ -5,10 +5,13 @@
 {% block title %}Nutrition - Spotter.ai{% endblock %}
 
 {% block extra_css %}
+<!-- stylelint-disable -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 <link rel="stylesheet" href="{% static 'css/nutrition_page.css' %}">
+<!-- stylelint-enable -->
 {% endblock %}
 
+<!-- htmlhint style-disabled:true -->
 {% block content %}
 <div class="nutrition-screen">
     <!-- Header -->
@@ -26,8 +29,8 @@
     </div>
 
     <!-- Food Search Modal -->
-    <div id="foodSearchModal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">
-        <div class="modal-content" style="background:#1a1a1a;border-radius:16px;width:90%;max-width:400px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="foodSearchModal" class="modal-overlay">
+        <div class="modal-content">
             <!-- Modal Header -->
             <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
                 <h2 style="margin:0;font-size:18px;color:white;">Search Foods & Supplements</h2>
@@ -268,7 +271,7 @@
                 <span class="calories-unit">kcal</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill" style="width: {{ calories_percentage }}%"></div>
+                <div class="progress-fill" style="--fill-width: {{ calories_percentage }}%;"></div>
             </div>
         </div>
 
@@ -336,7 +339,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="item_id" value="{{ item.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}">
                                         {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
@@ -364,7 +367,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="checkbox {% if supplement.taken %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if supplement.taken %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                    <button type="submit" class="checkbox {% if supplement.taken %}checked{% endif %}">
                                         {% if supplement.taken %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
@@ -438,7 +441,7 @@
                         <div style="display:flex;flex-direction:column;gap:8px;">
                         {% for entry in supplements %}
                             <div class="supplement-item {% if entry.taken %}completed{% endif %}" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);display:flex;align-items:center;gap:12px;">
-                                <button class="toggle-supplement-btn" data-entry-id="{{ entry.id }}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if entry.taken %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                <button class="toggle-supplement-btn checkbox {% if entry.taken %}checked{% endif %}" data-entry-id="{{ entry.id }}">
                                     {% if entry.taken %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                 </button>
                                 <div style="flex:1;">

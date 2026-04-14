@@ -493,6 +493,7 @@ span.flatpickr-weekday {
     height: 100%;
     background-color: var(--accent);
     transition: width 0.3s ease;
+    width: var(--fill-width, 0%);
 }
 
 /* Macros Card */
@@ -843,4 +844,102 @@ span.flatpickr-weekday {
 svg {
     width: 24px;
     height: 24px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal-content {
+    background: #1a1a1a;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Utility Classes */
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.text-muted {
+    color: #888;
+    font-size: 12px;
+}
+
+.text-gray {
+    color: #666;
+}
+
+.input-field {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.text-label {
+    display: block;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.mb-12 {
+    margin-bottom: 12px;
+}
+
+.mb-16 {
+    margin-bottom: 16px;
+}
+
+.mb-4 {
+    margin-bottom: 4px;
+}
+
+.mt-2 {
+    margin-top: 2px;
+}
+
+.p-20 {
+    padding: 20px;
+}
+
+.p-16 {
+    padding: 16px 20px;
 }
