@@ -24,7 +24,18 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, Workout, Exercise, PasswordReset
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, UserProfile
+
+
+def get_user_calorie_goal(user, default=2400):
+    """
+    Fetch the user's calorie goal from their profile, or return default if not set.
+    """
+    try:
+        profile = UserProfile.objects.get(user=user)
+        return profile.calorie_goal or default
+    except UserProfile.DoesNotExist:
+        return default
 
 
 def splash(request):
@@ -397,12 +408,7 @@ def home_dash(request):
     ).aggregate(total=Sum('calories'))['total'] or 0
     
     # Get calorie goal from user profile or use default
-    from core.models import UserProfile
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-        calorie_goal = profile.calorie_goal or 2400
-    except UserProfile.DoesNotExist:
-        calorie_goal = 2400
+    calorie_goal = get_user_calorie_goal(request.user)
     
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
     
@@ -601,12 +607,7 @@ def nutrition_page(request):
     total_fats = totals['total_fats'] or 0
 
     # Get calorie goal from user profile or use default
-    from core.models import UserProfile
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-        calorie_goal = profile.calorie_goal or 2400
-    except UserProfile.DoesNotExist:
-        calorie_goal = 2400
+    calorie_goal = get_user_calorie_goal(request.user)
     
     calories_percentage = min(
         round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
