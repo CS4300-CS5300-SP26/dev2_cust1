@@ -32,7 +32,7 @@
     top: 46px;
     right: 0;
     background: #1a1a1a;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 12px;
     padding: 8px 0;
     min-width: 200px;
@@ -46,12 +46,12 @@
 
 .profile-dropdown .user-info {
     padding: 14px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .profile-dropdown .user-email {
     font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .profile-dropdown .user-name {
@@ -85,7 +85,7 @@
     height: 68px;
     background: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -98,7 +98,7 @@
     align-items: center;
     gap: 4px;
     text-decoration: none;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.65);
     font-size: 0.7rem;
     font-weight: 500;
     transition: color 0.2s;
