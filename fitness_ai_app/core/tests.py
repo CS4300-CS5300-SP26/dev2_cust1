@@ -251,8 +251,8 @@ class EmailVerificationViewTests(TestCase):
 
     def test_valid_token_auto_logs_in(self):
         r = self.client.get(f'/verify_email/{self.verification.token}/')
-        self.assertIn('home_dash', r.url)
-        r2 = self.client.get('/home_dash/')
+        self.assertIn('get_started_profile', r.url)
+        r2 = self.client.get('/get_started_profile/')
         self.assertEqual(r2.status_code, 200)
 
     def test_already_verified_token(self):
