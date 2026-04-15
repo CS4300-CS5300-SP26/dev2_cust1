@@ -3135,3 +3135,327 @@ class UserProfileHomeGymTests(TestCase):
         # Reload and verify no is checked
         response = self.client.get('/get_started_profile/')
         self.assertContains(response, 'value="no" checked')
+
+
+# ---------------------------------------------------------------------------
+#  Onboarding feature tests
+# ---------------------------------------------------------------------------
+
+class OnboardingCompletionTests(TestCase):
+    """Tests for onboarding_completed field and skip button functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='onboard@example.com',
+            email='onboard@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='onboard@example.com', password='TestPass123!')
+    
+    def test_profile_created_on_get_started_access(self):
+        """Test that UserProfile is created when accessing get_started_profile if it doesn't exist."""
+        # Delete profile if it exists
+        from core.models import UserProfile
+        UserProfile.objects.filter(user=self.user).delete()
+        
+        # Access the page
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Profile should now exist
+        profile = self.user.profile
+        self.assertIsNotNone(profile)
+        self.assertFalse(profile.onboarding_completed)
+    
+    def test_onboarding_completed_false_by_default(self):
+        """Test that new profiles have onboarding_completed=False."""
+        from core.models import UserProfile
+        UserProfile.objects.filter(user=self.user).delete()
+        
+        # Access the page (creates profile)
+        self.client.get('/get_started_profile/')
+        
+        profile = self.user.profile
+        self.assertFalse(profile.onboarding_completed)
+    
+    def test_skip_button_shows_for_new_users(self):
+        """Test that skip button is visible for users with onboarding_completed=False."""
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=self.user)
+        profile.onboarding_completed = False
+        profile.save()
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertContains(response, 'Skip for Now')
+    
+    def test_skip_button_hidden_after_completion(self):
+        """Test that skip button is hidden after onboarding_completed=True."""
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=self.user)
+        profile.onboarding_completed = True
+        profile.save()
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertNotContains(response, 'Skip for Now')
+    
+    def test_skip_parameter_marks_onboarding_complete(self):
+        """Test that ?skip=true parameter sets onboarding_completed=True."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+        
+        # Should redirect to home_dash
+        self.assertContains(response, 'home')
+    
+    def test_skip_parameter_redirects_to_home(self):
+        """Test that ?skip=true redirects to home_dash."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('home_dash', response.url)
+    
+    def test_form_submission_marks_onboarding_complete(self):
+        """Test that form submission sets onboarding_completed=True."""
+        response = self.client.post('/get_started_profile/', {
+            'name': 'Test User',
+            'height': '180',
+            'weight': '75',
+        }, follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+    
+    def test_discard_button_marks_onboarding_complete(self):
+        """Test that discard button redirects with skip parameter."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+
+
+class SocialLoginUserFieldTests(TestCase):
+    """Tests for social_login_user field tracking."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_social_login_user_false_by_default(self):
+        """Test that new profiles have social_login_user=False."""
+        from core.models import UserProfile
+        user = User.objects.create_user(
+            username='regular@example.com',
+            email='regular@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        profile = UserProfile.objects.create(user=user)
+        self.assertFalse(profile.social_login_user)
+    
+    def test_email_verified_user_shows_skip_button(self):
+        """Test that email-verified users see skip button on first onboarding."""
+        from core.models import UserProfile, EmailVerification
+        
+        # Create user via email signup
+        user = User.objects.create_user(
+            username='emailsignup@example.com',
+            email='emailsignup@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Simulate email verification and redirect to get_started_profile
+        self.client.login(username='emailsignup@example.com', password='TestPass123!')
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Profile should be created
+        profile = user.profile
+        self.assertFalse(profile.onboarding_completed)
+        self.assertFalse(profile.social_login_user)
+        
+        # Skip button should show
+        self.assertContains(response, 'Skip for Now')
+
+
+class OnboardingMiddlewareTests(TestCase):
+    """Tests for SocialLoginOnboardingMiddleware behavior."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_middleware_redirects_incomplete_social_user(self):
+        """Test that middleware redirects users with social_login_user=True and onboarding_completed=False."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='socialuser@example.com',
+            email='socialuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as social login user with incomplete onboarding
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='socialuser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should redirect to get_started_profile
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('get_started_profile', response.url)
+    
+    def test_middleware_does_not_redirect_completed_user(self):
+        """Test that middleware doesn't redirect users with onboarding_completed=True."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='completeduser@example.com',
+            email='completeduser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as social login user with completed onboarding
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=True
+        )
+        
+        self.client.login(username='completeduser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should NOT redirect to get_started_profile
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_middleware_does_not_redirect_non_social_user(self):
+        """Test that middleware doesn't redirect regular (non-social) users."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='regularuser@example.com',
+            email='regularuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Create profile but mark social_login_user=False
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=False,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='regularuser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should NOT redirect
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_middleware_does_not_redirect_from_onboarding_page(self):
+        """Test that middleware doesn't create redirect loop on onboarding page."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='looptest@example.com',
+            email='looptest@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as incomplete social user
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='looptest@example.com', password='TestPass123!')
+        
+        # Accessing get_started_profile should NOT redirect
+        response = self.client.get('/get_started_profile/', follow=False)
+        self.assertEqual(response.status_code, 200)
+
+
+class GetStartedProfileIntegrationTests(TestCase):
+    """Integration tests for complete get_started_profile flow."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_complete_onboarding_flow_email_signup(self):
+        """Test complete flow: create account -> verify email -> skip onboarding -> access home."""
+        from core.models import UserProfile, EmailVerification
+        
+        # Step 1: Create account
+        user = User.objects.create_user(
+            username='fullflow@example.com',
+            email='fullflow@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Step 2: Login (simulating after email verification)
+        self.client.login(username='fullflow@example.com', password='TestPass123!')
+        
+        # Step 3: Access get_started_profile - should show skip button
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Skip for Now')
+        
+        # Step 4: Click skip
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        # Step 5: Verify onboarding is completed
+        user.refresh_from_db()
+        profile = user.profile
+        self.assertTrue(profile.onboarding_completed)
+        
+        # Step 6: Verify redirect to home_dash succeeded
+        self.assertContains(response, 'home')
+        
+        # Step 7: Verify skip button is hidden on subsequent visits
+        response = self.client.get('/get_started_profile/')
+        self.assertNotContains(response, 'Skip for Now')
+    
+    def test_complete_onboarding_flow_form_submission(self):
+        """Test complete flow: create account -> fill form -> completion."""
+        user = User.objects.create_user(
+            username='formflow@example.com',
+            email='formflow@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        self.client.login(username='formflow@example.com', password='TestPass123!')
+        
+        # Submit form
+        response = self.client.post('/get_started_profile/', {
+            'name': 'John Doe',
+            'height': '180',
+            'weight': '75',
+            'age': '30',
+            'primary_goal': 'muscle_gain',
+            'experience_level': 'intermediate',
+            'dietary_preference': 'omnivore',
+            'has_home_gym': 'yes',
+        }, follow=True)
+        
+        # Verify onboarding completed
+        user.refresh_from_db()
+        profile = user.profile
+        self.assertTrue(profile.onboarding_completed)
+        self.assertEqual(profile.height, 180)
+        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.age, 30)
