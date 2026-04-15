@@ -230,9 +230,19 @@ def get_started_profile(request):
         else:
             profile.bio = None
         
+        # Mark onboarding as completed
+        profile.onboarding_completed = True
         profile.save()
         
         messages.success(request, 'Profile updated successfully!')
+        return redirect('home_dash')
+    
+    # Handle GET request with skip parameter
+    if request.GET.get('skip') == 'true':
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        profile.onboarding_completed = True
+        profile.save()
         return redirect('home_dash')
     
     # GET request - pass profile data to template
@@ -399,6 +409,14 @@ def user_logout(request):
 def home_dash(request):
     from datetime import date
     from django.db.models import Sum
+    
+    # Redirect to onboarding if social login user hasn't completed it
+    try:
+        profile = request.user.profile
+        if profile.social_login_user and not profile.onboarding_completed:
+            return redirect('get_started_profile')
+    except:
+        pass
     
     # Check for discard action from profile
     if request.GET.get('discard') == 'true':

@@ -365,7 +365,7 @@
 
   <!-- Current User Info -->
   <div class="skip-button-container">
-    <a href="{% url 'home_dash' %}" class="top-skip-button">Skip for Now</a>
+    <a href="{% url 'get_started_profile' %}?skip=true" class="top-skip-button">Skip for Now</a>
   </div>
   <div class="profile-section">
     <div class="account-info-header">
@@ -599,8 +599,8 @@
 
 <script>
 function discardChanges() {
-  // Redirect to home with discard parameter
-  window.location.href = '{% url "home_dash" %}?discard=true';
+  // Redirect to get_started_profile with skip parameter to mark onboarding as complete
+  window.location.href = '{% url "get_started_profile" %}?skip=true';
 }
 
 document.querySelectorAll('.bubble-option input').forEach(input => {
@@ -637,10 +637,19 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
   button.disabled = true;
   button.textContent = 'Saving...';
   
+  // Mark that user has seen this page in local storage
+  localStorage.setItem('spotter_onboarding_completed', 'true');
+  localStorage.setItem('spotter_onboarding_timestamp', new Date().toISOString());
+  
   setTimeout(() => {
     button.disabled = false;
     button.textContent = originalText;
   }, 2000);
+});
+
+// Mark that user has seen this page when it loads
+document.addEventListener('DOMContentLoaded', function() {
+  localStorage.setItem('spotter_onboarding_seen', 'true');
 });
 </script>
 {% endblock %}

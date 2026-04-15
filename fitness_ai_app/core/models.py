@@ -52,6 +52,8 @@ class UserProfile(models.Model):
     has_home_gym = models.BooleanField(null=True, blank=True, help_text="Does user have home gym setup")
     home_equipment = models.JSONField(default=list, blank=True, help_text="Available home exercise equipment")
     bio = models.TextField(null=True, blank=True, help_text="About you and your fitness journey")
+    onboarding_completed = models.BooleanField(default=False, help_text="Whether user has completed the get_started_profile onboarding")
+    social_login_user = models.BooleanField(default=False, help_text="Whether user came from a social login")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
