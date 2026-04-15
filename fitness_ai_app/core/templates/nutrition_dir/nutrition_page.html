@@ -38,6 +38,83 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
+
+  /* Confirmation Modal Styles */
+  .delete-confirmation-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  
+  .delete-confirmation-modal.active {
+    display: flex;
+  }
+  
+  .delete-confirmation-content {
+    background: #1a1a1a;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(246, 125, 38, 0.2);
+  }
+  
+  .delete-confirmation-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    margin: 0 0 16px 0;
+  }
+  
+  .delete-confirmation-message {
+    font-size: 14px;
+    color: #aaa;
+    margin: 0 0 32px 0;
+    line-height: 1.5;
+  }
+  
+  .delete-confirmation-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  
+  .delete-confirmation-buttons button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .delete-confirmation-buttons .btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+  }
+  
+  .delete-confirmation-buttons .btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+  }
+  
+  .delete-confirmation-buttons .btn-delete {
+    background: #e74c3c;
+    color: white;
+  }
+  
+  .delete-confirmation-buttons .btn-delete:hover {
+    background: #c0392b;
+  }
 </style>
 {% endblock %}
 
@@ -263,7 +340,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="item_id" value="{{ item.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="delete-btn" title="Delete item" onclick="return confirm('Delete this item?');" style="border:none;background:none;">
+                                    <button type="button" class="delete-btn" title="Delete item" data-delete-type="item" data-delete-message="Delete this item?" style="border:none;background:none;">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="3 6 5 6 21 6"></polyline>
                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -327,6 +404,18 @@
                     <p style="margin-top:8px;">Loading foods...</p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmationModal" class="delete-confirmation-modal">
+    <div class="delete-confirmation-content">
+        <h2 class="delete-confirmation-title">Confirm Delete</h2>
+        <p class="delete-confirmation-message" id="deleteConfirmationMessage"></p>
+        <div class="delete-confirmation-buttons">
+            <button class="btn-cancel" onclick="closeDeleteConfirmation()">Cancel</button>
+            <button class="btn-delete" onclick="confirmDelete()">Delete</button>
         </div>
     </div>
 </div>
@@ -714,6 +803,40 @@
             saveFoodBtn.textContent = 'Save to Database';
             showStatus('Failed to save. Please try again.', true);
         });
+    });
+
+    // Delete confirmation modal
+    let currentDeleteForm = null;
+
+    document.querySelectorAll('[data-delete-message]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = this.closest('form');
+            const message = this.dataset.deleteMessage;
+            currentDeleteForm = form;
+            
+            document.getElementById('deleteConfirmationMessage').textContent = message;
+            document.getElementById('deleteConfirmationModal').classList.add('active');
+        });
+    });
+
+    function closeDeleteConfirmation() {
+        document.getElementById('deleteConfirmationModal').classList.remove('active');
+        currentDeleteForm = null;
+    }
+
+    function confirmDelete() {
+        if (currentDeleteForm) {
+            currentDeleteForm.submit();
+        }
+        closeDeleteConfirmation();
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('deleteConfirmationModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeDeleteConfirmation();
+        }
     });
 </script>
 {% endblock %}
