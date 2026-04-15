@@ -60,18 +60,6 @@
 {{ block.super }}
 {% endblock %}
 
-{% block pre_content %}
-<!-- Logo on same line as profile bubble -->
-<div class="top-logo">
-  <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai">
-  <div class="top-logo-text">
-    <h2>Nutrition</h2>
-    <p>Meal Plan</p>
-  </div>
-</div>
-{{ block.super }}
-{% endblock %}
-
 {% block content %}
 <div class="nutrition-screen">
     <!-- Header -->
