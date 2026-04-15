@@ -35,7 +35,7 @@ def splash(request):
 
 @login_required
 def chat_page(request):
-    return render(request, 'core/chat.html', {'active_tab': 'ai'})
+    return render(request, 'core/chat.html')
 
 
 @csrf_exempt
@@ -55,17 +55,6 @@ def api_chat(request):
         return JsonResponse({"error": "OPENAI_API_KEY not configured."}, status=500)
 
     client = OpenAI(api_key=api_key)
-
-    system_prompt = {
-        "role": "system",
-        "content": (
-            "You are an AI chatbot for a fitness app called Spotter.ai. "
-            "Only discuss health, food, and fitness with the user. "
-            "If the user asks about anything else, politely redirect them "
-            "back to health, food, or fitness topics. "
-            "Keep your responses short — no more than 2-3 sentences for usability."
-        ),
-    }
 
     try:
         response = client.chat.completions.create(
@@ -293,25 +282,7 @@ def user_logout(request):
 
 @login_required
 def home_dash(request):
-    from datetime import date
-    from django.db.models import Sum
-    
-    today = date.today()
-    total_calories = FoodItem.objects.filter(
-        meal__user=request.user,
-        meal__date=today,
-        completed=True
-    ).aggregate(total=Sum('calories'))['total'] or 0
-    
-    calorie_goal = 2400
-    calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
-    
-    return render(request, 'home_dash_dir/home_dash.html', {
-        'active_tab': 'home',
-        'total_calories': total_calories,
-        'calorie_goal': calorie_goal,
-        'calories_percentage': calories_percentage
-    })
+    return render(request, 'home_dash_dir/home_dash.html', {'active_tab': 'home'})
 
 
 @login_required
