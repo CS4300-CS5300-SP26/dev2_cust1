@@ -12,18 +12,6 @@ class Command(BaseCommand):
 
         # Get or create the default site
         site = Site.objects.get_or_create(id=1)[0]
-        
-        # Update site domain from SITE_DOMAIN env var or derive from ALLOWED_HOSTS
-        site_domain = os.getenv('SITE_DOMAIN')
-        if not site_domain:
-            allowed_hosts = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-            site_domain = next((h.strip() for h in allowed_hosts if h.strip() and h.strip() not in ('localhost', '127.0.0.1', 'testserver')), None)
-        
-        if site_domain:
-            site.domain = site_domain
-            site.name = site_domain
-            site.save()
-            self.stdout.write(self.style.SUCCESS(f'✓ Site domain updated to {site_domain}'))
 
         # Google OAuth
         google_client_id = os.getenv('GOOGLE_CLIENT_ID', '')
