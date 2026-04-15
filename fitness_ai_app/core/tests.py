@@ -2667,3 +2667,450 @@ class SetupSocialAppsCommandTests(TestCase):
         self.assertEqual(existing_app.client_id, 'updated-insta-id')
 
 
+
+# ============================================================================
+# DELETE MODAL CONFIRMATION TESTS
+# ============================================================================
+
+class DeleteModalTemplateTests(TestCase):
+    """Tests for delete confirmation modal HTML structure in templates"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal1',
+            email='deletemodal1@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal1', password='testpass123')
+
+    def test_train_page_has_modal_container(self):
+        """Test that train page contains the delete confirmation modal container"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'id="deleteConfirmationModal"')
+        self.assertContains(response, 'class="delete-confirmation-modal"')
+
+    def test_nutrition_page_has_modal_container(self):
+        """Test that nutrition page contains the delete confirmation modal container"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'id="deleteConfirmationModal"')
+        self.assertContains(response, 'class="delete-confirmation-modal"')
+
+    def test_train_page_modal_has_title(self):
+        """Test that modal has 'Confirm Delete' title"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'Confirm Delete')
+        self.assertContains(response, 'class="delete-confirmation-title"')
+
+    def test_nutrition_page_modal_has_title(self):
+        """Test that nutrition modal has 'Confirm Delete' title"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'Confirm Delete')
+        self.assertContains(response, 'class="delete-confirmation-title"')
+
+    def test_train_page_modal_has_message_element(self):
+        """Test that modal has dynamic message element"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'id="deleteConfirmationMessage"')
+
+    def test_nutrition_page_modal_has_message_element(self):
+        """Test that nutrition modal has dynamic message element"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'id="deleteConfirmationMessage"')
+
+    def test_train_page_modal_has_buttons(self):
+        """Test that modal has Cancel and Delete buttons"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'class="btn-cancel"')
+        self.assertContains(response, 'class="btn-delete"')
+        self.assertContains(response, '>Cancel<')
+        self.assertContains(response, '>Delete<')
+
+    def test_nutrition_page_modal_has_buttons(self):
+        """Test that nutrition modal has Cancel and Delete buttons"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'class="btn-cancel"')
+        self.assertContains(response, 'class="btn-delete"')
+
+
+class DeleteButtonStructureTests(TestCase):
+    """Tests for delete button structure and attributes"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal2',
+            email='deletemodal2@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal2', password='testpass123')
+        
+        # Create test data
+        self.workout = Workout.objects.create(
+            user=self.user,
+            name='Test Workout',
+            goal='strength',
+            date=date.today()
+        )
+        self.exercise = Exercise.objects.create(
+            workout=self.workout,
+            name='Test Exercise',
+            muscle_group='arms',
+            sets=3,
+            reps=10
+        )
+        self.meal = Meal.objects.create(
+            user=self.user,
+            name='Test Meal',
+            date=date.today()
+        )
+        self.food_item = FoodItem.objects.create(
+            meal=self.meal,
+            name='Test Food',
+            calories=200
+        )
+
+    def test_workout_delete_button_has_data_attributes(self):
+        """Test that workout delete button has required data attributes"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'data-delete-message="Delete this workout and all its exercises?"')
+        self.assertContains(response, 'data-delete-type="workout"')
+
+    def test_exercise_delete_button_has_data_attributes(self):
+        """Test that exercise delete button has required data attributes"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'data-delete-message="Delete this exercise?"')
+        self.assertContains(response, 'data-delete-type="exercise"')
+
+    def test_food_item_delete_button_has_data_attributes(self):
+        """Test that food item delete button has required data attributes"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'data-delete-message="Delete this item?"')
+        self.assertContains(response, 'data-delete-type="item"')
+
+    def test_delete_buttons_use_button_type(self):
+        """Test that delete buttons use type='button'"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        self.assertIn('type="button"', content)
+
+    def test_delete_buttons_no_onclick_confirm(self):
+        """Test that delete buttons don't have onclick='return confirm()' handlers"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        self.assertNotIn('onclick="return confirm', content)
+
+    def test_nutrition_delete_buttons_no_onclick_confirm(self):
+        """Test that nutrition delete buttons don't have onclick='return confirm()' handlers"""
+        response = self.client.get('/nutrition/')
+        content = response.content.decode()
+        self.assertNotIn('onclick="return confirm', content)
+
+
+class DeleteModalCSSTests(TestCase):
+    """Tests for delete modal CSS styling"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal3',
+            email='deletemodal3@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal3', password='testpass123')
+
+    def test_train_page_has_modal_css_classes(self):
+        """Test that train page template contains modal CSS classes"""
+        response = self.client.get('/train/')
+        
+        css_classes = [
+            'delete-confirmation-modal',
+            'delete-confirmation-content',
+            'delete-confirmation-title',
+            'btn-cancel',
+            'btn-delete',
+        ]
+        
+        for css_class in css_classes:
+            with self.subTest(css_class=css_class):
+                self.assertContains(response, f'class="{css_class}"')
+
+    def test_nutrition_page_has_modal_css_classes(self):
+        """Test that nutrition page template contains modal CSS classes"""
+        response = self.client.get('/nutrition/')
+        
+        css_classes = [
+            'delete-confirmation-modal',
+            'delete-confirmation-content',
+            'delete-confirmation-title',
+            'btn-cancel',
+            'btn-delete',
+        ]
+        
+        for css_class in css_classes:
+            with self.subTest(css_class=css_class):
+                self.assertContains(response, f'class="{css_class}"')
+
+    def test_train_page_has_modal_styling(self):
+        """Test that train page has CSS styles for modal"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        styles = [
+            '.delete-confirmation-modal',
+            '.delete-confirmation-content',
+            '.btn-cancel',
+            '.btn-delete',
+        ]
+        
+        for style in styles:
+            with self.subTest(style=style):
+                self.assertIn(style, content)
+
+    def test_nutrition_page_has_modal_styling(self):
+        """Test that nutrition page has CSS styles for modal"""
+        response = self.client.get('/nutrition/')
+        content = response.content.decode()
+        
+        styles = [
+            '.delete-confirmation-modal',
+            '.delete-confirmation-content',
+            '.btn-cancel',
+            '.btn-delete',
+        ]
+        
+        for style in styles:
+            with self.subTest(style=style):
+                self.assertIn(style, content)
+
+
+class DeleteModalJavaScriptTests(TestCase):
+    """Tests for delete modal JavaScript functionality"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal4',
+            email='deletemodal4@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal4', password='testpass123')
+
+    def test_train_page_has_javascript_functions(self):
+        """Test that train page contains required JavaScript functions"""
+        response = self.client.get('/train/')
+        
+        functions = ['closeDeleteConfirmation', 'confirmDelete']
+        
+        for func in functions:
+            with self.subTest(func=func):
+                self.assertContains(response, f'function {func}')
+
+    def test_nutrition_page_has_javascript_functions(self):
+        """Test that nutrition page contains required JavaScript functions"""
+        response = self.client.get('/nutrition/')
+        
+        functions = ['closeDeleteConfirmation', 'confirmDelete']
+        
+        for func in functions:
+            with self.subTest(func=func):
+                self.assertContains(response, f'function {func}')
+
+    def test_train_page_has_event_listener(self):
+        """Test that train page has event listener for delete buttons"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('[data-delete-message]', content)
+        self.assertIn('addEventListener', content)
+        self.assertIn('deleteConfirmationModal', content)
+
+    def test_nutrition_page_has_event_listener(self):
+        """Test that nutrition page has event listener for delete buttons"""
+        response = self.client.get('/nutrition/')
+        content = response.content.decode()
+        
+        self.assertIn('[data-delete-message]', content)
+        self.assertIn('addEventListener', content)
+        self.assertIn('deleteConfirmationModal', content)
+
+    def test_train_page_modal_toggle_logic(self):
+        """Test that train page has logic to toggle modal active state"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('deleteConfirmationModal', content)
+        self.assertIn('classList.add', content)
+        self.assertIn('classList.remove', content)
+        self.assertIn('active', content)
+
+    def test_nutrition_page_modal_toggle_logic(self):
+        """Test that nutrition page has logic to toggle modal active state"""
+        response = self.client.get('/nutrition/')
+        content = response.content.decode()
+        
+        self.assertIn('deleteConfirmationModal', content)
+        self.assertIn('classList.add', content)
+        self.assertIn('classList.remove', content)
+        self.assertIn('active', content)
+
+
+class DeleteModalMessagesTests(TestCase):
+    """Tests for delete modal messages"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal5',
+            email='deletemodal5@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal5', password='testpass123')
+        
+        # Create test data
+        self.workout = Workout.objects.create(
+            user=self.user,
+            name='Test Workout',
+            goal='strength',
+            date=date.today()
+        )
+        self.exercise = Exercise.objects.create(
+            workout=self.workout,
+            name='Test Exercise',
+            muscle_group='arms',
+            sets=3,
+            reps=10
+        )
+        self.meal = Meal.objects.create(
+            user=self.user,
+            name='Test Meal',
+            date=date.today()
+        )
+        self.food_item = FoodItem.objects.create(
+            meal=self.meal,
+            name='Test Food',
+            calories=200
+        )
+
+    def test_workout_delete_message(self):
+        """Test that workout delete button shows correct message"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'Delete this workout and all its exercises?')
+
+    def test_exercise_delete_message(self):
+        """Test that exercise delete button shows correct message"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'Delete this exercise?')
+
+    def test_food_item_delete_message(self):
+        """Test that food item delete button shows correct message"""
+        response = self.client.get('/nutrition/')
+        self.assertContains(response, 'Delete this item?')
+
+
+class DeleteModalIntegrationTests(TestCase):
+    """Integration tests for delete modal with forms"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal6',
+            email='deletemodal6@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal6', password='testpass123')
+        
+        self.workout = Workout.objects.create(
+            user=self.user,
+            name='Test Workout',
+            goal='strength',
+            date=date.today()
+        )
+
+    def test_delete_form_has_csrf_token(self):
+        """Test that delete form includes CSRF token"""
+        response = self.client.get('/train/')
+        self.assertContains(response, 'csrfmiddlewaretoken')
+
+    def test_only_one_modal_created(self):
+        """Test that only one modal is created"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        modal_count = content.count('id="deleteConfirmationModal"')
+        self.assertEqual(modal_count, 1, "There should be exactly one modal container")
+
+    def test_modal_reused_for_multiple_delete_types(self):
+        """Test that same modal works for different delete types"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('data-delete-type="workout"', content)
+        self.assertEqual(content.count('id="deleteConfirmationModal"'), 1)
+
+
+class DeleteModalEventHandlingTests(TestCase):
+    """Tests for delete modal event handling logic"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='deletemodal7',
+            email='deletemodal7@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='deletemodal7', password='testpass123')
+
+    def test_modal_event_listener_uses_data_attribute(self):
+        """Test that event listener uses data-delete-message selector"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('[data-delete-message]', content)
+
+    def test_modal_prevents_default_form_submission(self):
+        """Test that modal prevents default form submission"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('preventDefault', content)
+
+    def test_modal_captures_form_reference(self):
+        """Test that modal captures form reference before showing"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('currentDeleteForm', content)
+        self.assertIn('closest', content)
+
+    def test_modal_extracts_message_from_data_attribute(self):
+        """Test that modal extracts message from data attribute"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('dataset.deleteMessage', content)
+
+    def test_confirm_function_submits_form(self):
+        """Test that confirmDelete function submits the captured form"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('function confirmDelete', content)
+        self.assertIn('.submit()', content)
+
+    def test_close_function_removes_modal_class(self):
+        """Test that closeDeleteConfirmation removes active class"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('function closeDeleteConfirmation', content)
+        self.assertIn('classList.remove', content)
+        self.assertIn('active', content)
+
+    def test_outside_click_closes_modal(self):
+        """Test that clicking outside modal closes it"""
+        response = self.client.get('/train/')
+        content = response.content.decode()
+        
+        self.assertIn('addEventListener', content)
+        self.assertIn('closeDeleteConfirmation', content)
