@@ -1,12 +1,5 @@
+/* Page-specific variables (shared tokens in app.css) */
 :root {
-    --background: #0f0f0f;
-    --card: #181818;
-    --border: #242424;
-    --accent: #e85c00;
-    --accentDim: rgba(232, 92, 0, 0.08);
-    --textPrimary: #ffffff;
-    --textSecondary: #cccccc;
-    --textMuted: #999999;
     --durationColor: #e85c00;
     --exerciseColor: #22c55e;
     --caloriesColor: #e83355;

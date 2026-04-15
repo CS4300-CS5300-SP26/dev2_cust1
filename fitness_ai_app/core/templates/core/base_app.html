@@ -4,11 +4,7 @@
 
 {% block page_css %}
 <link rel="stylesheet" href="{% static 'css/app.css' %}">
-<style>
-  .logo-container {
-    display: none;
-  }
-</style>
+<link rel="stylesheet" href="{% static 'css/river.css' %}">
 {% endblock %}
 
 {% block pre_content %}
@@ -31,6 +27,12 @@
 {% endblock %}
 
 {% block post_container %}
+<!-- The River — Desktop sidebar -->
+<aside class="river-sidebar" id="river-sidebar" aria-label="The River — Live activity feed"></aside>
+
+<!-- The River — Mobile bottom bar -->
+<div class="river-mobile" id="river-mobile"></div>
+
 <!-- Bottom Navigation -->
 <div class="bottom-nav">
     <a href="{% url 'home_dash' %}" class="nav-item {% if active_tab == 'home' %}active{% endif %}">
@@ -65,4 +67,7 @@
         }
     });
 </script>
+
+<!-- The River JS -->
+<script src="{% static 'js/river.js' %}"></script>
 {% endblock %}
