@@ -4,6 +4,43 @@
 
 {% block title %}Nutrition - Spotter.ai{% endblock %}
 
+{% block page_css %}
+{{ block.super }}
+<style>
+  .top-logo {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-logo img {
+    width: 48px;
+    height: auto;
+  }
+  .top-logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .top-logo-text h2 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin: 0;
+    color: #f67d26;
+    letter-spacing: -0.5px;
+  }
+  .top-logo-text p {
+    font-size: 0.6rem;
+    margin: 0;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+{% endblock %}
+
 {% block extra_css %}
 <!-- stylelint-disable -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
@@ -12,6 +49,18 @@
 {% endblock %}
 
 <!-- htmlhint style-disabled:true -->
+{% block pre_content %}
+<!-- Logo on same line as profile bubble -->
+<div class="top-logo">
+  <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai">
+  <div class="top-logo-text">
+    <h2>Nutrition</h2>
+    <p>Meal Plan</p>
+  </div>
+</div>
+{{ block.super }}
+{% endblock %}
+
 {% block content %}
 <div class="nutrition-screen">
     <!-- Header -->
