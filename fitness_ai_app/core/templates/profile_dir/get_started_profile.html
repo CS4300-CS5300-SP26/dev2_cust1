@@ -364,9 +364,11 @@
   </div>
 
   <!-- Current User Info -->
+  {% if is_first_time_onboarding %}
   <div class="skip-button-container">
     <a href="{% url 'get_started_profile' %}?skip=true" class="top-skip-button">Skip for Now</a>
   </div>
+  {% endif %}
   <div class="profile-section">
     <div class="account-info-header">
       <div class="profile-section-title">Account Information</div>

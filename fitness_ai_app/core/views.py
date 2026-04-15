@@ -247,14 +247,15 @@ def get_started_profile(request):
     
     # GET request - pass profile data to template
     from core.models import UserProfile
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-    except UserProfile.DoesNotExist:
-        profile = None
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Show skip button on first-time onboarding (any user who hasn't completed it yet)
+    is_first_time_onboarding = not profile.onboarding_completed
     
     return render(request, 'profile_dir/get_started_profile.html', {
         'active_tab': 'profile',
-        'profile': profile
+        'profile': profile,
+        'is_first_time_onboarding': is_first_time_onboarding
     })
 
 
