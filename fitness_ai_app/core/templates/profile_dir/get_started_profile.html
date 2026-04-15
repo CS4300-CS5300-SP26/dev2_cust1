@@ -287,6 +287,42 @@
     color: rgba(255, 255, 255, 0.9);
   }
 
+  .top-skip-button {
+    background: linear-gradient(135deg, rgba(246, 125, 38, 0.2), rgba(246, 125, 38, 0.1));
+    border: 2px solid #f67d26;
+    color: #f67d26;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .top-skip-button:hover {
+    background: linear-gradient(135deg, rgba(246, 125, 38, 0.3), rgba(246, 125, 38, 0.15));
+    border-color: #f67d26;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(246, 125, 38, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .skip-button-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+
+  .account-info-header {
+    display: block;
+  }
+
   @media (max-width: 480px) {
     .profile-container {
       padding: 16px;
@@ -328,8 +364,13 @@
   </div>
 
   <!-- Current User Info -->
+  <div class="skip-button-container">
+    <a href="{% url 'home_dash' %}" class="top-skip-button">Skip for Now</a>
+  </div>
   <div class="profile-section">
-    <div class="profile-section-title">Account Information</div>
+    <div class="account-info-header">
+      <div class="profile-section-title">Account Information</div>
+    </div>
     <div class="user-info-display">
       <div class="user-info-label">Email</div>
       <div class="user-info-value">{{ request.user.email }}</div>
@@ -544,7 +585,7 @@
     <!-- Action Buttons -->
     <div class="button-group">
       <button type="submit" class="btn-save">Save & Continue</button>
-      <a href="{% url 'home_dash' %}" class="btn-skip">Skip for Now</a>
+      <button type="button" class="btn-skip" onclick="discardChanges();">Discard</button>
     </div>
   </form>
 
@@ -557,6 +598,11 @@
 </div>
 
 <script>
+function discardChanges() {
+  // Redirect to home with discard parameter
+  window.location.href = '{% url "home_dash" %}?discard=true';
+}
+
 document.querySelectorAll('.bubble-option input').forEach(input => {
   input.addEventListener('change', function() {
     const bubbleGroup = this.closest('.bubble-group');

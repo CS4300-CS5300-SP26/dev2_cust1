@@ -400,6 +400,10 @@ def home_dash(request):
     from datetime import date
     from django.db.models import Sum
     
+    # Check for discard action from profile
+    if request.GET.get('discard') == 'true':
+        messages.info(request, 'Changes discarded. Nothing was saved.')
+    
     today = date.today()
     total_calories = FoodItem.objects.filter(
         meal__user=request.user,
