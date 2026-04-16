@@ -814,7 +814,18 @@
             }, 300);
         });
         
-        // Hide results when clicking outside
+        // Hide results when clicking outside or when leaving the input field
+        input.addEventListener('blur', function() {
+            resultsDiv.style.display = 'none';
+        });
+        
+        // Also hide when clicking on other form inputs
+        form.addEventListener('mousedown', function(e) {
+            if (e.target !== input && !resultsDiv.contains(e.target)) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+        
         document.addEventListener('click', function(e) {
             if (!container.contains(e.target)) {
                 resultsDiv.style.display = 'none';
@@ -1377,10 +1388,15 @@
                         `).join('');
                         foodSearchResults.style.display = 'block';
                     } else {
-                        foodSearchResults.innerHTML = '<div style="padding:10px;text-align:center;color:#888;">No results found</div>';
-                        foodSearchResults.style.display = 'block';
+                        foodSearchResults.innerHTML = '';
+                        foodSearchResults.style.display = 'none';
                     }
                 });
+        });
+        
+        // Close dropdown when leaving food input
+        foodNameInput.addEventListener('blur', function() {
+            foodSearchResults.style.display = 'none';
         });
     }
     
@@ -1417,8 +1433,8 @@
                         `).join('');
                         supplementSearchResults.style.display = 'block';
                     } else {
-                        supplementSearchResults.innerHTML = '<div style="padding:10px;text-align:center;color:#888;">No results found</div>';
-                        supplementSearchResults.style.display = 'block';
+                        supplementSearchResults.innerHTML = '';
+                        supplementSearchResults.style.display = 'none';
                     }
                 });
         });
