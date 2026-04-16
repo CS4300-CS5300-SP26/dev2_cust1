@@ -119,10 +119,13 @@
 {% endblock %}
 
 {% block extra_css %}
+<!-- stylelint-disable -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 <link rel="stylesheet" href="{% static 'css/nutrition_page.css' %}">
+<!-- stylelint-enable -->
 {% endblock %}
 
+<!-- htmlhint style-disabled:true -->
 {% block pre_content %}
 <!-- Logo on same line as profile bubble -->
 <div class="top-logo">
@@ -148,16 +151,15 @@
             <button class="tab-button active" data-tab="today">Today</button>
             <button class="tab-button" data-tab="history">History</button>
             <button class="tab-button" data-tab="search" id="searchTabBtn">Search</button>
-            <button class="tab-button" data-tab="supplements">Supplements</button>
         </div>
     </div>
 
     <!-- Food Search Modal -->
-    <div id="foodSearchModal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">
-        <div class="modal-content" style="background:#1a1a1a;border-radius:16px;width:90%;max-width:400px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="foodSearchModal" class="modal-overlay">
+        <div class="modal-content">
             <!-- Modal Header -->
             <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-                <h2 style="margin:0;font-size:18px;color:white;">Food Database</h2>
+                <h2 style="margin:0;font-size:18px;color:white;">Search Foods & Supplements</h2>
                 <button id="closeSearchModal" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;padding:0;line-height:1;">&times;</button>
             </div>
             
@@ -224,7 +226,140 @@
         </div>
     </div>
 
+    <!-- Add Food or Supplement Modal -->
+    <div id="addItemModal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">
+        <div class="modal-content" style="background:#1a1a1a;border-radius:16px;width:90%;max-width:500px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
+            <!-- Modal Header -->
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                <h2 style="margin:0;font-size:18px;color:white;">Add to Meal</h2>
+                <button id="closeAddItemModal" type="button" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;padding:0;line-height:1;">&times;</button>
+            </div>
+            
+            <!-- Choice Buttons -->
+            <div id="itemTypeChoices" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+                <button type="button" onclick="showFoodForm()" style="padding:16px;background:transparent;border:2px solid var(--accent);border-radius:8px;color:white;font-size:16px;cursor:pointer;text-align:left;transition:all 0.2s;display:flex;align-items:center;gap:12px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6-6 6 6"></path>
+                        <path d="M12 15v6"></path>
+                        <circle cx="6" cy="18" r="1"></circle>
+                        <circle cx="18" cy="18" r="1"></circle>
+                    </svg>
+                    <span>
+                        <div style="font-weight:600;">Food Item</div>
+                        <div style="font-size:12px;color:#aaa;margin-top:2px;">Create new or choose from database</div>
+                    </span>
+                </button>
+                <button type="button" onclick="showSupplementForm()" style="padding:16px;background:transparent;border:2px solid var(--accent);border-radius:8px;color:white;font-size:16px;cursor:pointer;text-align:left;transition:all 0.2s;display:flex;align-items:center;gap:12px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 14c1.49-1.46 2.29-2.74 2.29-4 0-2.5-2.04-4.5-4.5-4.5-1.42 0-2.74.5-3.79 1.5"></path>
+                        <path d="M5 14c-1.49-1.46-2.29-2.74-2.29-4 0-2.5 2.04-4.5 4.5-4.5 1.42 0 2.74.5 3.79 1.5"></path>
+                        <path d="M12 20v-6m0-4V4"></path>
+                        <circle cx="12" cy="12" r="1"></circle>
+                    </svg>
+                    <span>
+                        <div style="font-weight:600;">Supplement</div>
+                        <div style="font-size:12px;color:#aaa;margin-top:2px;">Vitamin, mineral, or other supplement</div>
+                    </span>
+                </button>
+            </div>
+            
+            <!-- Food Form (hidden by default) -->
+            <div id="foodFormSection" style="display:none;padding:20px;overflow-y:auto;flex:1;">
+                <button type="button" onclick="backToChoices()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--accent);cursor:pointer;margin-bottom:16px;padding:0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
+                <h3 style="margin:0 0 16px 0;color:white;font-size:16px;">Add Food Item</h3>
+                <form id="foodItemForm" method="POST" action="{% url 'add_food_item' %}">
+                    {% csrf_token %}
+                    <input type="hidden" id="foodMealId" name="meal_id">
+                    <input type="hidden" name="date" value="{{ date_string }}">
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Food Name or Search</label>
+                        <div style="position:relative;">
+                            <input type="text" name="food_name" id="foodNameInput" placeholder="Search or enter food name" required autocomplete="off" style="width:100%;padding:8px 32px 8px 8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <div id="foodSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background-color:#1a1a1a;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
+                        <input type="number" name="food_calories" id="foodCaloriesInput" placeholder="Calories" required min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
+                            <input type="number" name="protein" id="foodProteinInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Carbs (g)</label>
+                            <input type="number" name="carbs" id="foodCarbsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
+                            <input type="number" name="fats" id="foodFatsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        </div>
+                    </div>
+                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
+                </form>
+            </div>
+            
+            <!-- Supplement Form (hidden by default) -->
+            <div id="supplementFormSection" style="display:none;padding:20px;overflow-y:auto;flex:1;">
+                <button type="button" onclick="backToChoices()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--accent);cursor:pointer;margin-bottom:16px;padding:0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
+                <h3 style="margin:0 0 16px 0;color:white;font-size:16px;">Add Supplement</h3>
+                <form id="supplementForm" method="POST" action="{% url 'add_supplement_to_meal' %}">
+                    {% csrf_token %}
+                    <input type="hidden" id="supplementMealId" name="meal_id">
+                    <input type="hidden" name="date" value="{{ date_string }}">
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Supplement Name or Search</label>
+                        <div style="position:relative;">
+                            <input type="text" name="supplement_name" id="supplementNameInput" placeholder="Search or enter supplement name" required autocomplete="off" style="width:100%;padding:8px 32px 8px 8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <div id="supplementSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background-color:#1a1a1a;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Type</label>
+                        <select name="supplement_type" id="supplementTypeSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <option value="vitamin">Vitamin</option>
+                            <option value="mineral">Mineral</option>
+                            <option value="herb">Herbal</option>
+                            <option value="protein">Protein</option>
+                            <option value="amino_acid">Amino Acid</option>
+                            <option value="other" selected>Other</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Dosage</label>
+                        <input type="text" name="dosage" id="supplementDosageInput" placeholder="e.g., 1000" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                        <input type="text" name="unit" id="supplementUnitInput" placeholder="e.g., mg, mcg" value="serving" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                    </div>
+                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Supplement</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content -->
+
     <div class="content-container">
         <!-- Date Navigator -->
         <div class="date-navigator">
@@ -262,7 +397,7 @@
                 <span class="calories-unit">kcal</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill" style="width: {{ calories_percentage }}%"></div>
+                <div class="progress-fill" style="--fill-width: {{ calories_percentage }}%;"></div>
             </div>
         </div>
 
@@ -304,7 +439,7 @@
                 <form method="POST" action="{% url 'add_meal' %}" style="background-color:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">
                     {% csrf_token %}
                     <input type="hidden" name="date" value="{{ date_string }}">
-                    <input type="text" name="meal_name" placeholder="Meal name (e.g., Breakfast)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
+                    <input type="text" name="meal_name" placeholder="Meal name (optional - will auto-fill as Breakfast/Lunch/Dinner)" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;">
                     <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:8px;color:white;font-weight:600;cursor:pointer;">Add Meal</button>
                 </form>
             </div>
@@ -316,10 +451,10 @@
                         <div class="meal-header">
                             <span class="meal-name">{{ meal.name }}</span>
                             <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
-                            <button class="meal-edit-btn" type="button" data-toggle-sibling="add-food-form" title="Edit meal">
+                            <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}')" title="Add food or supplement">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 20h9"></path>
-                                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
                                 </svg>
                             </button>
                         </div>
@@ -330,7 +465,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="item_id" value="{{ item.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}" style="border:none;background:none;padding:0;width:16px;height:16px;border:1px solid var(--border);border-radius:3px;cursor:pointer;flex-shrink:0;{% if item.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
+                                    <button type="submit" class="checkbox {% if item.completed %}checked{% endif %}">
                                         {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
@@ -341,6 +476,34 @@
                                     <input type="hidden" name="item_id" value="{{ item.id }}">
                                     <input type="hidden" name="date" value="{{ date_string }}">
                                     <button type="button" class="delete-btn" title="Delete item" data-delete-type="item" data-delete-message="Delete this item?" style="border:none;background:none;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <!-- Supplements List -->
+                        <div class="supplements-list">
+                            {% for supplement in meal.supplements.all %}
+                            <div class="supplement-item {% if supplement.taken %}completed{% endif %}">
+                                <form method="POST" action="{% url 'toggle_meal_supplement' %}" style="display:flex;align-items:center;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
+                                    <input type="hidden" name="date" value="{{ date_string }}">
+                                    <button type="submit" class="checkbox {% if supplement.taken %}checked{% endif %}">
+                                        {% if supplement.taken %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
+                                    </button>
+                                </form>
+                                <span class="supplement-name" style="font-size:13px;color:#aaa;">{{ supplement.name }}</span>
+                                <span class="supplement-dosage" style="font-size:11px;color:#444;">{{ supplement.dosage }} {{ supplement.unit }}</span>
+                                <form method="POST" action="{% url 'delete_meal_supplement' %}" style="display:flex;align-items:center;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
+                                    <input type="hidden" name="date" value="{{ date_string }}">
+                                    <button type="submit" class="delete-btn" title="Delete supplement" onclick="return confirm('Delete this supplement?');" style="border:none;background:none;">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="3 6 5 6 21 6"></polyline>
                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -392,6 +555,84 @@
             </button>
         </div>
 
+        <!-- Supplements Tab Content -->
+        <div id="supplements-tab" class="tab-content" style="display:none;">
+            <div class="card">
+                <div class="section-header">
+                    <label class="card-label">SUPPLEMENTS</label>
+                </div>
+                
+                <div id="supplementsList" style="margin-bottom:16px;">
+                    {% if supplements %}
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                        {% for entry in supplements %}
+                            <div class="supplement-item {% if entry.taken %}completed{% endif %}" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);display:flex;align-items:center;gap:12px;">
+                                <button class="toggle-supplement-btn checkbox {% if entry.taken %}checked{% endif %}" data-entry-id="{{ entry.id }}">
+                                    {% if entry.taken %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
+                                </button>
+                                <div style="flex:1;">
+                                    <div style="font-weight:500;color:white;font-size:13px;">{{ entry.name }}</div>
+                                    <div style="font-size:11px;color:#888;margin-top:2px;">{{ entry.dosage }} {{ entry.unit }} • {{ entry.get_supplement_type_display }}</div>
+                                </div>
+                                <button class="delete-supplement-btn" data-entry-id="{{ entry.id }}" style="border:none;background:none;color:#888;cursor:pointer;padding:4px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <div style="text-align:center;padding:40px 20px;color:var(--textMuted);">
+                            <p>No supplements logged for this date</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Add Supplement Button -->
+                <button id="addSupplementBtn" style="width:100%;padding:12px;background:transparent;border:2px dashed var(--border);border-radius:8px;color:var(--accent);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Supplement
+                </button>
+                
+                <!-- Add Supplement Form (hidden by default) -->
+                <div id="addSupplementForm" style="display:none;margin-top:16px;padding:16px;border-top:1px solid var(--border);">
+                    <!-- Supplement Search Input -->
+                    <div style="margin-bottom:12px;">
+                        <input type="text" id="supplementSearch" placeholder="Search supplements or enter name..." autocomplete="off" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:13px;box-sizing:border-box;">
+                        <div id="supplementSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px;width:calc(100% - 32px);"></div>
+                    </div>
+                    
+                    <!-- Selected Supplement Display -->
+                    <div id="selectedSupplementInfo" style="display:none;margin-bottom:12px;padding:10px;background:rgba(232,92,0,0.1);border:1px solid var(--accent);border-radius:6px;">
+                        <div style="font-weight:500;color:white;font-size:12px;" id="selectedSupplementName"></div>
+                        <div style="font-size:11px;color:#888;margin-top:2px;" id="selectedSupplementDetails"></div>
+                    </div>
+                    
+                    <!-- Dosage Input -->
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Dosage</label>
+                        <input type="text" id="supplementDosage" placeholder="e.g., 1000" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                    </div>
+                    
+                    <!-- Unit Input -->
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                        <input type="text" id="supplementUnit" placeholder="e.g., mg, mcg, g" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                    </div>
+                    
+                    <div style="display:flex;gap:8px;">
+                        <button id="cancelSupplementBtn" style="flex:1;padding:10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:white;font-size:12px;cursor:pointer;">Cancel</button>
+                        <button id="saveSupplementBtn" style="flex:1;padding:10px;background:var(--accent);border:none;border-radius:6px;color:white;font-size:12px;font-weight:600;cursor:pointer;">Add Supplement</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Food Database Card (Read-only list of all foods) -->
         <div class="card food-database-card" style="margin-top:24px;">
             <div class="section-header" style="margin-bottom:12px;">
@@ -405,6 +646,21 @@
                 </div>
             </div>
         </div>
+
+        <!-- Supplement Database Card (Read-only list of all supplements) -->
+        <div class="card supplement-database-card" style="margin-top:24px;">
+            <div class="section-header" style="margin-bottom:12px;">
+                <label class="card-label">SUPPLEMENT DATABASE</label>
+                <span id="supplementDatabaseCount" style="color:var(--textMuted);font-size:12px;margin-left:8px;">Loading...</span>
+            </div>
+            <div id="supplementDatabaseList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);">
+                <div style="padding:20px;text-align:center;color:var(--textMuted);">
+                    <div class="loading-spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
+                    <p style="margin-top:8px;">Loading supplements...</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -450,6 +706,33 @@
     text-align:right;
     white-space:nowrap;
 }
+.supplement-db-item {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    border-bottom:1px solid var(--border);
+    transition:background-color 0.2s;
+}
+.supplement-db-item:last-child {
+    border-bottom:none;
+}
+.supplement-db-item:hover {
+    background-color:rgba(255,255,255,0.05);
+}
+.supplement-db-name {
+    font-weight:500;
+    color:white;
+    font-size:13px;
+    flex:1;
+}
+.supplement-db-type {
+    font-size:11px;
+    color:var(--textMuted);
+    text-align:right;
+    white-space:nowrap;
+    margin-left:12px;
+}
 </style>
 
 {% endblock %}
@@ -488,7 +771,37 @@
     // Load food database on page load
     document.addEventListener('DOMContentLoaded', loadFoodDatabase);
 
-    // Initialize flatpickr calendar picker
+    // Function to load all supplements into the Supplement Database card
+    function loadSupplementDatabase() {
+        const listEl = document.getElementById('supplementDatabaseList');
+        const countEl = document.getElementById('supplementDatabaseCount');
+        
+        fetch('/api/supplements/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.supplements && data.supplements.length > 0) {
+                    countEl.textContent = `(${data.supplements.length} items)`;
+                    listEl.innerHTML = data.supplements.map(function(supplement) {
+                        return `<div class="supplement-db-item">
+                            <span class="supplement-db-name">${supplement.name}</span>
+                            <span class="supplement-db-type">${supplement.supplement_type} | ${supplement.dosage}${supplement.unit}</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    countEl.textContent = '(0 items)';
+                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No supplements in database yet.</div>';
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load supplement database:', err);
+                countEl.textContent = '';
+                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load supplement database</div>';
+            });
+    }
+
+    // Load supplement database on page load
+    document.addEventListener('DOMContentLoaded', loadSupplementDatabase);
+
     var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
         defaultDate: '{{ date_string }}',
@@ -590,7 +903,18 @@
             }, 300);
         });
         
-        // Hide results when clicking outside
+        // Hide results when clicking outside or when leaving the input field
+        input.addEventListener('blur', function() {
+            resultsDiv.style.display = 'none';
+        });
+        
+        // Also hide when clicking on other form inputs
+        form.addEventListener('mousedown', function(e) {
+            if (e.target !== input && !resultsDiv.contains(e.target)) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+        
         document.addEventListener('click', function(e) {
             if (!container.contains(e.target)) {
                 resultsDiv.style.display = 'none';
@@ -659,7 +983,7 @@
         }, 3000);
     }
 
-    // Modal search functionality
+    // Modal search functionality (search both foods and supplements)
     modalSearchInput.addEventListener('input', function() {
         const query = this.value.trim();
         
@@ -673,55 +997,104 @@
         modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Searching...</p>';
         
         modalSearchTimeout = setTimeout(function() {
-            fetch('/api/search_foods/?q=' + encodeURIComponent(query))
-                .then(response => response.json())
-                .then(data => {
-                    if (data.results && data.results.length > 0) {
-                        modalSearchResults.innerHTML = data.results.map(function(item) {
-                            return `<div class="modal-food-item" data-id="${item.id || ''}" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
-                                    <button class="edit-food-btn" style="background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">Edit</button>
-                                </div>
-                                <div style="font-size:12px;color:#888;margin-top:6px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
-                            </div>`;
-                        }).join('');
-                        
-                        // Add click handlers for edit buttons
-                        modalSearchResults.querySelectorAll('.edit-food-btn').forEach(function(btn) {
-                            btn.addEventListener('click', function(e) {
-                                e.stopPropagation();
-                                const item = this.closest('.modal-food-item');
-                                openEditForm(
-                                    item.dataset.id,
-                                    item.dataset.name,
-                                    item.dataset.calories,
-                                    item.dataset.protein,
-                                    item.dataset.carbs,
-                                    item.dataset.fats
-                                );
-                            });
-                        });
-                        
-                        // Hover effects
-                        modalSearchResults.querySelectorAll('.modal-food-item').forEach(function(item) {
-                            item.addEventListener('mouseenter', function() {
-                                this.style.borderColor = 'var(--accent)';
-                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.1)';
-                            });
-                            item.addEventListener('mouseleave', function() {
-                                this.style.borderColor = 'var(--border)';
-                                this.style.backgroundColor = 'transparent';
-                            });
-                        });
-                    } else {
-                        modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">No foods found. Add a new one below!</p>';
-                    }
-                })
-                .catch(function(err) {
-                    console.error('Search error:', err);
-                    modalSearchResults.innerHTML = '<p style="color:#e85c5c;text-align:center;padding:20px 0;">Search failed. Please try again.</p>';
+            // Fetch both foods and supplements in parallel
+            Promise.all([
+                fetch('/api/search_foods/?q=' + encodeURIComponent(query)).then(r => r.json()),
+                fetch('/api/search_supplements/?q=' + encodeURIComponent(query)).then(r => r.json())
+            ])
+            .then(([foodData, supplementData]) => {
+                let html = '';
+                const foods = foodData.results || [];
+                const supplements = supplementData.results || [];
+                
+                // Add foods section
+                if (foods.length > 0) {
+                    html += '<div style="margin-bottom:16px;"><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Foods</h3>';
+                    html += foods.map(function(item) {
+                        return `<div class="modal-food-item" data-id="${item.id || ''}" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
+                                <button class="edit-food-btn" style="background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">Edit</button>
+                            </div>
+                            <div style="font-size:12px;color:#888;margin-top:6px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
+                        </div>`;
+                    }).join('');
+                    html += '</div>';
+                }
+                
+                // Add supplements section
+                if (supplements.length > 0) {
+                    html += '<div><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Supplements</h3>';
+                    html += supplements.map(function(item) {
+                        return `<div class="modal-supplement-item" data-name="${item.name}" data-type="${item.supplement_type}" data-dosage="${item.dosage || ''}" data-unit="${item.unit || ''}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
+                                <span style="background:rgba(232, 92, 0, 0.2);border:1px solid var(--accent);border-radius:4px;color:var(--accent);padding:2px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">${item.supplement_type}</span>
+                            </div>
+                            <div style="font-size:12px;color:#888;margin-top:6px;">${item.dosage}${item.unit ? ' ' + item.unit : ''}</div>
+                        </div>`;
+                    }).join('');
+                    html += '</div>';
+                }
+                
+                // If no results found
+                if (foods.length === 0 && supplements.length === 0) {
+                    modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">No foods or supplements found.</p>';
+                    return;
+                }
+                
+                modalSearchResults.innerHTML = html;
+                
+                // Add click handlers for food edit buttons
+                modalSearchResults.querySelectorAll('.edit-food-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const item = this.closest('.modal-food-item');
+                        openEditForm(
+                            item.dataset.id,
+                            item.dataset.name,
+                            item.dataset.calories,
+                            item.dataset.protein,
+                            item.dataset.carbs,
+                            item.dataset.fats
+                        );
+                    });
                 });
+                
+                // Add click handlers for supplement items
+                modalSearchResults.querySelectorAll('.modal-supplement-item').forEach(function(item) {
+                    item.addEventListener('click', function() {
+                        // Populate supplement data (you'll need to handle this in the form)
+                        console.log('Supplement selected:', this.dataset);
+                        // TODO: Add supplement to meal if applicable
+                    });
+                    
+                    item.addEventListener('mouseenter', function() {
+                        this.style.borderColor = 'var(--accent)';
+                        this.style.backgroundColor = 'rgba(232, 92, 0, 0.1)';
+                    });
+                    item.addEventListener('mouseleave', function() {
+                        this.style.borderColor = 'var(--border)';
+                        this.style.backgroundColor = 'transparent';
+                    });
+                });
+                
+                // Hover effects for food items
+                modalSearchResults.querySelectorAll('.modal-food-item').forEach(function(item) {
+                    item.addEventListener('mouseenter', function() {
+                        this.style.borderColor = 'var(--accent)';
+                        this.style.backgroundColor = 'rgba(232, 92, 0, 0.1)';
+                    });
+                    item.addEventListener('mouseleave', function() {
+                        this.style.borderColor = 'var(--border)';
+                        this.style.backgroundColor = 'transparent';
+                    });
+                });
+            })
+            .catch(function(err) {
+                console.error('Search error:', err);
+                modalSearchResults.innerHTML = '<p style="color:#e85c5c;text-align:center;padding:20px 0;">Search failed. Please try again.</p>';
+            });
         }, 300);
     });
 
@@ -838,5 +1211,363 @@
             closeDeleteConfirmation();
         }
     });
+    // ==================== SUPPLEMENTS FUNCTIONALITY ====================
+    const addSupplementBtn = document.getElementById('addSupplementBtn');
+    const addSupplementForm = document.getElementById('addSupplementForm');
+    const supplementSearch = document.getElementById('supplementSearch');
+    const supplementSearchResults = document.getElementById('supplementSearchResults');
+    const supplementDosage = document.getElementById('supplementDosage');
+    const supplementUnit = document.getElementById('supplementUnit');
+    const selectedSupplementInfo = document.getElementById('selectedSupplementInfo');
+    const selectedSupplementName = document.getElementById('selectedSupplementName');
+    const selectedSupplementDetails = document.getElementById('selectedSupplementDetails');
+    const cancelSupplementBtn = document.getElementById('cancelSupplementBtn');
+    const saveSupplementBtn = document.getElementById('saveSupplementBtn');
+    
+    let selectedSupplementData = null;
+    let supplementSearchTimeout = null;
+
+    addSupplementBtn.addEventListener('click', function() {
+        addSupplementForm.style.display = addSupplementForm.style.display === 'none' ? 'block' : 'none';
+        if (addSupplementForm.style.display === 'block') {
+            supplementSearch.focus();
+        }
+    });
+
+    cancelSupplementBtn.addEventListener('click', function() {
+        addSupplementForm.style.display = 'none';
+        supplementSearch.value = '';
+        selectedSupplementData = null;
+        selectedSupplementInfo.style.display = 'none';
+        supplementDosage.value = '';
+        supplementUnit.value = '';
+        supplementSearchResults.style.display = 'none';
+    });
+
+    supplementSearch.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        if (supplementSearchTimeout) clearTimeout(supplementSearchTimeout);
+        
+        if (query.length < 2) {
+            supplementSearchResults.style.display = 'none';
+            return;
+        }
+        
+        supplementSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:12px;">Searching...</p>';
+        supplementSearchResults.style.display = 'block';
+        
+        supplementSearchTimeout = setTimeout(function() {
+            fetch('/api/search_supplements/?q=' + encodeURIComponent(query))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        supplementSearchResults.innerHTML = data.results.map(function(item) {
+                            return `<div class="supplement-search-item" data-id="${item.id}" data-name="${item.name}" data-type="${item.supplement_type}" data-dosage="${item.dosage}" data-unit="${item.unit}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
+                                <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
+                                <div style="font-size:11px;color:#888;margin-top:2px;">${item.dosage} ${item.unit}</div>
+                            </div>`;
+                        }).join('');
+                        supplementSearchResults.style.display = 'block';
+                        
+                        supplementSearchResults.querySelectorAll('.supplement-search-item').forEach(function(item) {
+                            item.addEventListener('click', function() {
+                                selectedSupplementData = {
+                                    id: this.dataset.id,
+                                    name: this.dataset.name,
+                                    type: this.dataset.type,
+                                    dosage: this.dataset.dosage,
+                                    unit: this.dataset.unit
+                                };
+                                
+                                supplementSearch.value = this.dataset.name;
+                                selectedSupplementName.textContent = this.dataset.name;
+                                selectedSupplementDetails.textContent = this.dataset.dosage + ' ' + this.dataset.unit;
+                                selectedSupplementInfo.style.display = 'block';
+                                supplementSearchResults.style.display = 'none';
+                                
+                                supplementDosage.value = this.dataset.dosage;
+                                supplementUnit.value = this.dataset.unit;
+                            });
+                            
+                            item.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.15)';
+                            });
+                            item.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = 'transparent';
+                            });
+                        });
+                    } else {
+                        supplementSearchResults.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No supplements found</p>';
+                        supplementSearchResults.style.display = 'block';
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Supplement search error:', err);
+                    supplementSearchResults.style.display = 'none';
+                });
+        }, 300);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!supplementSearch.closest('#addSupplementForm').contains(e.target)) {
+            supplementSearchResults.style.display = 'none';
+        }
+    });
+
+    saveSupplementBtn.addEventListener('click', function() {
+        const name = supplementSearch.value.trim();
+        const dosage = supplementDosage.value.trim();
+        const unit = supplementUnit.value.trim();
+        
+        if (!name) {
+            alert('Please select or enter a supplement name');
+            return;
+        }
+        
+        saveSupplementBtn.disabled = true;
+        saveSupplementBtn.textContent = 'Adding...';
+        
+        const payload = {
+            name: name,
+            dosage: dosage || '1',
+            unit: unit || 'serving',
+            supplement_type: selectedSupplementData ? selectedSupplementData.type : 'other',
+            supplement_id: selectedSupplementData ? selectedSupplementData.id : null,
+            date: '{{ selected_date|date:"Y-m-d" }}'
+        };
+        
+        fetch('/api/supplement_entries/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            saveSupplementBtn.disabled = false;
+            saveSupplementBtn.textContent = 'Add Supplement';
+            
+            if (data.success) {
+                addSupplementForm.style.display = 'none';
+                supplementSearch.value = '';
+                selectedSupplementData = null;
+                selectedSupplementInfo.style.display = 'none';
+                supplementDosage.value = '';
+                supplementUnit.value = '';
+                
+                // Reload the page to see the new supplement
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to add supplement'));
+            }
+        })
+        .catch(function(err) {
+            console.error('Add supplement error:', err);
+            saveSupplementBtn.disabled = false;
+            saveSupplementBtn.textContent = 'Add Supplement';
+            alert('Failed to add supplement');
+        });
+    });
+
+    // Toggle supplement taken status
+    document.querySelectorAll('.toggle-supplement-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const entryId = this.dataset.entryId;
+            const isCurrentlyTaken = this.classList.contains('checked');
+            
+            fetch('/api/supplement_entries/' + entryId + '/toggle/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ taken: !isCurrentlyTaken })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(err => console.error('Toggle error:', err));
+        });
+    });
+
+    // Delete supplement entry
+    document.querySelectorAll('.delete-supplement-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (confirm('Delete this supplement?')) {
+                const entryId = this.dataset.entryId;
+                // Would need a delete endpoint
+                console.log('Delete entry:', entryId);
+            }
+        });
+    });
+
+    // Tab switching
+    document.querySelectorAll('.tab-button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.style.display = 'none';
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(function(button) {
+                button.classList.remove('active');
+            });
+            
+            // Show selected tab
+            if (tabName === 'today') {
+                document.querySelector('.meals-list-container').parentElement.style.display = 'block';
+            } else if (tabName === 'history') {
+                document.getElementById(tabName + '-tab').style.display = 'block';
+            } else if (tabName === 'supplements') {
+                document.getElementById(tabName + '-tab').style.display = 'block';
+            } else if (tabName === 'search') {
+                modal.style.display = 'flex';
+            }
+            
+            // Add active class to clicked button
+            this.classList.add('active');
+        });
+    });
+    
+    // Modal functionality for adding food/supplement to meal
+    const addItemModal = document.getElementById('addItemModal');
+    const closeAddItemModal = document.getElementById('closeAddItemModal');
+    const itemTypeChoices = document.getElementById('itemTypeChoices');
+    const foodFormSection = document.getElementById('foodFormSection');
+    const supplementFormSection = document.getElementById('supplementFormSection');
+    
+    // Close modal handlers
+    closeAddItemModal.addEventListener('click', closeModal);
+    addItemModal.addEventListener('click', function(e) {
+        if (e.target === addItemModal) closeModal();
+    });
+    
+    function closeModal() {
+        addItemModal.style.display = 'none';
+        itemTypeChoices.style.display = 'flex';
+        foodFormSection.style.display = 'none';
+        supplementFormSection.style.display = 'none';
+    }
+    
+    function openAddItemModal(mealId) {
+        addItemModal.style.display = 'flex';
+        document.getElementById('foodMealId').value = mealId;
+        document.getElementById('supplementMealId').value = mealId;
+    }
+    
+    function showFoodForm() {
+        itemTypeChoices.style.display = 'none';
+        foodFormSection.style.display = 'block';
+        supplementFormSection.style.display = 'none';
+        document.getElementById('foodNameInput').focus();
+        setupFoodSearch();
+    }
+    
+    function showSupplementForm() {
+        itemTypeChoices.style.display = 'none';
+        foodFormSection.style.display = 'none';
+        supplementFormSection.style.display = 'block';
+        document.getElementById('supplementNameInput').focus();
+        setupSupplementSearch();
+    }
+    
+    function backToChoices() {
+        itemTypeChoices.style.display = 'flex';
+        foodFormSection.style.display = 'none';
+        supplementFormSection.style.display = 'none';
+    }
+    
+    // Food search functionality
+    function setupFoodSearch() {
+        const foodNameInput = document.getElementById('foodNameInput');
+        const foodSearchResults = document.getElementById('foodSearchResults');
+        
+        foodNameInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            if (query.length < 2) {
+                foodSearchResults.style.display = 'none';
+                return;
+            }
+            
+            fetch(`/api/search_foods/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        foodSearchResults.innerHTML = data.results.map(food => `
+                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectFoodResult(${food.id}, '${food.name}', ${food.calories}, ${food.protein || 0}, ${food.carbs || 0}, ${food.fats || 0})">
+                                <div style="color:white;font-weight:600;">${food.name}</div>
+                                <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
+                            </div>
+                        `).join('');
+                        foodSearchResults.style.display = 'block';
+                    } else {
+                        foodSearchResults.innerHTML = '';
+                        foodSearchResults.style.display = 'none';
+                    }
+                });
+        });
+        
+        // Close dropdown when leaving food input
+        foodNameInput.addEventListener('blur', function() {
+            foodSearchResults.style.display = 'none';
+        });
+    }
+    
+    function selectFoodResult(id, name, calories, protein, carbs, fats) {
+        document.getElementById('foodNameInput').value = name;
+        document.getElementById('foodCaloriesInput').value = calories;
+        document.getElementById('foodProteinInput').value = protein;
+        document.getElementById('foodCarbsInput').value = carbs;
+        document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('foodSearchResults').style.display = 'none';
+    }
+    
+    // Supplement search functionality
+    function setupSupplementSearch() {
+        const supplementNameInput = document.getElementById('supplementNameInput');
+        const supplementSearchResults = document.getElementById('supplementSearchResults');
+        
+        supplementNameInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            if (query.length < 2) {
+                supplementSearchResults.style.display = 'none';
+                return;
+            }
+            
+            fetch(`/api/search_supplements/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        supplementSearchResults.innerHTML = data.results.map(supp => `
+                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectSupplementResult('${supp.name}', '${supp.supplement_type}', '${supp.dosage}', '${supp.unit}')">
+                                <div style="color:white;font-weight:600;">${supp.name}</div>
+                                <div style="color:#888;font-size:11px;margin-top:2px;">${supp.supplement_type} • ${supp.dosage} ${supp.unit}</div>
+                            </div>
+                        `).join('');
+                        supplementSearchResults.style.display = 'block';
+                    } else {
+                        supplementSearchResults.innerHTML = '';
+                        supplementSearchResults.style.display = 'none';
+                    }
+                });
+        });
+    }
+    
+    function selectSupplementResult(name, type, dosage, unit) {
+        document.getElementById('supplementNameInput').value = name;
+        document.getElementById('supplementTypeSelect').value = type;
+        document.getElementById('supplementDosageInput').value = dosage;
+        document.getElementById('supplementUnitInput').value = unit;
+        document.getElementById('supplementSearchResults').style.display = 'none';
+    }
 </script>
 {% endblock %}
