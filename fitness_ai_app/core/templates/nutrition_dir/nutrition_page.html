@@ -275,6 +275,7 @@
                 <form id="foodItemForm" method="POST" action="{% url 'add_food_item' %}">
                     {% csrf_token %}
                     <input type="hidden" id="foodMealId" name="meal_id">
+                    <input type="hidden" id="foodItemId" name="item_id">
                     <input type="hidden" name="date" value="{{ date_string }}">
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Food Name or Search</label>
@@ -305,7 +306,7 @@
                             <input type="number" name="fats" id="foodFatsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                     </div>
-                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
+                    <button type="submit" id="addFoodItemBtn" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
                 </form>
             </div>
             
@@ -321,6 +322,7 @@
                 <form id="supplementForm" method="POST" action="{% url 'add_supplement_to_meal' %}">
                     {% csrf_token %}
                     <input type="hidden" id="supplementMealId" name="meal_id">
+                    <input type="hidden" id="supplementMealSupplementId" name="meal_supplement_id">
                     <input type="hidden" name="date" value="{{ date_string }}">
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Supplement Name or Search</label>
@@ -352,7 +354,7 @@
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
                         <input type="text" name="unit" id="supplementUnitInput" placeholder="e.g., mg, mcg" value="serving" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                     </div>
-                    <button type="submit" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Supplement</button>
+                    <button type="submit" id="addSupplementBtn" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Supplement</button>
                 </form>
             </div>
         </div>
@@ -484,17 +486,25 @@
                                 </form>
                                 <span class="food-name">{{ item.name }}</span>
                                 <span class="food-calories">{{ item.calories }}</span>
-                                <form method="POST" action="{% url 'delete_food_item' %}" style="display:flex;align-items:center;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                    <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="button" class="delete-btn" title="Delete item" data-delete-type="item" data-delete-message="Delete this item?" style="border:none;background:none;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                                    <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', {{ item.calories }}, {{ item.protein }}, {{ item.carbs }}, {{ item.fats }})">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 20h9"></path>
+                                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
                                         </svg>
                                     </button>
-                                </form>
+                                    <form method="POST" action="{% url 'delete_food_item' %}" style="display:flex;align-items:center;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <input type="hidden" name="date" value="{{ date_string }}">
+                                        <button type="button" class="delete-btn" title="Delete item" data-delete-type="item" data-delete-message="Delete this item?" style="border:none;background:none;">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -512,17 +522,25 @@
                                 </form>
                                 <span class="supplement-name" style="font-size:13px;color:#aaa;">{{ supplement.name }}</span>
                                 <span class="supplement-dosage" style="font-size:11px;color:#444;">{{ supplement.dosage }} {{ supplement.unit }}</span>
-                                <form method="POST" action="{% url 'delete_meal_supplement' %}" style="display:flex;align-items:center;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
-                                    <input type="hidden" name="date" value="{{ date_string }}">
-                                    <button type="submit" class="delete-btn" title="Delete supplement" onclick="return confirm('Delete this supplement?');" style="border:none;background:none;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                                    <button type="button" class="edit-supplement-btn" title="Edit supplement" onclick="editSupplement('{{ supplement.id }}', '{{ meal.id }}', '{{ supplement.name|escapejs }}', '{{ supplement.supplement_type }}', '{{ supplement.dosage }}', '{{ supplement.unit }}')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 20h9"></path>
+                                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
                                         </svg>
                                     </button>
-                                </form>
+                                    <form method="POST" action="{% url 'delete_meal_supplement' %}" style="display:flex;align-items:center;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
+                                        <input type="hidden" name="date" value="{{ date_string }}">
+                                        <button type="button" class="delete-btn" title="Delete supplement" data-delete-type="supplement" data-delete-message="Delete this supplement?" style="border:none;background:none;">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -1469,12 +1487,43 @@
         itemTypeChoices.style.display = 'flex';
         foodFormSection.style.display = 'none';
         supplementFormSection.style.display = 'none';
+        document.getElementById('addFoodItemBtn').textContent = 'Add Food Item';
+        document.getElementById('addSupplementBtn').textContent = 'Add Supplement';
+        document.getElementById('foodItemId').value = '';
+        document.getElementById('supplementMealSupplementId').value = '';
     }
     
     function openAddItemModal(mealId) {
         addItemModal.style.display = 'flex';
         document.getElementById('foodMealId').value = mealId;
         document.getElementById('supplementMealId').value = mealId;
+        document.getElementById('foodItemId').value = '';
+        document.getElementById('supplementMealSupplementId').value = '';
+    }
+    
+    function editFoodItem(itemId, mealId, name, calories, protein, carbs, fats) {
+        document.getElementById('foodMealId').value = mealId;
+        document.getElementById('foodItemId').value = itemId;
+        document.getElementById('foodNameInput').value = name;
+        document.getElementById('foodCaloriesInput').value = calories;
+        document.getElementById('foodProteinInput').value = protein;
+        document.getElementById('foodCarbsInput').value = carbs;
+        document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('addFoodItemBtn').textContent = 'Save Changes';
+        addItemModal.style.display = 'flex';
+        showFoodForm();
+    }
+    
+    function editSupplement(supplementId, mealId, name, type, dosage, unit) {
+        document.getElementById('supplementMealId').value = mealId;
+        document.getElementById('supplementMealSupplementId').value = supplementId;
+        document.getElementById('supplementNameInput').value = name;
+        document.getElementById('supplementTypeSelect').value = type;
+        document.getElementById('supplementDosageInput').value = dosage;
+        document.getElementById('supplementUnitInput').value = unit;
+        document.getElementById('addSupplementBtn').textContent = 'Save Changes';
+        addItemModal.style.display = 'flex';
+        showSupplementForm();
     }
     
     function showFoodForm() {

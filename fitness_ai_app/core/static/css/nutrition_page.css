@@ -779,6 +779,27 @@ span.flatpickr-weekday {
     color: #e74c3c;
 }
 
+.edit-item-btn,
+.edit-supplement-btn {
+    background-color: transparent;
+    border: none;
+    color: var(--textMuted);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+    width: 14px;
+    height: 14px;
+}
+
+.edit-item-btn:hover,
+.edit-supplement-btn:hover {
+    color: var(--accent);
+}
+
 /* Supplements List */
 .supplements-list {
     display: flex;
