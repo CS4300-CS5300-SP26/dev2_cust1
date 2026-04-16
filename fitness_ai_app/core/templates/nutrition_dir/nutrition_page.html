@@ -520,8 +520,8 @@
                                         {% if supplement.taken %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
-                                <span class="supplement-name" style="font-size:13px;color:#aaa;">{{ supplement.name }}</span>
-                                <span class="supplement-dosage" style="font-size:11px;color:#444;">{{ supplement.dosage }} {{ supplement.unit }}</span>
+                                <span class="supplement-name">{{ supplement.name }}</span>
+                                <span class="supplement-dosage">{{ supplement.dosage }} {{ supplement.unit }}</span>
                                 <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
                                     <button type="button" class="edit-supplement-btn" title="Edit supplement" onclick="editSupplement('{{ supplement.id }}', '{{ meal.id }}', '{{ supplement.name|escapejs }}', '{{ supplement.supplement_type }}', '{{ supplement.dosage }}', '{{ supplement.unit }}')">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

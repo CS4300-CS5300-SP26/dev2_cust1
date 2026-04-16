@@ -831,13 +831,13 @@ span.flatpickr-weekday {
 
 .supplement-name {
     font-size: 13px;
-    color: #aaa;
+    color: #ccc;
     flex: 1;
 }
 
 .supplement-dosage {
     font-size: 11px;
-    color: #444;
+    color: #888;
     font-family: 'Courier New', monospace;
     min-width: 50px;
     text-align: right;
