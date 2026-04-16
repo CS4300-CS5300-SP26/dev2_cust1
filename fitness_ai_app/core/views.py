@@ -638,6 +638,19 @@ def delete_food_item(request):
 
 @login_required
 @require_POST
+def delete_meal(request):
+    meal_id = request.POST.get('meal_id')
+    date_param = request.POST.get('date')
+    
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    meal.delete()
+    messages.success(request, 'Meal deleted.')
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
 def add_supplement_to_meal(request):
     meal_id = request.POST.get('meal_id')
     supplement_name = request.POST.get('supplement_name', '').strip()

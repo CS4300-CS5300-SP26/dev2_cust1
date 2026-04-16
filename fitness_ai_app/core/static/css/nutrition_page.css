@@ -645,22 +645,51 @@ span.flatpickr-weekday {
     margin-right: 12px;
 }
 
+.meal-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .meal-edit-btn {
+    background-color: rgba(232, 92, 0, 0.15);
+    border: 1px solid rgba(232, 92, 0, 0.3);
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+.meal-edit-btn:hover {
+    background-color: rgba(232, 92, 0, 0.25);
+    border-color: rgba(232, 92, 0, 0.5);
+}
+
+.meal-delete-btn {
     background-color: transparent;
-    border: none;
+    border: 1px solid #666;
     color: var(--textMuted);
     cursor: pointer;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease;
-    width: 18px;
-    height: 18px;
+    transition: all 0.2s ease;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
 }
 
-.meal-edit-btn:hover {
-    color: var(--accent);
+.meal-delete-btn:hover {
+    background-color: rgba(231, 76, 60, 0.15);
+    border-color: #e74c3c;
+    color: #e74c3c;
 }
 
 /* Food Items List */

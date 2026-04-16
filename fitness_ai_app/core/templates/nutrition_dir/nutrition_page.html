@@ -451,12 +451,25 @@
                         <div class="meal-header">
                             <span class="meal-name">{{ meal.name }}</span>
                             <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
-                            <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}')" title="Add food or supplement">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </button>
+                            <div class="meal-actions">
+                                <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}')" title="Add food or supplement">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                                <form method="POST" action="{% url 'delete_meal' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="meal_id" value="{{ meal.id }}">
+                                    <input type="hidden" name="date" value="{{ date_string }}">
+                                    <button type="button" class="meal-delete-btn" title="Delete meal" data-delete-type="meal" data-delete-message="Delete this meal and all its items?">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                         <div class="food-items-list">
                             {% for item in meal.items.all %}

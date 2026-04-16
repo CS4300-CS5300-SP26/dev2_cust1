@@ -39,6 +39,7 @@ urlpatterns = [
     path('train/delete_exercise/', views.delete_exercise, name='delete_exercise'),
     path('nutrition/', views.nutrition_page, name='nutrition_page'),
     path('nutrition/add_meal/', views.add_meal, name='add_meal'),
+    path('nutrition/delete_meal/', views.delete_meal, name='delete_meal'),
     path('nutrition/add_food_item/', views.add_food_item, name='add_food_item'),
     path('nutrition/toggle_food_item/', views.toggle_food_item, name='toggle_food_item'),
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),
