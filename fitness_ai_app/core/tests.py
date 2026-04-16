@@ -1,6 +1,7 @@
 import uuid
 import smtplib
 import unittest
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -8,7 +9,10 @@ from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import EmailVerification
+from .models import (
+    EmailVerification, ExerciseType, MuscleGroup, Muscle, Equipment,
+    TrainingExercise, UserInjury, UserEquipmentProfile
+)
 from .forms import RegistrationForm
 
 
@@ -3114,3 +3118,603 @@ class DeleteModalEventHandlingTests(TestCase):
         
         self.assertIn('addEventListener', content)
         self.assertIn('closeDeleteConfirmation', content)
+
+
+# ===== EXERCISE DATABASE TESTS =====
+
+class ExerciseTypeTestCase(TestCase):
+    """Test ExerciseType model"""
+
+    def setUp(self):
+        self.exercise_type = ExerciseType.objects.create(
+            name='Strength',
+            description='Build muscle and strength'
+        )
+
+    def test_exercise_type_creation(self):
+        """Test creating an exercise type"""
+        self.assertEqual(self.exercise_type.name, 'Strength')
+        self.assertEqual(self.exercise_type.description, 'Build muscle and strength')
+
+    def test_exercise_type_str(self):
+        """Test string representation"""
+        self.assertEqual(str(self.exercise_type), 'Strength')
+
+
+class MuscleGroupTestCase(TestCase):
+    """Test MuscleGroup model"""
+
+    def setUp(self):
+        self.muscle_group = MuscleGroup.objects.create(
+            name='Upper Body',
+            description='Arms, shoulders, chest, back'
+        )
+
+    def test_muscle_group_creation(self):
+        """Test creating a muscle group"""
+        self.assertEqual(self.muscle_group.name, 'Upper Body')
+
+    def test_muscle_group_str(self):
+        """Test string representation"""
+        self.assertEqual(str(self.muscle_group), 'Upper Body')
+
+
+class MuscleTestCase(TestCase):
+    """Test Muscle model"""
+
+    def setUp(self):
+        self.muscle_group = MuscleGroup.objects.create(name='Upper Body')
+        self.muscle = Muscle.objects.create(
+            name='Biceps',
+            muscle_group=self.muscle_group,
+            description='Front upper arm muscle'
+        )
+
+    def test_muscle_creation(self):
+        """Test creating a muscle"""
+        self.assertEqual(self.muscle.name, 'Biceps')
+        self.assertEqual(self.muscle.muscle_group.name, 'Upper Body')
+
+    def test_muscle_str(self):
+        """Test string representation"""
+        self.assertEqual(str(self.muscle), 'Biceps (Upper Body)')
+
+
+class EquipmentTestCase(TestCase):
+    """Test Equipment model"""
+
+    def setUp(self):
+        self.equipment = Equipment.objects.create(
+            name='Dumbbells',
+            description='Free weights'
+        )
+
+    def test_equipment_creation(self):
+        """Test creating equipment"""
+        self.assertEqual(self.equipment.name, 'Dumbbells')
+
+    def test_equipment_str(self):
+        """Test string representation"""
+        self.assertEqual(str(self.equipment), 'Dumbbells')
+
+
+class TrainingExerciseTestCase(TestCase):
+    """Test TrainingExercise model"""
+
+    def setUp(self):
+        self.exercise_type = ExerciseType.objects.create(name='Strength')
+        self.muscle_group = MuscleGroup.objects.create(name='Upper Body')
+        self.biceps = Muscle.objects.create(
+            name='Biceps',
+            muscle_group=self.muscle_group
+        )
+        self.equipment = Equipment.objects.create(name='Dumbbells')
+
+        self.exercise = TrainingExercise.objects.create(
+            name='Dumbbell Curl',
+            description='Isolate biceps with dumbbells',
+            instructions='1. Stand with dumbbells\n2. Curl up\n3. Lower down',
+            exercise_type=self.exercise_type,
+            difficulty='beginner',
+            location='both',
+            default_sets=3,
+            default_reps=10,
+        )
+        self.exercise.muscle_groups.add(self.muscle_group)
+        self.exercise.primary_muscles.add(self.biceps)
+        self.exercise.equipment.add(self.equipment)
+
+    def test_exercise_creation(self):
+        """Test creating an exercise"""
+        self.assertEqual(self.exercise.name, 'Dumbbell Curl')
+        self.assertEqual(self.exercise.exercise_type.name, 'Strength')
+        self.assertEqual(self.exercise.difficulty, 'beginner')
+        self.assertTrue(self.exercise.is_active)
+
+    def test_exercise_default_sets_reps(self):
+        """Test default sets and reps"""
+        self.assertEqual(self.exercise.default_sets, 3)
+        self.assertEqual(self.exercise.default_reps, 10)
+
+    def test_exercise_relationships(self):
+        """Test exercise relationships"""
+        self.assertIn(self.muscle_group, self.exercise.muscle_groups.all())
+        self.assertIn(self.biceps, self.exercise.primary_muscles.all())
+        self.assertIn(self.equipment, self.exercise.equipment.all())
+
+    def test_exercise_str(self):
+        """Test string representation"""
+        self.assertEqual(str(self.exercise), 'Dumbbell Curl (Strength)')
+
+    def test_exercise_difficulty_choices(self):
+        """Test all difficulty levels"""
+        for difficulty in ['beginner', 'intermediate', 'advanced']:
+            ex = TrainingExercise.objects.create(
+                name=f'Test {difficulty}',
+                exercise_type=self.exercise_type,
+                difficulty=difficulty
+            )
+            self.assertEqual(ex.difficulty, difficulty)
+
+    def test_exercise_location_choices(self):
+        """Test all location types"""
+        for location in ['home', 'gym', 'both']:
+            ex = TrainingExercise.objects.create(
+                name=f'Test {location}',
+                exercise_type=self.exercise_type,
+                location=location
+            )
+            self.assertEqual(ex.location, location)
+
+
+class UserInjuryTestCase(TestCase):
+    """Test UserInjury model"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='injuryuser',
+            email='injury@test.com',
+            password='testpass123'
+        )
+        self.muscle_group = MuscleGroup.objects.create(name='Upper Body')
+        self.biceps = Muscle.objects.create(
+            name='Biceps',
+            muscle_group=self.muscle_group
+        )
+        self.injury = UserInjury.objects.create(
+            user=self.user,
+            muscle=self.biceps,
+            severity='moderate',
+            notes='Sports injury',
+            start_date=timezone.now().date()
+        )
+
+    def test_injury_creation(self):
+        """Test creating an injury record"""
+        self.assertEqual(self.injury.user, self.user)
+        self.assertEqual(self.injury.muscle.name, 'Biceps')
+        self.assertEqual(self.injury.severity, 'moderate')
+        self.assertTrue(self.injury.is_active)
+
+    def test_injury_active_status(self):
+        """Test injury active/inactive toggle"""
+        self.assertTrue(self.injury.is_active)
+        self.injury.is_active = False
+        self.injury.save()
+        self.assertFalse(self.injury.is_active)
+
+    def test_injury_severity_choices(self):
+        """Test all severity levels"""
+        for severity in ['mild', 'moderate', 'severe']:
+            inj = UserInjury.objects.create(
+                user=self.user,
+                muscle=self.biceps,
+                severity=severity,
+                start_date=timezone.now().date()
+            )
+            self.assertEqual(inj.severity, severity)
+
+    def test_injury_str(self):
+        """Test string representation"""
+        self.assertIn(self.user.email, str(self.injury))
+        self.assertIn('Biceps', str(self.injury))
+
+
+class UserEquipmentProfileTestCase(TestCase):
+    """Test UserEquipmentProfile model"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='equipuser',
+            email='equip@test.com',
+            password='testpass123'
+        )
+        self.dumbbells = Equipment.objects.create(name='Dumbbells')
+        self.barbell = Equipment.objects.create(name='Barbell')
+
+        self.profile, created = UserEquipmentProfile.objects.get_or_create(
+            user=self.user,
+            defaults={'location': 'gym'}
+        )
+        self.profile.equipment.add(self.dumbbells, self.barbell)
+
+    def test_profile_creation(self):
+        """Test creating equipment profile"""
+        self.assertEqual(self.profile.user, self.user)
+        self.assertEqual(self.profile.location, 'gym')
+
+    def test_profile_onetoone(self):
+        """Test OneToOne relationship"""
+        profile = UserEquipmentProfile.objects.get(user=self.user)
+        self.assertEqual(profile.id, self.profile.id)
+
+    def test_profile_equipment_management(self):
+        """Test managing equipment"""
+        self.assertEqual(self.profile.equipment.count(), 2)
+        self.assertIn(self.dumbbells, self.profile.equipment.all())
+
+    def test_profile_get_or_create(self):
+        """Test get_or_create pattern"""
+        profile2, created = UserEquipmentProfile.objects.get_or_create(
+            user=self.user,
+            defaults={'location': 'home'}
+        )
+        self.assertFalse(created)
+        self.assertEqual(profile2.id, self.profile.id)
+
+
+class ExerciseFilteringTestCase(TestCase):
+    """Test exercise filtering and queries"""
+
+    def setUp(self):
+        # Create base data
+        self.strength_type = ExerciseType.objects.create(name='Strength')
+        self.cardio_type = ExerciseType.objects.create(name='Cardio')
+
+        self.upper_body = MuscleGroup.objects.create(name='Upper Body')
+        self.lower_body = MuscleGroup.objects.create(name='Lower Body')
+
+        self.biceps = Muscle.objects.create(name='Biceps', muscle_group=self.upper_body)
+        self.triceps = Muscle.objects.create(name='Triceps', muscle_group=self.upper_body)
+        self.quads = Muscle.objects.create(name='Quadriceps', muscle_group=self.lower_body)
+
+        self.dumbbells = Equipment.objects.create(name='Dumbbells')
+        self.barbell = Equipment.objects.create(name='Barbell')
+
+        # Create exercises
+        self.curl = TrainingExercise.objects.create(
+            name='Dumbbell Curl',
+            exercise_type=self.strength_type,
+            difficulty='beginner',
+            location='both'
+        )
+        self.curl.muscle_groups.add(self.upper_body)
+        self.curl.primary_muscles.add(self.biceps)
+        self.curl.equipment.add(self.dumbbells)
+
+        self.bench = TrainingExercise.objects.create(
+            name='Bench Press',
+            exercise_type=self.strength_type,
+            difficulty='intermediate',
+            location='gym'
+        )
+        self.bench.muscle_groups.add(self.upper_body)
+        self.bench.primary_muscles.add(self.triceps)
+        self.bench.equipment.add(self.barbell)
+
+    def test_filter_by_type(self):
+        """Test filtering exercises by type"""
+        strength = TrainingExercise.objects.filter(exercise_type=self.strength_type)
+        self.assertEqual(strength.count(), 2)
+
+    def test_filter_by_difficulty(self):
+        """Test filtering by difficulty"""
+        beginner = TrainingExercise.objects.filter(difficulty='beginner')
+        self.assertEqual(beginner.count(), 1)
+        self.assertIn(self.curl, beginner)
+
+    def test_filter_by_location(self):
+        """Test filtering by location"""
+        both_loc = TrainingExercise.objects.filter(location='both')
+        self.assertEqual(both_loc.count(), 1)
+        self.assertIn(self.curl, both_loc)
+
+    def test_filter_by_muscle_group(self):
+        """Test filtering by muscle group"""
+        upper = TrainingExercise.objects.filter(muscle_groups=self.upper_body)
+        self.assertEqual(upper.count(), 2)
+
+    def test_filter_by_specific_muscle(self):
+        """Test filtering by specific muscle"""
+        bicep_ex = TrainingExercise.objects.filter(primary_muscles=self.biceps)
+        self.assertEqual(bicep_ex.count(), 1)
+        self.assertIn(self.curl, bicep_ex)
+
+    def test_filter_by_equipment(self):
+        """Test filtering by equipment"""
+        dumbbell_ex = TrainingExercise.objects.filter(equipment=self.dumbbells)
+        self.assertEqual(dumbbell_ex.count(), 1)
+        self.assertIn(self.curl, dumbbell_ex)
+
+    def test_exclude_exercise(self):
+        """Test excluding exercises"""
+        no_gym = TrainingExercise.objects.exclude(location='gym')
+        self.assertEqual(no_gym.count(), 1)
+        self.assertNotIn(self.bench, no_gym)
+
+    def test_exclude_by_muscle(self):
+        """Test excluding by muscle"""
+        # User is injured in biceps, should exclude curl
+        no_bicep = TrainingExercise.objects.exclude(
+            primary_muscles=self.biceps
+        )
+        self.assertEqual(no_bicep.count(), 1)
+        self.assertIn(self.bench, no_bicep)
+        self.assertNotIn(self.curl, no_bicep)
+
+
+# ===== EXERCISE API TESTS =====
+
+class ExerciseAPITestCase(TestCase):
+    """Test Exercise API endpoints"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='apiuser',
+            email='api@test.com',
+            password='testpass123'
+        )
+
+        self.strength_type = ExerciseType.objects.create(name='Strength')
+        self.cardio_type = ExerciseType.objects.create(name='Cardio')
+
+        self.upper_body = MuscleGroup.objects.create(name='Upper Body')
+        self.biceps = Muscle.objects.create(name='Biceps', muscle_group=self.upper_body)
+        self.dumbbells = Equipment.objects.create(name='Dumbbells')
+
+        self.curl = TrainingExercise.objects.create(
+            name='Dumbbell Curl',
+            exercise_type=self.strength_type,
+            difficulty='beginner',
+            location='both'
+        )
+        self.curl.muscle_groups.add(self.upper_body)
+        self.curl.primary_muscles.add(self.biceps)
+        self.curl.equipment.add(self.dumbbells)
+
+    def test_get_exercise_types(self):
+        """Test GET /api/exercises/types/"""
+        response = self.client.get('/api/exercises/types/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('exercise_types', data)
+        self.assertEqual(len(data['exercise_types']), 2)
+
+    def test_get_muscle_groups(self):
+        """Test GET /api/exercises/muscle-groups/"""
+        response = self.client.get('/api/exercises/muscle-groups/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('muscle_groups', data)
+        self.assertEqual(len(data['muscle_groups']), 1)
+
+    def test_get_equipment(self):
+        """Test GET /api/exercises/equipment/"""
+        response = self.client.get('/api/exercises/equipment/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('equipment', data)
+        self.assertEqual(len(data['equipment']), 1)
+
+    def test_get_muscles(self):
+        """Test GET /api/exercises/muscles/"""
+        response = self.client.get('/api/exercises/muscles/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('muscles', data)
+        self.assertEqual(len(data['muscles']), 1)
+
+    def test_get_muscles_by_group(self):
+        """Test filtering muscles by muscle group"""
+        response = self.client.get(f'/api/exercises/muscles/?group_id={self.upper_body.id}')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(len(data['muscles']), 1)
+        self.assertEqual(data['muscles'][0]['name'], 'Biceps')
+
+    def test_filter_exercises_requires_auth(self):
+        """Test that filter endpoint requires authentication"""
+        response = self.client.get('/api/exercises/filter/')
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+
+    def test_filter_exercises_authenticated(self):
+        """Test filter exercises with authentication"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('exercises', data)
+        self.assertIn('count', data)
+
+    def test_filter_by_exercise_type(self):
+        """Test filtering by exercise type"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get(f'/api/exercises/filter/?exercise_type={self.strength_type.id}')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+
+    def test_filter_by_difficulty(self):
+        """Test filtering by difficulty"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?difficulty=beginner')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+
+    def test_filter_by_location(self):
+        """Test filtering by location"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?location=home')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertGreaterEqual(data['count'], 0)
+
+    def test_get_exercise_detail(self):
+        """Test GET /api/exercises/<id>/"""
+        response = self.client.get(f'/api/exercises/{self.curl.id}/')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['name'], 'Dumbbell Curl')
+        self.assertEqual(data['difficulty'], 'Beginner')
+
+    def test_get_exercise_detail_404(self):
+        """Test 404 for non-existent exercise"""
+        response = self.client.get('/api/exercises/9999/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_add_user_injury_requires_auth(self):
+        """Test that add injury requires authentication"""
+        response = self.client.post('/api/user/injury/add/')
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+
+    def test_add_user_injury(self):
+        """Test adding user injury"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.post(
+            '/api/user/injury/add/',
+            data=json.dumps({
+                'muscle_id': self.biceps.id,
+                'severity': 'moderate',
+                'notes': 'Test injury'
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+
+    def test_update_equipment_profile(self):
+        """Test updating user equipment"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.post(
+            '/api/user/equipment/',
+            data=json.dumps({
+                'location': 'gym',
+                'equipment': [self.dumbbells.id]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+
+        # Verify profile was created/updated
+        profile = UserEquipmentProfile.objects.get(user=self.user)
+        self.assertEqual(profile.location, 'gym')
+        self.assertIn(self.dumbbells, profile.equipment.all())
+
+    def test_exercise_detail_response_structure(self):
+        """Test exercise detail response has all required fields"""
+        response = self.client.get(f'/api/exercises/{self.curl.id}/')
+        data = json.loads(response.content)
+
+        required_fields = [
+            'id', 'name', 'description', 'instructions',
+            'difficulty', 'exercise_type', 'muscle_groups',
+            'primary_muscles', 'secondary_muscles', 'location',
+            'equipment', 'default_sets', 'default_reps'
+        ]
+
+        for field in required_fields:
+            self.assertIn(field, data, f'Missing field: {field}')
+
+    def test_filter_response_structure(self):
+        """Test filter response has correct structure"""
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/')
+        data = json.loads(response.content)
+
+        self.assertIn('count', data)
+        self.assertIn('exercises', data)
+        self.assertIsInstance(data['exercises'], list)
+
+
+class InjuryAwareFilteringTestCase(TestCase):
+    """Test injury-aware exercise filtering"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='injuryfilter',
+            email='injuryfilter@test.com',
+            password='testpass123'
+        )
+
+        self.strength_type = ExerciseType.objects.create(name='Strength')
+        self.upper_body = MuscleGroup.objects.create(name='Upper Body')
+
+        self.biceps = Muscle.objects.create(name='Biceps', muscle_group=self.upper_body)
+        self.triceps = Muscle.objects.create(name='Triceps', muscle_group=self.upper_body)
+
+        self.dumbbells = Equipment.objects.create(name='Dumbbells')
+
+        # Create two exercises - one targeting biceps, one targeting triceps
+        self.curl = TrainingExercise.objects.create(
+            name='Dumbbell Curl',
+            exercise_type=self.strength_type,
+            difficulty='beginner'
+        )
+        self.curl.muscle_groups.add(self.upper_body)
+        self.curl.primary_muscles.add(self.biceps)
+        self.curl.equipment.add(self.dumbbells)
+
+        self.extension = TrainingExercise.objects.create(
+            name='Tricep Extension',
+            exercise_type=self.strength_type,
+            difficulty='beginner'
+        )
+        self.extension.muscle_groups.add(self.upper_body)
+        self.extension.primary_muscles.add(self.triceps)
+        self.extension.equipment.add(self.dumbbells)
+
+    def test_exclude_injured_biceps(self):
+        """Test that exercises for injured biceps are excluded"""
+        # Create injury for biceps
+        UserInjury.objects.create(
+            user=self.user,
+            muscle=self.biceps,
+            severity='moderate',
+            start_date=timezone.now().date(),
+            is_active=True
+        )
+
+        self.client.login(username='injuryfilter', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?exclude_injured=true')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+
+        # Should not include curl (targets biceps)
+        exercise_names = [ex['name'] for ex in data['exercises']]
+        self.assertNotIn('Dumbbell Curl', exercise_names)
+        self.assertIn('Tricep Extension', exercise_names)
+
+    def test_inactive_injury_not_excluded(self):
+        """Test that inactive injuries don't exclude exercises"""
+        # Create inactive injury
+        UserInjury.objects.create(
+            user=self.user,
+            muscle=self.biceps,
+            severity='moderate',
+            start_date=timezone.now().date(),
+            is_active=False
+        )
+
+        self.client.login(username='injuryfilter', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?exclude_injured=true')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+
+        # Should include both exercises (injury is inactive)
+        exercise_names = [ex['name'] for ex in data['exercises']]
+        self.assertIn('Dumbbell Curl', exercise_names)
+        self.assertIn('Tricep Extension', exercise_names)
