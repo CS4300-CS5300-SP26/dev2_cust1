@@ -29,6 +29,7 @@ def env_bool(name: str, default: bool = False) -> bool:
         return default
     return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
 
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 def env_list(name: str, default: str = ""):
     value = os.getenv(name, default)

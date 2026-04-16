@@ -37,9 +37,9 @@ Feature: Nutrition Tracking
     When I add a meal named "Breakfast" for date "2025-06-15"
     Then a meal named "Breakfast" should exist for date "2025-06-15"
 
-  Scenario: Add a meal with missing name is rejected
+  Scenario: Add a meal with missing name auto-generates one
     When I try to add a meal with no name for date "2025-06-15"
-    Then no meals should exist
+    Then a meal with an auto-generated name should exist for date "2025-06-15"
 
   Scenario: Add a meal with invalid date is rejected
     When I try to add a meal with name "Lunch" for date "bad-date"
