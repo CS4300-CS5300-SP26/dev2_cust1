@@ -791,8 +791,8 @@ span.flatpickr-weekday {
     justify-content: center;
     flex-shrink: 0;
     transition: color 0.2s ease;
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
 }
 
 .edit-item-btn:hover,
