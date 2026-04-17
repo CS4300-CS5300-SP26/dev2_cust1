@@ -703,6 +703,7 @@ def add_food_item(request):
     meal_id = request.POST.get('meal_id')
     food_name = request.POST.get('food_name', '').strip()
     food_calories = request.POST.get('food_calories', '0')
+    item_id = request.POST.get('item_id')  # For editing
     date_param = request.POST.get('date')
     
     if not meal_id or not food_name or not food_calories:
@@ -729,15 +730,30 @@ def add_food_item(request):
     except ValueError:
         protein = carbs = fats = 0
     
-    FoodItem.objects.create(
-        meal=meal,
-        name=food_name,
-        calories=calories,
-        protein=protein,
-        carbs=carbs,
-        fats=fats
-    )
-    messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
+    # Check if this is an update or create
+    if item_id:
+        try:
+            food_item = FoodItem.objects.get(id=item_id, meal__user=request.user)
+            food_item.name = food_name
+            food_item.calories = calories
+            food_item.protein = protein
+            food_item.carbs = carbs
+            food_item.fats = fats
+            food_item.save()
+            messages.success(request, f'Food item "{food_name}" updated.')
+        except FoodItem.DoesNotExist:
+            messages.error(request, 'Food item not found.')
+    else:
+        FoodItem.objects.create(
+            meal=meal,
+            name=food_name,
+            calories=calories,
+            protein=protein,
+            carbs=carbs,
+            fats=fats
+        )
+        messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
+    
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
@@ -769,6 +785,19 @@ def delete_food_item(request):
 
 @login_required
 @require_POST
+def delete_meal(request):
+    meal_id = request.POST.get('meal_id')
+    date_param = request.POST.get('date')
+    
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    meal.delete()
+    messages.success(request, 'Meal deleted.')
+    
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
 def add_supplement_to_meal(request):
     meal_id = request.POST.get('meal_id')
     supplement_name = request.POST.get('supplement_name', '').strip()
@@ -776,6 +805,7 @@ def add_supplement_to_meal(request):
     dosage = request.POST.get('dosage', '1')
     unit = request.POST.get('unit', 'serving')
     supplement_id = request.POST.get('supplement_id')
+    meal_supplement_id = request.POST.get('meal_supplement_id')  # For editing
     date_param = request.POST.get('date')
     
     if not meal_id or not supplement_name:
@@ -791,15 +821,30 @@ def add_supplement_to_meal(request):
         except SupplementDatabase.DoesNotExist:
             pass
     
-    MealSupplement.objects.create(
-        meal=meal,
-        supplement=supplement_obj,
-        name=supplement_name,
-        supplement_type=supplement_type,
-        dosage=dosage,
-        unit=unit
-    )
-    messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
+    # Check if this is an update or create
+    if meal_supplement_id:
+        try:
+            meal_supplement = MealSupplement.objects.get(id=meal_supplement_id, meal__user=request.user)
+            meal_supplement.name = supplement_name
+            meal_supplement.supplement_type = supplement_type
+            meal_supplement.dosage = dosage
+            meal_supplement.unit = unit
+            meal_supplement.supplement = supplement_obj
+            meal_supplement.save()
+            messages.success(request, f'Supplement "{supplement_name}" updated.')
+        except MealSupplement.DoesNotExist:
+            messages.error(request, 'Supplement not found.')
+    else:
+        MealSupplement.objects.create(
+            meal=meal,
+            supplement=supplement_obj,
+            name=supplement_name,
+            supplement_type=supplement_type,
+            dosage=dosage,
+            unit=unit
+        )
+        messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
+    
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 

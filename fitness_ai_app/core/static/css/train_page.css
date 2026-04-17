@@ -796,12 +796,14 @@ span.flatpickr-weekday {
     border: none;
     color: var(--textMuted);
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     transition: color 0.2s ease;
+    width: 18px;
+    height: 18px;
 }
 
 .edit-exercise-btn:hover {

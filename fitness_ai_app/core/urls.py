@@ -1,6 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
+from . import exercise_api
 
 urlpatterns = [
     path('', views.splash, name='splash'),
@@ -8,6 +9,17 @@ urlpatterns = [
     path('api/search_foods/', views.search_foods, name='search_foods'),
     path('api/save_food/', views.save_food_to_database, name='save_food_to_database'),
     path('api/all_foods/', views.get_all_foods, name='get_all_foods'),
+    # Exercise Database API endpoints
+    path('api/exercises/types/', exercise_api.get_exercise_types, name='get_exercise_types'),
+    path('api/exercises/muscle-groups/', exercise_api.get_muscle_groups, name='get_muscle_groups'),
+    path('api/exercises/muscles/', exercise_api.get_muscles, name='get_muscles'),
+    path('api/exercises/equipment/', exercise_api.get_equipment, name='get_equipment'),
+    path('api/exercises/filter/', exercise_api.filter_exercises, name='filter_exercises'),
+    path('api/exercises/safe/', exercise_api.get_user_safe_exercises, name='get_user_safe_exercises'),
+    path('api/exercises/<int:exercise_id>/', exercise_api.get_exercise_detail, name='get_exercise_detail'),
+    path('api/user/injury/add/', exercise_api.add_user_injury, name='add_user_injury'),
+    path('api/user/equipment/', exercise_api.update_user_equipment, name='update_user_equipment'),
+    # Supplement API endpoints
     path('api/supplements/', views.get_all_supplements, name='get_all_supplements'),
     path('api/search_supplements/', views.search_supplements, name='search_supplements'),
     path('api/supplement_entries/', views.supplement_entries, name='supplement_entries'),
@@ -28,6 +40,7 @@ urlpatterns = [
     path('train/delete_exercise/', views.delete_exercise, name='delete_exercise'),
     path('nutrition/', views.nutrition_page, name='nutrition_page'),
     path('nutrition/add_meal/', views.add_meal, name='add_meal'),
+    path('nutrition/delete_meal/', views.delete_meal, name='delete_meal'),
     path('nutrition/add_food_item/', views.add_food_item, name='add_food_item'),
     path('nutrition/toggle_food_item/', views.toggle_food_item, name='toggle_food_item'),
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),

@@ -9,6 +9,8 @@ A Django-based fitness AI web application.
 
 Visit http://localhost:3000 to see the app running
 
+The setup script also seeds the exercise database for Django admin (`TrainingExercise`, `ExerciseType`, `MuscleGroup`, `Muscle`, `Equipment`) so these models are visible with data on first run.
+
 ## Social Authentication Setup
 
 The app supports social authentication via Google, Facebook, Apple, and Instagram.
