@@ -6,7 +6,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0008_supplementdatabase_supplemententry_and_more'),
+        ('core', '0010_merge_branch_migrations'),
     ]
 
     operations = [

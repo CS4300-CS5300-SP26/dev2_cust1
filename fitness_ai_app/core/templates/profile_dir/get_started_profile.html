@@ -1,0 +1,661 @@
+{% extends "core/base_app.html" %}
+{% load static %}
+
+{% block title %}Get Started - Complete Your Profile - Spotter.ai{% endblock %}
+
+{% block page_css %}
+{{ block.super }}
+<style>
+  .top-logo {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-logo img {
+    width: 48px;
+    height: auto;
+  }
+  .top-logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .top-logo-text h1 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin: 0;
+    color: #f67d26;
+    letter-spacing: -0.5px;
+  }
+  .top-logo-text p {
+    font-size: 0.6rem;
+    margin: 0;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .profile-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 24px;
+    margin: 40px auto;
+  }
+
+  .profile-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .profile-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .profile-header p {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .profile-section {
+    margin-bottom: 28px;
+  }
+
+  .profile-section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f67d26;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .user-info-display {
+    padding: 16px;
+    background: rgba(232, 92, 0, 0.1);
+    border: 1px solid rgba(232, 92, 0, 0.2);
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  .user-info-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .user-info-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-top: 4px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 2px solid var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.08);
+    color: #fff;
+    font-size: 1rem;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  .form-group input::placeholder,
+  .form-group textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.15);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-error {
+    color: var(--classic-crimson);
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+
+  .bubble-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .bubble-option {
+    padding: 10px 16px;
+    border-radius: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(246, 125, 38, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .bubble-option:hover {
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.15);
+    color: #fff;
+  }
+
+  .bubble-option.active {
+    border-color: var(--harvest-orange);
+    background: var(--harvest-orange);
+    color: #fff;
+  }
+
+  .bubble-option input {
+    display: none;
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .checkbox-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(246, 125, 38, 0.08);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .checkbox-option:hover {
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.15);
+  }
+
+  .checkbox-option input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--harvest-orange);
+  }
+
+  .checkbox-option input[type="checkbox"]:checked + .checkbox-label {
+    color: #fff;
+  }
+
+  .checkbox-option input[type="checkbox"]:checked {
+    accent-color: var(--harvest-orange);
+  }
+
+  .checkbox-option:has(input:checked) {
+    border-color: var(--harvest-orange);
+    background: rgba(246, 125, 38, 0.2);
+  }
+
+  .checkbox-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    user-select: none;
+  }
+
+  .button-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .button-group button,
+  .button-group a {
+    flex: 1;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-save {
+    background: var(--harvest-orange);
+    color: #fff;
+  }
+
+  .btn-save:hover {
+    opacity: 0.9;
+  }
+
+  .btn-save:active {
+    transform: scale(0.98);
+  }
+
+  .btn-skip {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .btn-skip:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .top-skip-button {
+    background: linear-gradient(135deg, rgba(246, 125, 38, 0.2), rgba(246, 125, 38, 0.1));
+    border: 2px solid #f67d26;
+    color: #f67d26;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .top-skip-button:hover {
+    background: linear-gradient(135deg, rgba(246, 125, 38, 0.3), rgba(246, 125, 38, 0.15));
+    border-color: #f67d26;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(246, 125, 38, 0.3);
+    transform: translateY(-2px);
+  }
+
+  .skip-button-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+
+  .account-info-header {
+    display: block;
+  }
+
+  @media (max-width: 480px) {
+    .profile-container {
+      padding: 16px;
+      margin: 20px auto;
+    }
+
+    .profile-header h1 {
+      font-size: 1.5rem;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .button-group {
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block pre_content %}
+<!-- Logo on same line as profile bubble -->
+<div class="top-logo">
+  <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai">
+  <div class="top-logo-text">
+    <h1>Spotter</h1>
+    <p>Fitness AI</p>
+  </div>
+</div>
+{{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+  <div class="profile-header">
+    <h1>Welcome, {{ request.user.first_name|default:request.user.email }}!</h1>
+    <p>Let's set up your profile to personalize your fitness journey</p>
+  </div>
+
+  <!-- Current User Info -->
+  {% if is_first_time_onboarding %}
+  <div class="skip-button-container">
+    <a href="{% url 'get_started_profile' %}?skip=true" class="top-skip-button">Skip for Now</a>
+  </div>
+  {% endif %}
+  <div class="profile-section">
+    <div class="account-info-header">
+      <div class="profile-section-title">Account Information</div>
+    </div>
+    <div class="user-info-display">
+      <div class="user-info-label">Email</div>
+      <div class="user-info-value">{{ request.user.email }}</div>
+    </div>
+    <div class="user-info-display">
+      <div class="user-info-label">Account Created</div>
+      <div class="user-info-value">{{ request.user.date_joined|date:"M d, Y" }}</div>
+    </div>
+  </div>
+
+  <!-- Profile Form -->
+  <form method="post" id="profileForm">
+    {% csrf_token %}
+
+    <!-- Personal Information -->
+    <div class="profile-section">
+      <div class="profile-section-title">Personal Information</div>
+      
+      <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Enter your name" value="{{ request.user.first_name }}">
+        {% if errors.name %}<div class="form-error">{{ errors.name.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Fitness Goals -->
+    <div class="profile-section">
+      <div class="profile-section-title">Fitness Profile</div>
+      
+      <div class="form-group">
+        <label>Primary Fitness Goal</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.primary_goal == 'weight_loss' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="weight_loss"{% if profile.primary_goal == 'weight_loss' %} checked{% endif %}>
+            Weight Loss
+          </label>
+          <label class="bubble-option{% if profile.primary_goal == 'muscle_gain' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="muscle_gain"{% if profile.primary_goal == 'muscle_gain' %} checked{% endif %}>
+            Muscle Gain
+          </label>
+          <label class="bubble-option{% if profile.primary_goal == 'strength' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="strength"{% if profile.primary_goal == 'strength' %} checked{% endif %}>
+            Strength Training
+          </label>
+          <label class="bubble-option{% if profile.primary_goal == 'endurance' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="endurance"{% if profile.primary_goal == 'endurance' %} checked{% endif %}>
+            Endurance & Cardio
+          </label>
+          <label class="bubble-option{% if profile.primary_goal == 'flexibility' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="flexibility"{% if profile.primary_goal == 'flexibility' %} checked{% endif %}>
+            Flexibility & Mobility
+          </label>
+          <label class="bubble-option{% if profile.primary_goal == 'general_health' %} active{% endif %}">
+            <input type="radio" name="primary_goal" value="general_health"{% if profile.primary_goal == 'general_health' %} checked{% endif %}>
+            General Health & Wellness
+          </label>
+        </div>
+        {% if errors.primary_goal %}<div class="form-error">{{ errors.primary_goal.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-group">
+        <label>Experience Level</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.experience_level == 'beginner' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="beginner"{% if profile.experience_level == 'beginner' %} checked{% endif %}>
+            Beginner
+          </label>
+          <label class="bubble-option{% if profile.experience_level == 'intermediate' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="intermediate"{% if profile.experience_level == 'intermediate' %} checked{% endif %}>
+            Intermediate
+          </label>
+          <label class="bubble-option{% if profile.experience_level == 'advanced' %} active{% endif %}">
+            <input type="radio" name="experience_level" value="advanced"{% if profile.experience_level == 'advanced' %} checked{% endif %}>
+            Advanced
+          </label>
+        </div>
+        {% if errors.experience_level %}<div class="form-error">{{ errors.experience_level.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-group">
+        <label>Dietary Preference</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.dietary_preference == 'omnivore' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="omnivore"{% if profile.dietary_preference == 'omnivore' %} checked{% endif %}>
+            Omnivore
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'vegetarian' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="vegetarian"{% if profile.dietary_preference == 'vegetarian' %} checked{% endif %}>
+            Vegetarian
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'vegan' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="vegan"{% if profile.dietary_preference == 'vegan' %} checked{% endif %}>
+            Vegan
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'keto' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="keto"{% if profile.dietary_preference == 'keto' %} checked{% endif %}>
+            Keto
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'paleo' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="paleo"{% if profile.dietary_preference == 'paleo' %} checked{% endif %}>
+            Paleo
+          </label>
+          <label class="bubble-option{% if profile.dietary_preference == 'gluten_free' %} active{% endif %}">
+            <input type="radio" name="dietary_preference" value="gluten_free"{% if profile.dietary_preference == 'gluten_free' %} checked{% endif %}>
+            Gluten-Free
+          </label>
+        </div>
+        {% if errors.dietary_preference %}<div class="form-error">{{ errors.dietary_preference.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-group">
+        <label>Fitness at Home?</label>
+        <div class="bubble-group">
+          <label class="bubble-option{% if profile.has_home_gym == True %} active{% endif %}">
+            <input type="radio" name="has_home_gym" value="yes"{% if profile.has_home_gym == True %} checked{% endif %}>
+            Yes
+          </label>
+          <label class="bubble-option{% if profile.has_home_gym == False %} active{% endif %}">
+            <input type="radio" name="has_home_gym" value="no"{% if profile.has_home_gym == False %} checked{% endif %}>
+            No
+          </label>
+        </div>
+        {% if errors.has_home_gym %}<div class="form-error">{{ errors.has_home_gym.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-group" id="equipment-section" style="display: {% if profile.has_home_gym %}block{% else %}none{% endif %};">
+        <label>Available Home Equipment</label>
+        <div class="checkbox-group">
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="dumbbells"{% if 'dumbbells' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Dumbbells</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="resistance_bands"{% if 'resistance_bands' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Resistance Bands</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="kettlebell"{% if 'kettlebell' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Kettlebell</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="yoga_mat"{% if 'yoga_mat' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Yoga Mat</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="pull_up_bar"{% if 'pull_up_bar' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Pull-up Bar</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="bench"{% if 'bench' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Weight Bench</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="treadmill"{% if 'treadmill' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Treadmill</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="stationary_bike"{% if 'stationary_bike' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Stationary Bike</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="jump_rope"{% if 'jump_rope' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Jump Rope</span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="home_equipment" value="medicine_ball"{% if 'medicine_ball' in profile.home_equipment %} checked{% endif %}>
+            <span class="checkbox-label">Medicine Ball</span>
+          </label>
+        </div>
+        {% if errors.home_equipment %}<div class="form-error">{{ errors.home_equipment.0 }}</div>{% endif %}
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="height">Height (cm)</label>
+          <input type="number" id="height" name="height" placeholder="e.g. 180" min="100" max="250" value="{{ profile.height|default:'' }}">
+          {% if errors.height %}<div class="form-error">{{ errors.height.0 }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="weight">Weight (kg)</label>
+          <input type="number" id="weight" name="weight" placeholder="e.g. 75" min="30" max="300" value="{{ profile.weight|default:'' }}">
+          {% if errors.weight %}<div class="form-error">{{ errors.weight.0 }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="age">Age</label>
+          <input type="number" id="age" name="age" placeholder="e.g. 34" min="13" max="120" value="{{ profile.age|default:'' }}">
+          {% if errors.age %}<div class="form-error">{{ errors.age.0 }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="calorieGoal">Daily Calorie Goal (kcal)</label>
+          <input type="number" id="calorieGoal" name="calorie_goal" placeholder="e.g. 2400 kcal" min="1000" max="5000" value="{% if profile.calorie_goal and profile.calorie_goal != 2400 %}{{ profile.calorie_goal }}{% endif %}">
+          <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">Leave blank for default: 2400 kcal</div>
+          {% if errors.calorie_goal %}<div class="form-error">{{ errors.calorie_goal.0 }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional Notes -->
+    <div class="profile-section">
+      <div class="profile-section-title">Additional Information</div>
+      
+      <div class="form-group">
+        <label for="bio">About You</label>
+        <textarea id="bio" name="bio" placeholder="Tell us about your fitness journey, interests, or any health considerations...">{{ profile.bio|default:'' }}</textarea>
+        {% if errors.bio %}<div class="form-error">{{ errors.bio.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="button-group">
+      <button type="submit" class="btn-save">Save & Continue</button>
+      <button type="button" class="btn-skip" onclick="discardChanges();">Discard</button>
+    </div>
+  </form>
+
+  <!-- Additional Information Card -->
+  <div style="margin-top: 32px; padding: 16px; background: rgba(232, 92, 0, 0.08); border: 1px solid rgba(232, 92, 0, 0.2); border-radius: 10px; text-align: center;">
+    <div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.75);">
+      💡 These settings help us personalize your fitness experience and track your progress effectively. You can update them anytime from your profile settings.
+    </div>
+  </div>
+</div>
+
+<script>
+function discardChanges() {
+  // Redirect to get_started_profile with skip parameter to mark onboarding as complete
+  window.location.href = '{% url "get_started_profile" %}?skip=true';
+}
+
+document.querySelectorAll('.bubble-option input').forEach(input => {
+  input.addEventListener('change', function() {
+    const bubbleGroup = this.closest('.bubble-group');
+    bubbleGroup.querySelectorAll('.bubble-option').forEach(bubble => {
+      bubble.classList.remove('active');
+    });
+    this.closest('.bubble-option').classList.add('active');
+  });
+
+  if (input.checked) {
+    input.closest('.bubble-option').classList.add('active');
+  }
+});
+
+// Show/hide equipment section based on home gym selection
+const homeGymRadios = document.querySelectorAll('input[name="has_home_gym"]');
+const equipmentSection = document.getElementById('equipment-section');
+
+homeGymRadios.forEach(radio => {
+  radio.addEventListener('change', function() {
+    if (this.value === 'yes') {
+      equipmentSection.style.display = 'block';
+    } else {
+      equipmentSection.style.display = 'none';
+    }
+  });
+});
+
+document.getElementById('profileForm').addEventListener('submit', function(e) {
+  const button = this.querySelector('.btn-save');
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Saving...';
+  
+  // Mark that user has seen this page in local storage
+  localStorage.setItem('spotter_onboarding_completed', 'true');
+  localStorage.setItem('spotter_onboarding_timestamp', new Date().toISOString());
+  
+  setTimeout(() => {
+    button.disabled = false;
+    button.textContent = originalText;
+  }, 2000);
+});
+
+// Mark that user has seen this page when it loads
+document.addEventListener('DOMContentLoaded', function() {
+  localStorage.setItem('spotter_onboarding_seen', 'true');
+});
+</script>
+{% endblock %}
+
+{% block post_container %}
+{{ block.super }}
+{% endblock %}

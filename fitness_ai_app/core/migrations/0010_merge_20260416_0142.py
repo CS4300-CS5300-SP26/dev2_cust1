@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('core', '0008_equipment_exercisetype_muscle_musclegroup_userinjury_and_more'),
-        ('core', '0009_mealsupplement'),
+        ('core', '0011_mealsupplement'),
     ]
 
     operations = [

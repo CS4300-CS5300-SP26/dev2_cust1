@@ -255,8 +255,8 @@ class EmailVerificationViewTests(TestCase):
 
     def test_valid_token_auto_logs_in(self):
         r = self.client.get(f'/verify_email/{self.verification.token}/')
-        self.assertIn('home_dash', r.url)
-        r2 = self.client.get('/home_dash/')
+        self.assertIn('get_started_profile', r.url)
+        r2 = self.client.get('/get_started_profile/')
         self.assertEqual(r2.status_code, 200)
 
     def test_already_verified_token(self):
@@ -3723,6 +3723,797 @@ class InjuryAwareFilteringTestCase(TestCase):
         exercise_names = [ex['name'] for ex in data['exercises']]
         self.assertIn('Dumbbell Curl', exercise_names)
         self.assertIn('Tricep Extension', exercise_names)
+class UserProfileFormTests(TestCase):
+    """Tests for the UserProfile form and data persistence on get_started_profile page."""
+    
+    def setUp(self):
+        self.client = Client()
+        # Create and login a user
+        self.user = User.objects.create_user(
+            username='testuser@example.com',
+            email='testuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='testuser@example.com', password='TestPass123!')
+    
+    def test_profile_page_accessible_to_authenticated_user(self):
+        """Test that authenticated user can access the get_started_profile page."""
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Get Started')
+    
+    def test_profile_page_redirects_unauthenticated_user(self):
+        """Test that unauthenticated user is redirected from get_started_profile."""
+        self.client.logout()
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_save_user_name_field(self):
+        """Test that user name is saved to User.first_name."""
+        response = self.client.post('/get_started_profile/', {
+            'name': 'John Doe',
+        }, follow=True)
+        
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'John Doe')
+    
+    def test_empty_name_field_not_saved(self):
+        """Test that empty name doesn't overwrite existing name."""
+        self.user.first_name = 'Original Name'
+        self.user.save()
+        
+        self.client.post('/get_started_profile/', {})
+        
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Original Name')
+    
+    def test_save_height_field(self):
+        """Test that height (cm) is saved to UserProfile."""
+        self.client.post('/get_started_profile/', {
+            'height': '180',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.height, 180)
+    
+    def test_save_weight_field(self):
+        """Test that weight (kg) is saved to UserProfile."""
+        self.client.post('/get_started_profile/', {
+            'weight': '75',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.weight, 75)
+    
+    def test_save_age_field(self):
+        """Test that age is saved to UserProfile."""
+        self.client.post('/get_started_profile/', {
+            'age': '28',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.age, 28)
+    
+    def test_save_primary_goal_bubble_selection(self):
+        """Test that primary_goal bubble selection is saved."""
+        self.client.post('/get_started_profile/', {
+            'primary_goal': 'muscle_gain',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.primary_goal, 'muscle_gain')
+    
+    def test_all_primary_goal_options_save(self):
+        """Test that all primary goal options can be saved."""
+        goals = ['weight_loss', 'muscle_gain', 'strength', 'endurance', 'flexibility', 'general_health']
+        
+        for goal in goals:
+            self.client.post('/get_started_profile/', {
+                'primary_goal': goal,
+            }, follow=True)
+            
+            self.user.refresh_from_db()
+            profile = self.user.profile
+            self.assertEqual(profile.primary_goal, goal)
+    
+    def test_save_experience_level_bubble_selection(self):
+        """Test that experience_level bubble selection is saved."""
+        self.client.post('/get_started_profile/', {
+            'experience_level': 'intermediate',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.experience_level, 'intermediate')
+    
+    def test_all_experience_level_options_save(self):
+        """Test that all experience level options can be saved."""
+        levels = ['beginner', 'intermediate', 'advanced']
+        
+        for level in levels:
+            self.client.post('/get_started_profile/', {
+                'experience_level': level,
+            }, follow=True)
+            
+            self.user.refresh_from_db()
+            profile = self.user.profile
+            self.assertEqual(profile.experience_level, level)
+    
+    def test_save_dietary_preference_bubble_selection(self):
+        """Test that dietary_preference bubble selection is saved."""
+        self.client.post('/get_started_profile/', {
+            'dietary_preference': 'vegan',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.dietary_preference, 'vegan')
+    
+    def test_all_dietary_preference_options_save(self):
+        """Test that all dietary preference options can be saved."""
+        prefs = ['omnivore', 'vegetarian', 'vegan', 'keto', 'paleo', 'gluten_free']
+        
+        for pref in prefs:
+            self.client.post('/get_started_profile/', {
+                'dietary_preference': pref,
+            }, follow=True)
+            
+            self.user.refresh_from_db()
+            profile = self.user.profile
+            self.assertEqual(profile.dietary_preference, pref)
+    
+    def test_save_home_gym_yes(self):
+        """Test that has_home_gym is saved when user selects 'yes'."""
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'yes',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertTrue(profile.has_home_gym)
+    
+    def test_save_home_gym_no(self):
+        """Test that has_home_gym is saved when user selects 'no'."""
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'no',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertFalse(profile.has_home_gym)
+    
+    def test_save_single_home_equipment(self):
+        """Test that single home equipment selection is saved."""
+        self.client.post('/get_started_profile/', {
+            'home_equipment': ['dumbbells'],
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertIn('dumbbells', profile.home_equipment)
+        self.assertEqual(len(profile.home_equipment), 1)
+    
+    def test_save_multiple_home_equipment(self):
+        """Test that multiple home equipment selections are saved."""
+        equipment = ['dumbbells', 'yoga_mat', 'resistance_bands', 'kettlebell']
+        self.client.post('/get_started_profile/', {
+            'home_equipment': equipment,
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(set(profile.home_equipment), set(equipment))
+        self.assertEqual(len(profile.home_equipment), 4)
+    
+    def test_all_home_equipment_options_save(self):
+        """Test that all home equipment options can be saved."""
+        equipment = [
+            'dumbbells', 'resistance_bands', 'kettlebell', 'yoga_mat',
+            'pull_up_bar', 'bench', 'treadmill', 'stationary_bike',
+            'jump_rope', 'medicine_ball'
+        ]
+        
+        self.client.post('/get_started_profile/', {
+            'home_equipment': equipment,
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(set(profile.home_equipment), set(equipment))
+    
+    def test_save_empty_home_equipment_list(self):
+        """Test that empty home equipment list is saved correctly."""
+        # First save some equipment
+        self.client.post('/get_started_profile/', {
+            'home_equipment': ['dumbbells', 'yoga_mat'],
+        }, follow=True)
+        
+        # Then clear it
+        self.client.post('/get_started_profile/', {
+            'home_equipment': [],
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.home_equipment, [])
+    
+    def test_save_bio_field(self):
+        """Test that bio text is saved to UserProfile."""
+        bio_text = 'I love fitness and want to improve my endurance!'
+        self.client.post('/get_started_profile/', {
+            'bio': bio_text,
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.bio, bio_text)
+    
+    def test_save_multiline_bio(self):
+        """Test that multiline bio text is saved correctly."""
+        bio_text = 'I love fitness.\nI want to improve my endurance.\nLooking forward to training!'
+        self.client.post('/get_started_profile/', {
+            'bio': bio_text,
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.bio, bio_text)
+    
+    def test_save_calorie_goal_custom_value(self):
+        """Test that custom calorie goal is saved."""
+        self.client.post('/get_started_profile/', {
+            'calorie_goal': '3000',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.calorie_goal, 3000)
+    
+    def test_calorie_goal_defaults_to_2400(self):
+        """Test that calorie_goal defaults to 2400 when not provided."""
+        # Create profile without specifying calorie_goal
+        self.client.post('/get_started_profile/', {
+            'name': 'Test User',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertEqual(profile.calorie_goal, 2400)
+    
+    def test_profile_persists_when_revisiting_page(self):
+        """Test that all saved profile data persists when revisiting the page."""
+        # Save initial data
+        self.client.post('/get_started_profile/', {
+            'name': 'John Smith',
+            'height': '180',
+            'weight': '75',
+            'age': '28',
+            'primary_goal': 'muscle_gain',
+            'experience_level': 'intermediate',
+            'dietary_preference': 'vegan',
+            'has_home_gym': 'yes',
+            'home_equipment': ['dumbbells', 'yoga_mat'],
+            'calorie_goal': '2800',
+            'bio': 'Fitness enthusiast',
+        }, follow=True)
+        
+        # Revisit the page
+        response = self.client.get('/get_started_profile/')
+        
+        # Verify all data is present in the response
+        self.assertContains(response, 'John Smith')
+        self.assertContains(response, '180')
+        self.assertContains(response, '75')
+        self.assertContains(response, '28')
+        self.assertContains(response, 'Fitness enthusiast')
+        
+        # Verify data in the database
+        profile = self.user.profile
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'John Smith')
+        self.assertEqual(profile.height, 180)
+        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.age, 28)
+        self.assertEqual(profile.primary_goal, 'muscle_gain')
+        self.assertEqual(profile.experience_level, 'intermediate')
+        self.assertEqual(profile.dietary_preference, 'vegan')
+        self.assertTrue(profile.has_home_gym)
+        self.assertIn('dumbbells', profile.home_equipment)
+        self.assertIn('yoga_mat', profile.home_equipment)
+        self.assertEqual(profile.calorie_goal, 2800)
+        self.assertEqual(profile.bio, 'Fitness enthusiast')
+    
+    def test_form_submission_redirects_to_home_dash(self):
+        """Test that form submission redirects to home_dash."""
+        response = self.client.post('/get_started_profile/', {
+            'name': 'Test User',
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/home_dash/', response.url)
+    
+    def test_form_submission_shows_success_message(self):
+        """Test that form submission shows a success message."""
+        response = self.client.post('/get_started_profile/', {
+            'name': 'Test User',
+        }, follow=True)
+        
+        messages = list(response.context['messages'])
+        self.assertTrue(any('updated' in str(m).lower() or 'saved' in str(m).lower() for m in messages))
+    
+    def test_invalid_height_value_not_saved(self):
+        """Test that invalid height value is not saved."""
+        self.client.post('/get_started_profile/', {
+            'height': 'not_a_number',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertIsNone(profile.height)
+    
+    def test_invalid_weight_value_not_saved(self):
+        """Test that invalid weight value is not saved."""
+        self.client.post('/get_started_profile/', {
+            'weight': 'invalid',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertIsNone(profile.weight)
+    
+    def test_invalid_age_value_not_saved(self):
+        """Test that invalid age value is not saved."""
+        self.client.post('/get_started_profile/', {
+            'age': 'not_numeric',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertIsNone(profile.age)
+    
+    def test_invalid_calorie_goal_value_not_saved(self):
+        """Test that invalid calorie goal value is not saved (reverts to default)."""
+        # First create profile with initial calorie goal
+        self.client.post('/get_started_profile/', {
+            'calorie_goal': '2500',
+        }, follow=True)
+        
+        # Try to save invalid value
+        self.client.post('/get_started_profile/', {
+            'calorie_goal': 'not_valid',
+        }, follow=True)
+        
+        profile = self.user.profile
+        # Should keep the original value since invalid value wasn't saved
+        self.assertEqual(profile.calorie_goal, 2500)
+    
+    def test_partial_form_submission(self):
+        """Test that partial form submission (only some fields) saves correctly."""
+        # Save some fields
+        self.client.post('/get_started_profile/', {
+            'name': 'Partial User',
+            'height': '175',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Partial User')
+        self.assertEqual(profile.height, 175)
+        self.assertIsNone(profile.weight)
+        self.assertIsNone(profile.age)
+    
+    def test_updating_existing_profile_data(self):
+        """Test that updating existing profile data overwrites old values."""
+        # Save initial data
+        self.client.post('/get_started_profile/', {
+            'name': 'Original Name',
+            'height': '170',
+            'primary_goal': 'weight_loss',
+        }, follow=True)
+        
+        # Update with new data
+        self.client.post('/get_started_profile/', {
+            'name': 'Updated Name',
+            'height': '180',
+            'primary_goal': 'muscle_gain',
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Updated Name')
+        self.assertEqual(profile.height, 180)
+        self.assertEqual(profile.primary_goal, 'muscle_gain')
+    
+class UserProfileHomeGymTests(TestCase):
+    """Tests for home gym conditional functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='homeuser@example.com',
+            email='homeuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='homeuser@example.com', password='TestPass123!')
+    
+    def test_home_gym_yes_enables_equipment_selection(self):
+        """Test that selecting yes allows saving equipment."""
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'yes',
+            'home_equipment': ['dumbbells', 'yoga_mat'],
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertTrue(profile.has_home_gym)
+        self.assertIn('dumbbells', profile.home_equipment)
+        self.assertIn('yoga_mat', profile.home_equipment)
+    
+    def test_home_gym_no_disables_equipment_selection(self):
+        """Test that selecting no doesn't save equipment."""
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'no',
+            'home_equipment': [],
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertFalse(profile.has_home_gym)
+        self.assertEqual(profile.home_equipment, [])
+    
+    def test_equipment_persists_when_switching_back_to_yes(self):
+        """Test that equipment list is preserved when toggling home gym."""
+        # First select yes with equipment
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'yes',
+            'home_equipment': ['dumbbells', 'yoga_mat'],
+        }, follow=True)
+        
+        # Then switch to no
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'no',
+        }, follow=True)
+        
+        # Switch back to yes (equipment should still be there)
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'yes',
+            'home_equipment': ['dumbbells', 'yoga_mat'],
+        }, follow=True)
+        
+        profile = self.user.profile
+        self.assertTrue(profile.has_home_gym)
+        self.assertIn('dumbbells', profile.home_equipment)
+        self.assertIn('yoga_mat', profile.home_equipment)
+    
+    def test_home_gym_selection_persists_on_reload(self):
+        """Test that home gym yes/no selection is preserved when reloading."""
+        # Save yes selection
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'yes',
+        }, follow=True)
+        
+        # Reload and verify
+        response = self.client.get('/get_started_profile/')
+        self.assertContains(response, 'value="yes" checked')
+        
+        # Now switch to no
+        self.client.post('/get_started_profile/', {
+            'has_home_gym': 'no',
+        }, follow=True)
+        
+        # Reload and verify no is checked
+        response = self.client.get('/get_started_profile/')
+        self.assertContains(response, 'value="no" checked')
+
+
+# ---------------------------------------------------------------------------
+#  Onboarding feature tests
+# ---------------------------------------------------------------------------
+
+class OnboardingCompletionTests(TestCase):
+    """Tests for onboarding_completed field and skip button functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='onboard@example.com',
+            email='onboard@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='onboard@example.com', password='TestPass123!')
+    
+    def test_profile_created_on_get_started_access(self):
+        """Test that UserProfile is created when accessing get_started_profile if it doesn't exist."""
+        # Delete profile if it exists
+        from core.models import UserProfile
+        UserProfile.objects.filter(user=self.user).delete()
+        
+        # Access the page
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Profile should now exist
+        profile = self.user.profile
+        self.assertIsNotNone(profile)
+        self.assertFalse(profile.onboarding_completed)
+    
+    def test_onboarding_completed_false_by_default(self):
+        """Test that new profiles have onboarding_completed=False."""
+        from core.models import UserProfile
+        UserProfile.objects.filter(user=self.user).delete()
+        
+        # Access the page (creates profile)
+        self.client.get('/get_started_profile/')
+        
+        profile = self.user.profile
+        self.assertFalse(profile.onboarding_completed)
+    
+    def test_skip_button_shows_for_new_users(self):
+        """Test that skip button is visible for users with onboarding_completed=False."""
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=self.user)
+        profile.onboarding_completed = False
+        profile.save()
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertContains(response, 'Skip for Now')
+    
+    def test_skip_button_hidden_after_completion(self):
+        """Test that skip button is hidden after onboarding_completed=True."""
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=self.user)
+        profile.onboarding_completed = True
+        profile.save()
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertNotContains(response, 'Skip for Now')
+    
+    def test_skip_parameter_marks_onboarding_complete(self):
+        """Test that ?skip=true parameter sets onboarding_completed=True."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+        
+        # Should redirect to home_dash
+        self.assertContains(response, 'home')
+    
+    def test_skip_parameter_redirects_to_home(self):
+        """Test that ?skip=true redirects to home_dash."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('home_dash', response.url)
+    
+    def test_form_submission_marks_onboarding_complete(self):
+        """Test that form submission sets onboarding_completed=True."""
+        response = self.client.post('/get_started_profile/', {
+            'name': 'Test User',
+            'height': '180',
+            'weight': '75',
+        }, follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+    
+    def test_discard_button_marks_onboarding_complete(self):
+        """Test that discard button redirects with skip parameter."""
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        self.assertTrue(profile.onboarding_completed)
+
+
+class SocialLoginUserFieldTests(TestCase):
+    """Tests for social_login_user field tracking."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_social_login_user_false_by_default(self):
+        """Test that new profiles have social_login_user=False."""
+        from core.models import UserProfile
+        user = User.objects.create_user(
+            username='regular@example.com',
+            email='regular@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        profile = UserProfile.objects.create(user=user)
+        self.assertFalse(profile.social_login_user)
+    
+    def test_email_verified_user_shows_skip_button(self):
+        """Test that email-verified users see skip button on first onboarding."""
+        from core.models import UserProfile, EmailVerification
+        
+        # Create user via email signup
+        user = User.objects.create_user(
+            username='emailsignup@example.com',
+            email='emailsignup@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Simulate email verification and redirect to get_started_profile
+        self.client.login(username='emailsignup@example.com', password='TestPass123!')
+        
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Profile should be created
+        profile = user.profile
+        self.assertFalse(profile.onboarding_completed)
+        self.assertFalse(profile.social_login_user)
+        
+        # Skip button should show
+        self.assertContains(response, 'Skip for Now')
+
+
+class OnboardingMiddlewareTests(TestCase):
+    """Tests for SocialLoginOnboardingMiddleware behavior."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_middleware_redirects_incomplete_social_user(self):
+        """Test that middleware redirects users with social_login_user=True and onboarding_completed=False."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='socialuser@example.com',
+            email='socialuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as social login user with incomplete onboarding
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='socialuser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should redirect to get_started_profile
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('get_started_profile', response.url)
+    
+    def test_middleware_does_not_redirect_completed_user(self):
+        """Test that middleware doesn't redirect users with onboarding_completed=True."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='completeduser@example.com',
+            email='completeduser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as social login user with completed onboarding
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=True
+        )
+        
+        self.client.login(username='completeduser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should NOT redirect to get_started_profile
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_middleware_does_not_redirect_non_social_user(self):
+        """Test that middleware doesn't redirect regular (non-social) users."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='regularuser@example.com',
+            email='regularuser@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Create profile but mark social_login_user=False
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=False,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='regularuser@example.com', password='TestPass123!')
+        
+        # Accessing home_dash should NOT redirect
+        response = self.client.get('/home_dash/', follow=False)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_middleware_does_not_redirect_from_onboarding_page(self):
+        """Test that middleware doesn't create redirect loop on onboarding page."""
+        from core.models import UserProfile
+        
+        user = User.objects.create_user(
+            username='looptest@example.com',
+            email='looptest@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Mark as incomplete social user
+        profile = UserProfile.objects.create(
+            user=user,
+            social_login_user=True,
+            onboarding_completed=False
+        )
+        
+        self.client.login(username='looptest@example.com', password='TestPass123!')
+        
+        # Accessing get_started_profile should NOT redirect
+        response = self.client.get('/get_started_profile/', follow=False)
+        self.assertEqual(response.status_code, 200)
+
+
+class GetStartedProfileIntegrationTests(TestCase):
+    """Integration tests for complete get_started_profile flow."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_complete_onboarding_flow_email_signup(self):
+        """Test complete flow: create account -> verify email -> skip onboarding -> access home."""
+        from core.models import UserProfile, EmailVerification
+        
+        # Step 1: Create account
+        user = User.objects.create_user(
+            username='fullflow@example.com',
+            email='fullflow@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        # Step 2: Login (simulating after email verification)
+        self.client.login(username='fullflow@example.com', password='TestPass123!')
+        
+        # Step 3: Access get_started_profile - should show skip button
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Skip for Now')
+        
+        # Step 4: Click skip
+        response = self.client.get('/get_started_profile/?skip=true', follow=True)
+        
+        # Step 5: Verify onboarding is completed
+        user.refresh_from_db()
+        profile = user.profile
+        self.assertTrue(profile.onboarding_completed)
+        
+        # Step 6: Verify redirect to home_dash succeeded
+        self.assertContains(response, 'home')
+        
+        # Step 7: Verify skip button is hidden on subsequent visits
+        response = self.client.get('/get_started_profile/')
+        self.assertNotContains(response, 'Skip for Now')
+    
+    def test_complete_onboarding_flow_form_submission(self):
+        """Test complete flow: create account -> fill form -> completion."""
+        user = User.objects.create_user(
+            username='formflow@example.com',
+            email='formflow@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        
+        self.client.login(username='formflow@example.com', password='TestPass123!')
+        
+        # Submit form
+        response = self.client.post('/get_started_profile/', {
+            'name': 'John Doe',
+            'height': '180',
+            'weight': '75',
+            'age': '30',
+            'primary_goal': 'muscle_gain',
+            'experience_level': 'intermediate',
+            'dietary_preference': 'omnivore',
+            'has_home_gym': 'yes',
+        }, follow=True)
+        
+        # Verify onboarding completed
+        user.refresh_from_db()
+        profile = user.profile
+        self.assertTrue(profile.onboarding_completed)
+        self.assertEqual(profile.height, 180)
+        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.age, 30)
+
 # ==================== SUPPLEMENT TESTS ====================
 
 class SupplementDatabaseModelTests(TestCase):
@@ -3970,5 +4761,4 @@ class SupplementAPITests(TestCase):
         data = response.json()
         self.assertTrue(data['success'])
         self.assertIn('entry', data)
-
 

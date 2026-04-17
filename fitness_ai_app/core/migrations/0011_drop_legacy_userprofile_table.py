@@ -6,10 +6,4 @@ class Migration(migrations.Migration):
         ("core", "0010_merge_20260416_0142"),
     ]
 
-    operations = [
-        migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS core_userprofile;",
-            reverse_sql=migrations.RunSQL.noop,
-        ),
-    ]
-
+    operations = []

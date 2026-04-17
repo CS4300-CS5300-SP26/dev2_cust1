@@ -9,7 +9,7 @@ Feature: Email Verification
   Scenario: Valid verification token activates user account
     Given an unverified user "evbdd@spotter.ai" with a valid verification token
     When I visit the verification link for "evbdd@spotter.ai"
-    Then I should be redirected to "home_dash"
+    Then I should be redirected to "get_started_profile"
     And the user "evbdd@spotter.ai" should be active
 
   Scenario: Already verified token redirects to login

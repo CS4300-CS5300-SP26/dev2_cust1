@@ -41,51 +41,84 @@ class AutoSocialAdapter(DefaultSocialAccountAdapter):
                 if not user.username:
                     user.username = email
         
-        return super().save_user(request, sociallogin, form)
+        user = super().save_user(request, sociallogin, form)
+        
+        # Mark as social login user and ensure profile exists
+        try:
+            from .models import UserProfile
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            if not profile.social_login_user:
+                profile.social_login_user = True
+                profile.save(update_fields=['social_login_user'])
+        except:
+            pass
+        
+        return user
 
     def pre_social_login(self, request, sociallogin):
         """
         Called after a successful social authentication but before login completes.
         
-        This handles two scenarios:
+        This handles three scenarios:
         1. Auto-connect social account to existing user with same email
         2. Update existing user's email from social account data
+        3. Set redirect URL for onboarding if needed
+        
+        IMPORTANT: For NEW users, the profile doesn't exist yet in pre_social_login,
+        so we always redirect to onboarding for any new social signup.
         """
         super().pre_social_login(request, sociallogin)
         
-        # If social account is already connected to a user, just update email if needed
-        if sociallogin.is_existing:
-            user = sociallogin.user
+        # ALWAYS redirect new social signups to onboarding
+        # (sociallogin.user is not saved to DB yet for new users)
+        if not sociallogin.is_existing:
             extra_data = sociallogin.account.extra_data or {}
             email = extra_data.get('email', '')
             
-            if email and not user.email:
-                user.email = email
-                user.save(update_fields=['email'])
+            if email:
+                # Check if this email already exists
+                try:
+                    existing_user = User.objects.get(email__iexact=email)
+                    # Existing user with this email - connect to them
+                    sociallogin.connect(request, existing_user)
+                except User.DoesNotExist:
+                    # Try username as fallback
+                    try:
+                        existing_user = User.objects.get(username__iexact=email)
+                        sociallogin.connect(request, existing_user)
+                    except User.DoesNotExist:
+                        # Brand new user - always send to onboarding
+                        sociallogin.state['next'] = '/get_started_profile/'
+                        return
+            
+            # We found an existing user to connect to, now check their onboarding status
+            try:
+                profile = sociallogin.user.profile
+                if not profile.onboarding_completed:
+                    sociallogin.state['next'] = '/get_started_profile/'
+            except:
+                # No profile exists yet, redirect to onboarding to create it
+                sociallogin.state['next'] = '/get_started_profile/'
             return
         
-        # Social account is NOT connected yet - check if user with this email exists
-        email = None
+        # If social account is already connected to a user, just update email if needed
+        user = sociallogin.user
         extra_data = sociallogin.account.extra_data or {}
         email = extra_data.get('email', '')
         
-        if not email:
-            # No email from social provider, can't auto-connect
-            return
+        if email and not user.email:
+            user.email = email
+            user.save(update_fields=['email'])
         
-        # Look for existing user with this email
+        # For existing social accounts, check if user needs onboarding
         try:
-            existing_user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-            # Also check username (since we use email as username)
-            try:
-                existing_user = User.objects.get(username__iexact=email)
-            except User.DoesNotExist:
-                # No existing user found, allow normal signup flow
-                return
-        
-        # Found existing user! Connect the social account to this user
-        sociallogin.connect(request, existing_user)
+            profile = user.profile
+            if not profile.onboarding_completed:
+                sociallogin.state['next'] = '/get_started_profile/'
+        except:
+            # No profile - redirect to create one
+            sociallogin.state['next'] = '/get_started_profile/'
 
     def is_auto_signup_allowed(self, request, sociallogin):
         return True
+
