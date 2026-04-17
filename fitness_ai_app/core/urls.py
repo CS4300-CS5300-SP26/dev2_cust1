@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/supplement_entries/', views.supplement_entries, name='supplement_entries'),
     path('api/supplement_entries/<int:entry_id>/toggle/', views.toggle_supplement_taken, name='toggle_supplement_taken'),
     path('user_get_started/', views.user_get_started, name='user_get_started'),
+    path('get_started_profile/', views.get_started_profile, name='get_started_profile'),
     path('user_login/', views.user_login, name='user_login'),
     path('user_logout/', views.user_logout, name='user_logout'),
     path('forgot_password/', views.forgot_password, name='forgot_password'),

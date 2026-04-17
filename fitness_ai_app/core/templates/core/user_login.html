@@ -4,7 +4,9 @@
 
 {% block content %}
 <div class="title">Log In</div>
-<div class="desc">Sign in to your Spotter.ai account to continue.</div>
+<div style="width:100%;max-width:320px;margin:0 auto 0px auto;text-align:center;">
+    <div class="desc">Sign in to your Spotter.ai account to continue.</div>
+</div>
 <form method="post" action="{% url 'user_login' %}" id="loginForm" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:18px;margin-bottom:24px;">
     {% csrf_token %}
     <input type="email" name="email" placeholder="Email" required class="form-input">

@@ -24,7 +24,18 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, SupplementDatabase, SupplementEntry, MealSupplement
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
+
+
+def get_user_calorie_goal(user, default=2400):
+    """
+    Fetch the user's calorie goal from their profile, or return default if not set.
+    """
+    try:
+        profile = UserProfile.objects.get(user=user)
+        return profile.calorie_goal or default
+    except UserProfile.DoesNotExist:
+        return default
 
 
 def splash(request):
@@ -144,6 +155,110 @@ def user_get_started(request):
     return render(request, 'core/user_get_started.html', {'form': form})
 
 
+@login_required
+def get_started_profile(request):
+    if request.method == 'POST':
+        # Update user profile information
+        user = request.user
+        user.first_name = request.POST.get('name', user.first_name)
+        user.save()
+        
+        # Update or create user profile with fitness metrics
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        # Save calorie goal
+        calorie_goal = request.POST.get('calorie_goal', '').strip()
+        if calorie_goal:
+            try:
+                profile.calorie_goal = int(calorie_goal)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save height
+        height = request.POST.get('height', '').strip()
+        if height:
+            try:
+                profile.height = int(height)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save weight
+        weight = request.POST.get('weight', '').strip()
+        if weight:
+            try:
+                profile.weight = int(weight)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save age
+        age = request.POST.get('age', '').strip()
+        if age:
+            try:
+                profile.age = int(age)
+            except (ValueError, TypeError):
+                pass
+        
+        # Save primary goal
+        primary_goal = request.POST.get('primary_goal', '').strip()
+        if primary_goal:
+            profile.primary_goal = primary_goal
+        
+        # Save experience level
+        experience_level = request.POST.get('experience_level', '').strip()
+        if experience_level:
+            profile.experience_level = experience_level
+        
+        # Save dietary preference
+        dietary_preference = request.POST.get('dietary_preference', '').strip()
+        if dietary_preference:
+            profile.dietary_preference = dietary_preference
+        
+        # Save home gym status
+        has_home_gym = request.POST.get('has_home_gym', '').strip()
+        if has_home_gym:
+            profile.has_home_gym = has_home_gym == 'yes'
+        
+        # Save home equipment (multiple selections)
+        home_equipment = request.POST.getlist('home_equipment')
+        profile.home_equipment = [eq for eq in home_equipment if eq]
+        
+        # Save bio
+        bio = request.POST.get('bio', '').strip()
+        if bio:
+            profile.bio = bio
+        else:
+            profile.bio = None
+        
+        # Mark onboarding as completed
+        profile.onboarding_completed = True
+        profile.save()
+        
+        messages.success(request, 'Profile updated successfully!')
+        return redirect('home_dash')
+    
+    # Handle GET request with skip parameter
+    if request.GET.get('skip') == 'true':
+        from core.models import UserProfile
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        profile.onboarding_completed = True
+        profile.save()
+        return redirect('home_dash')
+    
+    # GET request - pass profile data to template
+    from core.models import UserProfile
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Show skip button on first-time onboarding (any user who hasn't completed it yet)
+    is_first_time_onboarding = not profile.onboarding_completed
+    
+    return render(request, 'profile_dir/get_started_profile.html', {
+        'active_tab': 'profile',
+        'profile': profile,
+        'is_first_time_onboarding': is_first_time_onboarding
+    })
+
+
 def verify_email(request, token):
     try:
         verification = EmailVerification.objects.get(token=token)
@@ -166,7 +281,7 @@ def verify_email(request, token):
     verification.user.save()
     login(request, verification.user, backend='django.contrib.auth.backends.ModelBackend')
     messages.success(request, 'Your email has been verified! Welcome to Spotter.ai.')
-    return redirect('home_dash')
+    return redirect('get_started_profile')
 
 
 def user_login(request):
@@ -296,6 +411,18 @@ def home_dash(request):
     from datetime import date
     from django.db.models import Sum
     
+    # Redirect to onboarding if social login user hasn't completed it
+    try:
+        profile = request.user.profile
+        if profile.social_login_user and not profile.onboarding_completed:
+            return redirect('get_started_profile')
+    except:
+        pass
+    
+    # Check for discard action from profile
+    if request.GET.get('discard') == 'true':
+        messages.info(request, 'Changes discarded. Nothing was saved.')
+    
     today = date.today()
     total_calories = FoodItem.objects.filter(
         meal__user=request.user,
@@ -303,7 +430,9 @@ def home_dash(request):
         completed=True
     ).aggregate(total=Sum('calories'))['total'] or 0
     
-    calorie_goal = 2400
+    # Get calorie goal from user profile or use default
+    calorie_goal = get_user_calorie_goal(request.user)
+    
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
     
     return render(request, 'home_dash_dir/home_dash.html', {
@@ -500,7 +629,9 @@ def nutrition_page(request):
     total_carbs = totals['total_carbs'] or 0
     total_fats = totals['total_fats'] or 0
 
-    calorie_goal = 2400
+    # Get calorie goal from user profile or use default
+    calorie_goal = get_user_calorie_goal(request.user)
+    
     calories_percentage = min(
         round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
         100,
