@@ -21,6 +21,22 @@ from .models import (
     Workout,
 )
 
+CORE_ADMIN_SECTIONS = [
+    ("Nutrition", "nutrition", {Meal, FoodItem, MealSupplement}),
+    ("Workouts", "workouts", {Workout, Exercise}),
+    ("Supplements", "supplements", {SupplementDatabase, SupplementEntry}),
+    (
+        "Exercise Database",
+        "exercise_database",
+        {TrainingExercise, ExerciseType, MuscleGroup, Muscle, Equipment},
+    ),
+    (
+        "User Preferences",
+        "user_preferences",
+        {UserInjury, UserEquipmentProfile, EmailVerification, PasswordReset},
+    ),
+]
+
 
 def _grouped_core_get_app_list(self, request, app_label=None):
     app_list = self._original_get_app_list(request, app_label=app_label)
@@ -32,33 +48,14 @@ def _grouped_core_get_app_list(self, request, app_label=None):
             continue
 
         core_models = app["models"]
+        matched_models = set()
 
-        def model_key(model_dict):
-            return model_dict.get("object_name", "").lower()
-
-        sections = [
-            ("Nutrition", "nutrition", {"meal", "fooditem", "mealsupplement"}),
-            ("Workouts", "workouts", {"workout", "exercise"}),
-            ("Supplements", "supplements", {"supplementdatabase", "supplemententry"}),
-            (
-                "Exercise Database",
-                "exercise_database",
-                {"trainingexercise", "exercisetype", "musclegroup", "muscle", "equipment"},
-            ),
-            (
-                "User Preferences",
-                "user_preferences",
-                {"userinjury", "userequipmentprofile", "emailverification", "passwordreset"},
-            ),
-        ]
-
-        matched = set()
-        for title, slug, names in sections:
-            models = [m for m in core_models if model_key(m) in names]
+        for title, slug, section_models in CORE_ADMIN_SECTIONS:
+            models = [m for m in core_models if m.get("model") in section_models]
             if not models:
                 continue
 
-            matched.update(model_key(m) for m in models)
+            matched_models.update(m.get("model") for m in models)
             organized.append(
                 {
                     **app,
@@ -68,7 +65,7 @@ def _grouped_core_get_app_list(self, request, app_label=None):
                 }
             )
 
-        leftovers = [m for m in core_models if model_key(m) not in matched]
+        leftovers = [m for m in core_models if m.get("model") not in matched_models]
         if leftovers:
             organized.append(
                 {
