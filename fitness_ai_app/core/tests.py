@@ -2293,6 +2293,32 @@ class TrainPageViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['active_tab'], 'train')
 
+    def test_train_page_uses_profile_goal_default(self):
+        """Primary onboarding goal should preselect workout goal in add form."""
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.primary_goal = 'muscle_gain'
+        profile.save()
+
+        self.client.login(username='trainuser@example.com', password='TestPass123!')
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['default_workout_goal'], 'strength')
+        self.assertContains(response, '<option value="strength" selected>Strength Training</option>', html=True)
+
+    def test_train_page_maps_endurance_to_cardio_default(self):
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.primary_goal = 'endurance'
+        profile.save()
+
+        self.client.login(username='trainuser@example.com', password='TestPass123!')
+        response = self.client.get('/train/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['default_workout_goal'], 'cardio')
+
 
 class SocialPageViewTests(TestCase):
     """Tests for the social_page view."""

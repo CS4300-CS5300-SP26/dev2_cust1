@@ -53,6 +53,25 @@ def get_user_calorie_goal(user, default=2400):
         return default
 
 
+def get_default_workout_goal(user):
+    """Map onboarding primary goal to train-page workout goal defaults."""
+    primary_to_workout_goal = {
+        'strength': 'strength',
+        'muscle_gain': 'strength',
+        'weight_loss': 'weight_loss',
+        'endurance': 'cardio',
+        'flexibility': 'flexibility',
+        'general_health': 'cardio',
+    }
+
+    try:
+        user_primary_goal = user.profile.primary_goal
+    except UserProfile.DoesNotExist:
+        return ''
+
+    return primary_to_workout_goal.get(user_primary_goal, '')
+
+
 def _parse_optional_positive_int(raw_value, field_label):
     """Parse optional positive integer form fields with user-friendly errors."""
     if raw_value in (None, ''):
@@ -545,6 +564,7 @@ def train_page(request):
     )
     equipment_options = list(Equipment.objects.all().values('id', 'name'))
     exercise_database_count = TrainingExercise.objects.filter(is_active=True).count()
+    default_workout_goal = get_default_workout_goal(request.user)
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -565,6 +585,7 @@ def train_page(request):
         'muscles': muscles,
         'equipment_options': equipment_options,
         'exercise_database_count': exercise_database_count,
+        'default_workout_goal': default_workout_goal,
     }
     return render(request, 'train_dir/train_page.html', context)
 
