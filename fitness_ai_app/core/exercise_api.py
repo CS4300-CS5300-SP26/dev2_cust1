@@ -6,7 +6,7 @@ Provides filtering and querying for the comprehensive exercise database
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Case, When, IntegerField
 from django.utils import timezone
 import json
 
@@ -14,6 +14,13 @@ from .models import (
     TrainingExercise, ExerciseType, MuscleGroup, Muscle, Equipment,
     UserInjury, UserEquipmentProfile
 )
+
+
+def _safe_int(value):
+    if value is None:
+        return None
+    value = str(value).strip()
+    return int(value) if value.isdigit() else None
 
 
 @require_http_methods(["GET"])
@@ -74,18 +81,26 @@ def filter_exercises(request):
         'equipment'
     )
     
+    query_text = request.GET.get('q', '').strip()
+    if query_text:
+        exercises = exercises.filter(
+            Q(name__icontains=query_text)
+            | Q(description__icontains=query_text)
+            | Q(instructions__icontains=query_text)
+        )
+
     # Filter by exercise type
-    exercise_type_id = request.GET.get('exercise_type')
+    exercise_type_id = _safe_int(request.GET.get('exercise_type'))
     if exercise_type_id:
         exercises = exercises.filter(exercise_type_id=exercise_type_id)
     
     # Filter by muscle group
-    muscle_group_id = request.GET.get('muscle_group')
+    muscle_group_id = _safe_int(request.GET.get('muscle_group'))
     if muscle_group_id:
         exercises = exercises.filter(muscle_groups__id=muscle_group_id).distinct()
     
     # Filter by specific muscle
-    muscle_id = request.GET.get('muscle')
+    muscle_id = _safe_int(request.GET.get('muscle'))
     if muscle_id:
         exercises = exercises.filter(
             Q(primary_muscles__id=muscle_id) | Q(secondary_muscles__id=muscle_id)
@@ -106,8 +121,15 @@ def filter_exercises(request):
     # Filter by equipment (user has at least one of these)
     equipment_ids = request.GET.get('equipment')
     if equipment_ids:
-        equipment_list = [int(x) for x in equipment_ids.split(',') if x.isdigit()]
-        exercises = exercises.filter(equipment__id__in=equipment_list).distinct()
+        equipment_list = [int(x) for x in equipment_ids.split(',') if x.strip().isdigit()]
+        if equipment_list:
+            equipment_mode = request.GET.get('equipment_mode', 'any')
+            if equipment_mode == 'all':
+                for equipment_id in equipment_list:
+                    exercises = exercises.filter(equipment__id=equipment_id)
+                exercises = exercises.distinct()
+            else:
+                exercises = exercises.filter(equipment__id__in=equipment_list).distinct()
     
     # Exclude exercises affecting injured muscles
     exclude_injured = request.GET.get('exclude_injured', 'false').lower() == 'true'
@@ -121,6 +143,42 @@ def filter_exercises(request):
             Q(primary_muscles__id__in=user_injuries) |
             Q(secondary_muscles__id__in=user_injuries)
         ).distinct()
+
+    exclude_high_impact = request.GET.get('exclude_high_impact', 'false').lower() == 'true'
+    if exclude_high_impact:
+        exercises = exercises.filter(high_impact=False)
+
+    timed_only = request.GET.get('timed_only', 'false').lower() == 'true'
+    if timed_only:
+        exercises = exercises.filter(default_duration_seconds__isnull=False)
+
+    sort_key = request.GET.get('sort', 'name_asc')
+    if sort_key == 'name_desc':
+        exercises = exercises.order_by('-name')
+    elif sort_key == 'difficulty_asc':
+        exercises = exercises.annotate(
+            difficulty_rank=Case(
+                When(difficulty='beginner', then=0),
+                When(difficulty='intermediate', then=1),
+                When(difficulty='advanced', then=2),
+                default=3,
+                output_field=IntegerField(),
+            )
+        ).order_by('difficulty_rank', 'name')
+    elif sort_key == 'difficulty_desc':
+        exercises = exercises.annotate(
+            difficulty_rank=Case(
+                When(difficulty='beginner', then=0),
+                When(difficulty='intermediate', then=1),
+                When(difficulty='advanced', then=2),
+                default=3,
+                output_field=IntegerField(),
+            )
+        ).order_by('-difficulty_rank', 'name')
+    elif sort_key == 'newest':
+        exercises = exercises.order_by('-created_at', 'name')
+    else:
+        exercises = exercises.order_by('name')
     
     # Serialize response
     exercise_list = []
@@ -131,6 +189,7 @@ def filter_exercises(request):
             'description': exercise.description,
             'instructions': exercise.instructions,
             'difficulty': exercise.get_difficulty_display(),
+            'difficulty_key': exercise.difficulty,
             'exercise_type': {
                 'id': exercise.exercise_type.id,
                 'name': exercise.exercise_type.name,
@@ -148,6 +207,7 @@ def filter_exercises(request):
                 for m in exercise.secondary_muscles.all()
             ],
             'location': exercise.get_location_display(),
+            'location_key': exercise.location,
             'equipment': [
                 {'id': e.id, 'name': e.name}
                 for e in exercise.equipment.all()

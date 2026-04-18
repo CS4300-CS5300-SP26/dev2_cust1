@@ -1199,6 +1199,25 @@ class TrainPageViewTests(TestCase):
         self.assertEqual(response.context['prev_date'], '2026-04-14')
         self.assertEqual(response.context['next_date'], '2026-04-16')
 
+    def test_train_page_invalid_tab_defaults_to_today(self):
+        response = self.client.get('/train/?tab=unknown')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_tab'], 'today')
+
+    def test_train_page_includes_exercise_filter_data(self):
+        ExerciseType.objects.create(name='Strength')
+        upper_body = MuscleGroup.objects.create(name='Upper Body')
+        Muscle.objects.create(name='Biceps', muscle_group=upper_body)
+        Equipment.objects.create(name='Dumbbells')
+
+        response = self.client.get('/train/?tab=search')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_tab'], 'search')
+        self.assertEqual(len(response.context['exercise_types']), 1)
+        self.assertEqual(len(response.context['muscle_groups']), 1)
+        self.assertEqual(len(response.context['muscles']), 1)
+        self.assertEqual(len(response.context['equipment_options']), 1)
+
 
 class TrainPagePastDateReadOnlyTests(TestCase):
     """Tests for read-only behavior on past dates"""
@@ -1376,6 +1395,19 @@ class AddExerciseTests(TestCase):
         self.workout = Workout.objects.create(
             user=self.user, name='Test Workout', goal='strength', date=date.today()
         )
+        self.exercise_type = ExerciseType.objects.create(name='Strength')
+        self.upper_body = MuscleGroup.objects.create(name='Upper Body')
+        self.biceps = Muscle.objects.create(name='Biceps', muscle_group=self.upper_body)
+        self.library_exercise = TrainingExercise.objects.create(
+            name='Library Curl',
+            exercise_type=self.exercise_type,
+            difficulty='beginner',
+            location='both',
+            default_sets=4,
+            default_reps=12,
+        )
+        self.library_exercise.muscle_groups.add(self.upper_body)
+        self.library_exercise.primary_muscles.add(self.biceps)
 
     def test_add_exercise_success(self):
         """Test successful exercise creation"""
@@ -1419,6 +1451,20 @@ class AddExerciseTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Exercise.objects.count(), 0)
+
+    def test_add_exercise_from_training_database_defaults(self):
+        response = self.client.post('/train/add_exercise/', {
+            'workout_id': self.workout.id,
+            'training_exercise_id': self.library_exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+            'tab': 'search',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        exercise = Exercise.objects.get(name='Library Curl')
+        self.assertEqual(exercise.muscle_group, 'arms')
+        self.assertEqual(exercise.sets, 4)
+        self.assertEqual(exercise.reps, 12)
 
 
 class EditExerciseTests(TestCase):
@@ -3478,6 +3524,7 @@ class ExerciseAPITestCase(TestCase):
         self.upper_body = MuscleGroup.objects.create(name='Upper Body')
         self.biceps = Muscle.objects.create(name='Biceps', muscle_group=self.upper_body)
         self.dumbbells = Equipment.objects.create(name='Dumbbells')
+        self.bench = Equipment.objects.create(name='Bench')
 
         self.curl = TrainingExercise.objects.create(
             name='Dumbbell Curl',
@@ -3488,6 +3535,14 @@ class ExerciseAPITestCase(TestCase):
         self.curl.muscle_groups.add(self.upper_body)
         self.curl.primary_muscles.add(self.biceps)
         self.curl.equipment.add(self.dumbbells)
+        self.curl.equipment.add(self.bench)
+        self.sprints = TrainingExercise.objects.create(
+            name='Sprints',
+            exercise_type=self.cardio_type,
+            difficulty='advanced',
+            location='both',
+            high_impact=True,
+        )
 
     def test_get_exercise_types(self):
         """Test GET /api/exercises/types/"""
@@ -3511,7 +3566,7 @@ class ExerciseAPITestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertIn('equipment', data)
-        self.assertEqual(len(data['equipment']), 1)
+        self.assertEqual(len(data['equipment']), 2)
 
     def test_get_muscles(self):
         """Test GET /api/exercises/muscles/"""
@@ -3566,6 +3621,33 @@ class ExerciseAPITestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertGreaterEqual(data['count'], 0)
+
+    def test_filter_by_query_text(self):
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?q=sprint')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+        self.assertEqual(data['exercises'][0]['name'], 'Sprints')
+
+    def test_filter_by_equipment_mode_all(self):
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get(
+            f'/api/exercises/filter/?equipment={self.dumbbells.id},{self.bench.id}&equipment_mode=all'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['count'], 1)
+        self.assertEqual(data['exercises'][0]['name'], 'Dumbbell Curl')
+
+    def test_filter_exclude_high_impact(self):
+        self.client.login(username='apiuser', password='testpass123')
+        response = self.client.get('/api/exercises/filter/?exclude_high_impact=true')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        exercise_names = [exercise['name'] for exercise in data['exercises']]
+        self.assertNotIn('Sprints', exercise_names)
+        self.assertIn('Dumbbell Curl', exercise_names)
 
     def test_get_exercise_detail(self):
         """Test GET /api/exercises/<id>/"""
