@@ -1318,6 +1318,17 @@ class AddWorkoutTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Workout.objects.filter(name='Morning Routine').exists())
 
+    def test_add_workout_with_profile_goal_option(self):
+        """Test workout creation with a goal shared from profile options."""
+        response = self.client.post('/train/add_workout/', {
+            'workout_name': 'Endurance Session',
+            'goal': 'endurance',
+            'status': 'planned',
+            'date': '2026-04-04',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Workout.objects.filter(name='Endurance Session', goal='endurance').exists())
+
     def test_add_workout_missing_fields(self):
         """Test workout creation fails with missing fields"""
         response = self.client.post('/train/add_workout/', {
@@ -2304,10 +2315,10 @@ class TrainPageViewTests(TestCase):
         self.client.login(username='trainuser@example.com', password='TestPass123!')
         response = self.client.get('/train/')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['default_workout_goal'], 'strength')
-        self.assertContains(response, '<option value="strength" selected>Strength Training</option>', html=True)
+        self.assertEqual(response.context['default_workout_goal'], 'muscle_gain')
+        self.assertContains(response, '<option value="muscle_gain" selected>Muscle Gain</option>', html=True)
 
-    def test_train_page_maps_endurance_to_cardio_default(self):
+    def test_train_page_uses_endurance_goal_default(self):
         from core.models import UserProfile
 
         profile, _ = UserProfile.objects.get_or_create(user=self.user)
@@ -2317,7 +2328,23 @@ class TrainPageViewTests(TestCase):
         self.client.login(username='trainuser@example.com', password='TestPass123!')
         response = self.client.get('/train/')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['default_workout_goal'], 'cardio')
+        self.assertEqual(response.context['default_workout_goal'], 'endurance')
+
+    def test_train_page_goal_options_include_profile_choices(self):
+        self.client.login(username='trainuser@example.com', password='TestPass123!')
+        response = self.client.get('/train/')
+        self.assertContains(response, '<option value="muscle_gain">Muscle Gain</option>', html=True)
+        self.assertContains(response, '<option value="endurance">Endurance &amp; Cardio</option>', html=True)
+        self.assertContains(response, '<option value="general_health">General Health &amp; Wellness</option>', html=True)
+
+    def test_train_page_goal_options_match_profile_order(self):
+        self.client.login(username='trainuser@example.com', password='TestPass123!')
+        response = self.client.get('/train/')
+        workout_goal_values = [goal_value for goal_value, _ in response.context['workout_goal_choices']]
+        self.assertEqual(
+            workout_goal_values[:6],
+            ['weight_loss', 'muscle_gain', 'strength', 'endurance', 'flexibility', 'general_health'],
+        )
 
 
 class SocialPageViewTests(TestCase):
