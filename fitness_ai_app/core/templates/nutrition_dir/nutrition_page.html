@@ -238,24 +238,14 @@
             <!-- Choice Buttons -->
             <div id="itemTypeChoices" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
                 <button type="button" onclick="showFoodForm()" style="padding:16px;background:transparent;border:2px solid var(--accent);border-radius:8px;color:white;font-size:16px;cursor:pointer;text-align:left;transition:all 0.2s;display:flex;align-items:center;gap:12px;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6 9l6-6 6 6"></path>
-                        <path d="M12 15v6"></path>
-                        <circle cx="6" cy="18" r="1"></circle>
-                        <circle cx="18" cy="18" r="1"></circle>
-                    </svg>
+                    <span style="font-size:28px;">🍴</span>
                     <span>
                         <div style="font-weight:600;">Food Item</div>
                         <div style="font-size:12px;color:#aaa;margin-top:2px;">Create new or choose from database</div>
                     </span>
                 </button>
                 <button type="button" onclick="showSupplementForm()" style="padding:16px;background:transparent;border:2px solid var(--accent);border-radius:8px;color:white;font-size:16px;cursor:pointer;text-align:left;transition:all 0.2s;display:flex;align-items:center;gap:12px;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 14c1.49-1.46 2.29-2.74 2.29-4 0-2.5-2.04-4.5-4.5-4.5-1.42 0-2.74.5-3.79 1.5"></path>
-                        <path d="M5 14c-1.49-1.46-2.29-2.74-2.29-4 0-2.5 2.04-4.5 4.5-4.5 1.42 0 2.74.5 3.79 1.5"></path>
-                        <path d="M12 20v-6m0-4V4"></path>
-                        <circle cx="12" cy="12" r="1"></circle>
-                    </svg>
+                    <span style="font-size:28px;">💊</span>
                     <span>
                         <div style="font-weight:600;">Supplement</div>
                         <div style="font-size:12px;color:#aaa;margin-top:2px;">Vitamin, mineral, or other supplement</div>
@@ -308,7 +298,7 @@
                     </div>
                     <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:16px;">
                         <div>
-                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Serving Size</label>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
                             <input type="number" name="serving_size" id="foodServingSizeInput" placeholder="1" min="0.1" step="0.1" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
@@ -1553,6 +1543,13 @@
         document.getElementById('foodServingUnitInput').value = servingUnit || 'grams';
         document.getElementById('addFoodItemBtn').textContent = 'Save Changes';
         addItemModal.style.display = 'flex';
+        
+        // Store base values (the displayed values ARE the base values from the database)
+        setTimeout(() => {
+            storeFoodBaseValues();
+            setupFoodMacroCalculation();
+        }, 100);
+        
         showFoodForm();
     }
     
@@ -1574,6 +1571,7 @@
         supplementFormSection.style.display = 'none';
         document.getElementById('foodNameInput').focus();
         setupFoodSearch();
+        setupFoodMacroCalculation();
     }
     
     function showSupplementForm() {
@@ -1675,6 +1673,86 @@
         document.getElementById('foodServingSizeInput').value = 1;
         document.getElementById('foodServingUnitInput').value = 'grams';
         document.getElementById('foodSearchResults').style.display = 'none';
+        
+        // Store base values for dynamic calculation
+        storeFoodBaseValues();
+    }
+    
+    // Store base macros for dynamic calculation
+    function storeFoodBaseValues() {
+        const caloriesInput = document.getElementById('foodCaloriesInput');
+        const proteinInput = document.getElementById('foodProteinInput');
+        const carbsInput = document.getElementById('foodCarbsInput');
+        const fatsInput = document.getElementById('foodFatsInput');
+        
+        caloriesInput.dataset.baseValue = caloriesInput.value || 0;
+        proteinInput.dataset.baseValue = proteinInput.value || 0;
+        carbsInput.dataset.baseValue = carbsInput.value || 0;
+        fatsInput.dataset.baseValue = fatsInput.value || 0;
+    }
+    
+    // Update macros based on serving size and unit
+    function updateFoodMacrosForServingSize() {
+        const servingSizeInput = document.getElementById('foodServingSizeInput');
+        const servingUnitInput = document.getElementById('foodServingUnitInput');
+        const caloriesInput = document.getElementById('foodCaloriesInput');
+        const proteinInput = document.getElementById('foodProteinInput');
+        const carbsInput = document.getElementById('foodCarbsInput');
+        const fatsInput = document.getElementById('foodFatsInput');
+        
+        const servingSize = parseFloat(servingSizeInput.value) || 1;
+        const servingUnit = servingUnitInput.value || 'grams';
+        
+        // Get base values (or current values if no base stored)
+        const baseCalories = parseFloat(caloriesInput.dataset.baseValue || caloriesInput.value || 0);
+        const baseProtein = parseFloat(proteinInput.dataset.baseValue || proteinInput.value || 0);
+        const baseCarbs = parseFloat(carbsInput.dataset.baseValue || carbsInput.value || 0);
+        const baseFats = parseFloat(fatsInput.dataset.baseValue || fatsInput.value || 0);
+        
+        // Get the base unit stored when values were set
+        const baseUnit = caloriesInput.dataset.baseUnit || 'grams';
+        
+        // Conversion factors to grams
+        const conversionToGrams = {
+            'grams': 1,
+            'ounces': 28.35,
+            'cups': 240
+        };
+        
+        // Convert current serving size to grams, then back to serving size in grams
+        const gramsPerServing = servingSize * (conversionToGrams[servingUnit] || 1);
+        
+        // Calculate adjusted values
+        caloriesInput.value = Math.round(baseCalories * gramsPerServing);
+        proteinInput.value = Math.round(baseProtein * gramsPerServing);
+        carbsInput.value = Math.round(baseCarbs * gramsPerServing);
+        fatsInput.value = Math.round(baseFats * gramsPerServing);
+    }
+    
+    // Setup event listeners for dynamic macro calculation
+    function setupFoodMacroCalculation() {
+        const servingSizeInput = document.getElementById('foodServingSizeInput');
+        const servingUnitInput = document.getElementById('foodServingUnitInput');
+        const caloriesInput = document.getElementById('foodCaloriesInput');
+        const proteinInput = document.getElementById('foodProteinInput');
+        const carbsInput = document.getElementById('foodCarbsInput');
+        const fatsInput = document.getElementById('foodFatsInput');
+        
+        // When serving size changes, update macros
+        servingSizeInput.addEventListener('change', updateFoodMacrosForServingSize);
+        servingSizeInput.addEventListener('input', updateFoodMacrosForServingSize);
+        
+        // When serving unit changes, update macros
+        servingUnitInput.addEventListener('change', updateFoodMacrosForServingSize);
+        
+        // When macros are manually edited, update base values
+        caloriesInput.addEventListener('change', storeFoodBaseValues);
+        proteinInput.addEventListener('change', storeFoodBaseValues);
+        carbsInput.addEventListener('change', storeFoodBaseValues);
+        fatsInput.addEventListener('change', storeFoodBaseValues);
+        
+        // Initialize base values on page load
+        storeFoodBaseValues();
     }
     
     // Supplement search functionality
