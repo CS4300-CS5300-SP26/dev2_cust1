@@ -95,12 +95,20 @@ class Meal(models.Model):
 
 
 class FoodItem(models.Model):
+    SERVING_UNIT_CHOICES = [
+        ('grams', 'Grams (g)'),
+        ('ounces', 'Ounces (oz)'),
+        ('cups', 'Cups'),
+    ]
+
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=200)
     calories = models.PositiveIntegerField()
     protein = models.PositiveIntegerField(default=0)
     carbs = models.PositiveIntegerField(default=0)
     fats = models.PositiveIntegerField(default=0)
+    serving_size = models.DecimalField(max_digits=6, decimal_places=2, default=1, help_text="Number of servings")
+    serving_unit = models.CharField(max_length=20, choices=SERVING_UNIT_CHOICES, default='grams', help_text="Unit of measurement for serving")
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -109,6 +117,22 @@ class FoodItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.calories} kcal)"
+    
+    def get_adjusted_calories(self):
+        """Calculate calories based on serving size"""
+        return int(self.calories * float(self.serving_size))
+    
+    def get_adjusted_protein(self):
+        """Calculate protein based on serving size"""
+        return int(self.protein * float(self.serving_size))
+    
+    def get_adjusted_carbs(self):
+        """Calculate carbs based on serving size"""
+        return int(self.carbs * float(self.serving_size))
+    
+    def get_adjusted_fats(self):
+        """Calculate fats based on serving size"""
+        return int(self.fats * float(self.serving_size))
 
 
 class Workout(models.Model):

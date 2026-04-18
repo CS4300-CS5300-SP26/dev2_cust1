@@ -306,6 +306,20 @@
                             <input type="number" name="fats" id="foodFatsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                     </div>
+                    <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Serving Size</label>
+                            <input type="number" name="serving_size" id="foodServingSizeInput" placeholder="1" min="0.1" step="0.1" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                            <select name="serving_unit" id="foodServingUnitInput" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <option value="grams">Grams (g)</option>
+                                <option value="ounces">Ounces (oz)</option>
+                                <option value="cups">Cups</option>
+                            </select>
+                        </div>
+                    </div>
                     <button type="submit" id="addFoodItemBtn" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
                 </form>
             </div>
@@ -484,10 +498,10 @@
                                         {% if item.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
                                     </button>
                                 </form>
-                                <span class="food-name">{{ item.name }}</span>
-                                <span class="food-calories">{{ item.calories }}</span>
+                                <span class="food-name">{{ item.name }} <span style="font-size:11px;color:#888;">({{ item.serving_size|floatformat:1 }} {% if item.serving_unit == 'grams' %}g{% elif item.serving_unit == 'ounces' %}oz{% else %}cups{% endif %})</span></span>
+                                <span class="food-calories">{{ item.get_adjusted_calories }}</span>
                                 <div style="display:flex;gap:10px;align-items:center;margin-left:auto;">
-                                    <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', {{ item.calories }}, {{ item.protein }}, {{ item.carbs }}, {{ item.fats }})">
+                                    <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}', '{{ item.serving_size|floatformat:2 }}', '{{ item.serving_unit }}')">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M12 20h9"></path>
                                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
@@ -1527,7 +1541,7 @@
         document.getElementById('supplementMealSupplementId').value = '';
     }
     
-    function editFoodItem(itemId, mealId, name, calories, protein, carbs, fats) {
+    function editFoodItem(itemId, mealId, name, calories, protein, carbs, fats, servingSize, servingUnit) {
         document.getElementById('foodMealId').value = mealId;
         document.getElementById('foodItemId').value = itemId;
         document.getElementById('foodNameInput').value = name;
@@ -1535,6 +1549,8 @@
         document.getElementById('foodProteinInput').value = protein;
         document.getElementById('foodCarbsInput').value = carbs;
         document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('foodServingSizeInput').value = servingSize || 1;
+        document.getElementById('foodServingUnitInput').value = servingUnit || 'grams';
         document.getElementById('addFoodItemBtn').textContent = 'Save Changes';
         addItemModal.style.display = 'flex';
         showFoodForm();
@@ -1591,22 +1607,62 @@
                 .then(data => {
                     if (data.results && data.results.length > 0) {
                         foodSearchResults.innerHTML = data.results.map(food => `
-                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectFoodResult(${food.id}, '${food.name}', ${food.calories}, ${food.protein || 0}, ${food.carbs || 0}, ${food.fats || 0})">
+                            <div class="food-result-item" 
+                                 data-id="${food.id}"
+                                 data-name="${food.name.replace(/"/g, '&quot;')}"
+                                 data-calories="${food.calories}"
+                                 data-protein="${food.protein || 0}"
+                                 data-carbs="${food.carbs || 0}"
+                                 data-fats="${food.fats || 0}"
+                                 style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;">
                                 <div style="color:white;font-weight:600;">${food.name}</div>
                                 <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
                             </div>
                         `).join('');
                         foodSearchResults.style.display = 'block';
+                        
+                        // Add event listeners to result items
+                        document.querySelectorAll('.food-result-item').forEach(item => {
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                selectFoodResult(
+                                    this.dataset.id,
+                                    this.dataset.name,
+                                    this.dataset.calories,
+                                    this.dataset.protein,
+                                    this.dataset.carbs,
+                                    this.dataset.fats
+                                );
+                            });
+                            item.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.15)';
+                            });
+                            item.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = 'transparent';
+                            });
+                        });
                     } else {
                         foodSearchResults.innerHTML = '';
                         foodSearchResults.style.display = 'none';
                     }
+                })
+                .catch(err => {
+                    console.error('Food search error:', err);
+                    foodSearchResults.style.display = 'none';
                 });
         });
         
-        // Close dropdown when leaving food input
+        // Close dropdown when leaving food input (with delay to allow click)
         foodNameInput.addEventListener('blur', function() {
-            foodSearchResults.style.display = 'none';
+            setTimeout(() => {
+                foodSearchResults.style.display = 'none';
+            }, 150);
+        });
+        
+        // Prevent closing when clicking in the results
+        foodSearchResults.addEventListener('mousedown', function(e) {
+            e.preventDefault();
         });
     }
     
@@ -1616,6 +1672,8 @@
         document.getElementById('foodProteinInput').value = protein;
         document.getElementById('foodCarbsInput').value = carbs;
         document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('foodServingSizeInput').value = 1;
+        document.getElementById('foodServingUnitInput').value = 'grams';
         document.getElementById('foodSearchResults').style.display = 'none';
     }
     
@@ -1636,17 +1694,58 @@
                 .then(data => {
                     if (data.results && data.results.length > 0) {
                         supplementSearchResults.innerHTML = data.results.map(supp => `
-                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectSupplementResult('${supp.name}', '${supp.supplement_type}', '${supp.dosage}', '${supp.unit}')">
+                            <div class="supplement-result-item"
+                                 data-name="${supp.name.replace(/"/g, '&quot;')}"
+                                 data-type="${supp.supplement_type}"
+                                 data-dosage="${supp.dosage}"
+                                 data-unit="${supp.unit}"
+                                 style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;">
                                 <div style="color:white;font-weight:600;">${supp.name}</div>
                                 <div style="color:#888;font-size:11px;margin-top:2px;">${supp.supplement_type} • ${supp.dosage} ${supp.unit}</div>
                             </div>
                         `).join('');
                         supplementSearchResults.style.display = 'block';
+                        
+                        // Add event listeners to result items
+                        document.querySelectorAll('.supplement-result-item').forEach(item => {
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                selectSupplementResult(
+                                    this.dataset.name,
+                                    this.dataset.type,
+                                    this.dataset.dosage,
+                                    this.dataset.unit
+                                );
+                            });
+                            item.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.15)';
+                            });
+                            item.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = 'transparent';
+                            });
+                        });
                     } else {
                         supplementSearchResults.innerHTML = '';
                         supplementSearchResults.style.display = 'none';
                     }
+                })
+                .catch(err => {
+                    console.error('Supplement search error:', err);
+                    supplementSearchResults.style.display = 'none';
                 });
+        });
+        
+        // Close dropdown when leaving input (with delay to allow click)
+        supplementNameInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                supplementSearchResults.style.display = 'none';
+            }, 150);
+        });
+        
+        // Prevent closing when clicking in the results
+        supplementSearchResults.addEventListener('mousedown', function(e) {
+            e.preventDefault();
         });
     }
     

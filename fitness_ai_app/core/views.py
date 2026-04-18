@@ -603,11 +603,7 @@ def nutrition_page(request):
     else:
         selected_date = date.today()
 
-    meals = (
-        Meal.objects.filter(user=request.user, date=selected_date)
-        .prefetch_related('items', 'supplements')
-        .annotate(meal_total=Sum('items__calories'))
-    )
+    meals = Meal.objects.filter(user=request.user, date=selected_date).prefetch_related('items', 'supplements')
 
     # Get all completed food items for the day
     completed_items = FoodItem.objects.filter(
@@ -616,18 +612,11 @@ def nutrition_page(request):
         completed=True,
     )
 
-    # Calculate totals
-    totals = completed_items.aggregate(
-        total_calories=Sum('calories'),
-        total_protein=Sum('protein'),
-        total_carbs=Sum('carbs'),
-        total_fats=Sum('fats')
-    )
-
-    total_calories = totals['total_calories'] or 0
-    total_protein = totals['total_protein'] or 0
-    total_carbs = totals['total_carbs'] or 0
-    total_fats = totals['total_fats'] or 0
+    # Calculate totals using adjusted values (accounting for serving size)
+    total_calories = sum(item.get_adjusted_calories() for item in completed_items)
+    total_protein = sum(item.get_adjusted_protein() for item in completed_items)
+    total_carbs = sum(item.get_adjusted_carbs() for item in completed_items)
+    total_fats = sum(item.get_adjusted_fats() for item in completed_items)
 
     # Get calorie goal from user profile or use default
     calorie_goal = get_user_calorie_goal(request.user)
@@ -639,6 +628,10 @@ def nutrition_page(request):
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    # Calculate meal totals with serving sizes
+    for meal in meals:
+        meal.meal_total = sum(item.get_adjusted_calories() for item in meal.items.all())
     
     # Get supplements for the selected date
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
@@ -730,6 +723,20 @@ def add_food_item(request):
     except ValueError:
         protein = carbs = fats = 0
     
+    # Serving size fields
+    serving_size = request.POST.get('serving_size', '1')
+    serving_unit = request.POST.get('serving_unit', 'grams')
+    
+    try:
+        serving_size = float(serving_size) if serving_size else 1.0
+    except ValueError:
+        serving_size = 1.0
+    
+    # Validate serving unit
+    valid_units = ['grams', 'ounces', 'cups']
+    if serving_unit not in valid_units:
+        serving_unit = 'grams'
+    
     # Check if this is an update or create
     if item_id:
         try:
@@ -739,6 +746,8 @@ def add_food_item(request):
             food_item.protein = protein
             food_item.carbs = carbs
             food_item.fats = fats
+            food_item.serving_size = serving_size
+            food_item.serving_unit = serving_unit
             food_item.save()
             messages.success(request, f'Food item "{food_name}" updated.')
         except FoodItem.DoesNotExist:
@@ -750,7 +759,9 @@ def add_food_item(request):
             calories=calories,
             protein=protein,
             carbs=carbs,
-            fats=fats
+            fats=fats,
+            serving_size=serving_size,
+            serving_unit=serving_unit
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
     
