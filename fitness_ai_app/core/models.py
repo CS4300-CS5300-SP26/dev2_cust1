@@ -130,6 +130,7 @@ class Workout(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
     date = models.DateField()
     total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Total workout duration in seconds")
+    current_session_seconds = models.PositiveIntegerField(default=0, help_text="Current session timer in seconds")
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

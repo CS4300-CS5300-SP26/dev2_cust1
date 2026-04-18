@@ -1138,6 +1138,36 @@ def supplement_entries(request):
 
 @login_required
 @csrf_exempt
+@require_http_methods(["POST"])
+def complete_workout(request):
+    """Mark a workout as completed."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    workout_id = data.get('workout_id')
+    
+    if not workout_id:
+        return JsonResponse({'success': False, 'error': 'workout_id is required'}, status=400)
+    
+    try:
+        workout = Workout.objects.get(id=workout_id, user=request.user)
+    except Workout.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
+    
+    workout.status = 'completed'
+    workout.save()
+    
+    return JsonResponse({
+        'success': True,
+        'workout_id': workout.id,
+        'status': workout.status,
+    })
+
+
+@login_required
+@csrf_exempt
 @require_http_methods(["PATCH"])
 def toggle_supplement_taken(request, entry_id):
     """Toggle the 'taken' status of a supplement entry."""
@@ -1241,6 +1271,8 @@ def save_set_progress(request):
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     
     set_data = data.get('set_data', [])  # List of {exercise_id, set_number, completed}
+    timer_seconds = data.get('timer_seconds', 0)
+    workout_id = data.get('workout_id')
     
     if not set_data or not isinstance(set_data, list):
         return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
@@ -1274,6 +1306,16 @@ def save_set_progress(request):
                 defaults={'completed': completed}
             )
             saved_count += 1
+        
+        # Save timer seconds to workout if provided
+        if workout_id and timer_seconds >= 0:
+            workout = Workout.objects.filter(
+                id=workout_id,
+                user=request.user
+            ).first()
+            if workout:
+                workout.current_session_seconds = timer_seconds
+                workout.save(update_fields=['current_session_seconds'])
         
         return JsonResponse({
             'success': True,
@@ -1323,6 +1365,7 @@ def get_set_progress(request):
         return JsonResponse({
             'success': True,
             'set_progress': set_progress_dict,
+            'timer_seconds': workout.current_session_seconds,
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
