@@ -129,6 +129,8 @@ class Workout(models.Model):
     goal = models.CharField(max_length=20, choices=GOAL_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
     date = models.DateField()
+    total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Total workout duration in seconds")
+    current_session_seconds = models.PositiveIntegerField(default=0, help_text="Current session timer in seconds")
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -162,6 +164,22 @@ class Exercise(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.get_muscle_group_display()}"
+
+
+class SetProgress(models.Model):
+    """Track completion status of individual sets within an exercise."""
+    exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='set_progress')
+    set_number = models.PositiveIntegerField()
+    completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['set_number']
+        unique_together = ('exercise', 'set_number')
+
+    def __str__(self):
+        return f"{self.exercise.name} - Set {self.set_number} - {'✓' if self.completed else '○'}"
 
 
 # ===== EXERCISE DATABASE MODELS =====

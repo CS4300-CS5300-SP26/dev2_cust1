@@ -1138,6 +1138,36 @@ def supplement_entries(request):
 
 @login_required
 @csrf_exempt
+@require_http_methods(["POST"])
+def complete_workout(request):
+    """Mark a workout as completed."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    workout_id = data.get('workout_id')
+    
+    if not workout_id:
+        return JsonResponse({'success': False, 'error': 'workout_id is required'}, status=400)
+    
+    try:
+        workout = Workout.objects.get(id=workout_id, user=request.user)
+    except Workout.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
+    
+    workout.status = 'completed'
+    workout.save()
+    
+    return JsonResponse({
+        'success': True,
+        'workout_id': workout.id,
+        'status': workout.status,
+    })
+
+
+@login_required
+@csrf_exempt
 @require_http_methods(["PATCH"])
 def toggle_supplement_taken(request, entry_id):
     """Toggle the 'taken' status of a supplement entry."""
@@ -1159,3 +1189,183 @@ def toggle_supplement_taken(request, entry_id):
         'success': True,
         'taken': entry.taken,
     })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_workout_time(request):
+    """Save the total duration for a workout."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    workout_id = data.get('workout_id')
+    total_seconds = data.get('total_seconds')
+    
+    if not workout_id or total_seconds is None:
+        return JsonResponse({'success': False, 'error': 'workout_id and total_seconds are required'}, status=400)
+    
+    try:
+        total_seconds = int(total_seconds)
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'total_seconds must be an integer'}, status=400)
+    
+    try:
+        workout = Workout.objects.get(id=workout_id, user=request.user)
+    except Workout.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
+    
+    workout.total_duration_seconds = total_seconds
+    workout.save()
+    
+    return JsonResponse({
+        'success': True,
+        'workout_id': workout.id,
+        'total_seconds': workout.total_duration_seconds,
+    })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def complete_exercises_by_ids(request):
+    """Mark specific exercises as completed."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    exercise_ids = data.get('exercise_ids', [])
+    
+    if not exercise_ids or not isinstance(exercise_ids, list):
+        return JsonResponse({'success': False, 'error': 'exercise_ids must be a non-empty list'}, status=400)
+    
+    try:
+        exercises = Exercise.objects.filter(id__in=exercise_ids, workout__user=request.user)
+        completed_count = 0
+        for exercise in exercises:
+            if not exercise.completed:
+                exercise.completed = True
+                exercise.save()
+                completed_count += 1
+        
+        return JsonResponse({
+            'success': True,
+            'completed_count': completed_count,
+            'exercise_ids': list(exercises.values_list('id', flat=True)),
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_set_progress(request):
+    """Save individual set completion status."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    set_data = data.get('set_data', [])  # List of {exercise_id, set_number, completed}
+    timer_seconds = data.get('timer_seconds', 0)
+    workout_id = data.get('workout_id')
+    
+    if not set_data or not isinstance(set_data, list):
+        return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
+    
+    try:
+        from django.db.models import Q
+        
+        saved_count = 0
+        for item in set_data:
+            exercise_id = item.get('exercise_id')
+            set_number = item.get('set_number')
+            completed = item.get('completed', False)
+            
+            if not exercise_id or not set_number:
+                continue
+            
+            # Verify user owns this exercise
+            exercise = Exercise.objects.filter(
+                id=exercise_id, 
+                workout__user=request.user
+            ).first()
+            
+            if not exercise:
+                continue
+            
+            # Create or update set progress
+            from core.models import SetProgress
+            progress, created = SetProgress.objects.update_or_create(
+                exercise_id=exercise_id,
+                set_number=set_number,
+                defaults={'completed': completed}
+            )
+            saved_count += 1
+        
+        # Save timer seconds to workout if provided
+        if workout_id and timer_seconds >= 0:
+            workout = Workout.objects.filter(
+                id=workout_id,
+                user=request.user
+            ).first()
+            if workout:
+                workout.current_session_seconds = timer_seconds
+                workout.save(update_fields=['current_session_seconds'])
+        
+        return JsonResponse({
+            'success': True,
+            'saved_count': saved_count,
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_set_progress(request):
+    """Get set completion status for a workout's exercises."""
+    workout_id = request.GET.get('workout_id')
+    
+    if not workout_id:
+        return JsonResponse({'success': False, 'error': 'workout_id required'}, status=400)
+    
+    try:
+        from core.models import SetProgress
+        
+        # Verify user owns this workout
+        workout = Workout.objects.filter(
+            id=workout_id,
+            user=request.user
+        ).first()
+        
+        if not workout:
+            return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
+        
+        # Get all set progress for this workout's exercises
+        progress = SetProgress.objects.filter(
+            exercise__workout=workout
+        ).values('exercise_id', 'set_number', 'completed')
+        
+        set_progress_dict = {}
+        for item in progress:
+            exercise_id = item['exercise_id']
+            if exercise_id not in set_progress_dict:
+                set_progress_dict[exercise_id] = []
+            set_progress_dict[exercise_id].append({
+                'set_number': item['set_number'],
+                'completed': item['completed']
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'set_progress': set_progress_dict,
+            'timer_seconds': workout.current_session_seconds,
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
