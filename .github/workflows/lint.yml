@@ -38,31 +38,27 @@ jobs:
         run: |
           bash scripts/run_linters.sh
 
-      - name: Build lint summary
+      - name: Print lint reports to logs
         run: |
-          mkdir -p lint-reports
-          echo "## Lint Report" > lint-reports/summary.md
-          echo "### Flake8" >> lint-reports/summary.md
-          if [ -s lint-reports/flake8.txt ]; then
-            head -n 300 lint-reports/flake8.txt >> lint-reports/summary.md || true
+          echo ""
+          echo "── Lint Report ────────────────────────────────────"
+          echo ""
+          echo "### Flake8"
+          if [ -f lint-reports/flake8.txt ] && [ -s lint-reports/flake8.txt ]; then
+            echo "---- flake8 (first 500 lines) ----"
+            sed -n '1,500p' lint-reports/flake8.txt || true
           else
-            echo "No flake8 output." >> lint-reports/summary.md
-          fi
-          echo "" >> lint-reports/summary.md
-          echo "### Pylint (truncated)" >> lint-reports/summary.md
-          if [ -s lint-reports/pylint.json ]; then
-            python -m json.tool lint-reports/pylint.json | head -n 300 >> lint-reports/summary.md || cat lint-reports/pylint.json | head -n 300 >> lint-reports/summary.md || true
-          else
-            echo "No pylint output." >> lint-reports/summary.md
+            echo "No flake8 output."
           fi
 
-      - name: Upload lint artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-reports
-          path: lint-reports
+          echo ""
+          echo "### Pylint (truncated)"
+          if [ -f lint-reports/pylint.json ] && [ -s lint-reports/pylint.json ]; then
+            echo "---- pylint (first 500 lines, pretty-printed) ----"
+            python -m json.tool lint-reports/pylint.json 2>/dev/null | sed -n '1,500p' || sed -n '1,500p' lint-reports/pylint.json || true
+          else
+            echo "No pylint output."
+          fi
 
-      - name: Comment lint summary on Pull Request
-        uses: thollander/actions-comment-pull-request@v3.0.1
-        with:
-          file-path: lint-reports/summary.md
+          echo ""
+          echo "Lint run completed."
