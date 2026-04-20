@@ -151,6 +151,8 @@ class Workout(models.Model):
     date = models.DateField()
     total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text='Total workout duration in seconds')
     current_session_seconds = models.PositiveIntegerField(default=0, help_text='Current session timer in seconds')
+    total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Total workout duration in seconds")
+    current_session_seconds = models.PositiveIntegerField(default=0, help_text="Current session timer in seconds")
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -187,6 +189,7 @@ class Exercise(models.Model):
 
 
 class SetProgress(models.Model):
+    """Track completion status of individual sets within an exercise."""
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='set_progress')
     set_number = models.PositiveIntegerField()
     completed = models.BooleanField(default=False)
@@ -199,6 +202,10 @@ class SetProgress(models.Model):
 
     def __str__(self):
         return f"Set {self.set_number} of {self.exercise.name}"
+        unique_together = ('exercise', 'set_number')
+
+    def __str__(self):
+        return f"{self.exercise.name} - Set {self.set_number} - {'✓' if self.completed else '○'}"
 
 
 # ===== EXERCISE DATABASE MODELS =====
