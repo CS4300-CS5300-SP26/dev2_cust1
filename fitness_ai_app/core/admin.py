@@ -7,6 +7,7 @@ from .models import (
     Equipment,
     Exercise,
     ExerciseType,
+    FoodDatabase,
     FoodItem,
     Meal,
     MealSupplement,
@@ -22,7 +23,7 @@ from .models import (
 )
 
 CORE_ADMIN_SECTIONS = [
-    ("Nutrition", "nutrition", {Meal, FoodItem, MealSupplement}),
+    ("Nutrition", "nutrition", {Meal, FoodItem, MealSupplement, FoodDatabase}),
     ("Workouts", "workouts", {Workout, Exercise}),
     ("Supplements", "supplements", {SupplementDatabase, SupplementEntry}),
     (
@@ -109,6 +110,13 @@ class MealAdmin(admin.ModelAdmin):
     list_display = ("name", "user", "date", "created_at")
     list_filter = ("date", "user")
     search_fields = ("name", "user__email")
+
+
+@admin.register(FoodDatabase)
+class FoodDatabaseAdmin(admin.ModelAdmin):
+    list_display = ("name", "calories", "protein", "carbs", "fats", "serving_size", "serving_unit")
+    list_filter = ("serving_unit",)
+    search_fields = ("name",)
 
 
 @admin.register(FoodItem)
@@ -219,3 +227,5 @@ class UserEquipmentProfileAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     list_filter = ["location"]
     filter_horizontal = ["equipment"]
+
+

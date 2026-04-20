@@ -119,20 +119,16 @@ class FoodItem(models.Model):
         return f"{self.name} ({self.calories} kcal)"
     
     def get_adjusted_calories(self):
-        """Calculate calories based on serving size"""
-        return int(self.calories * float(self.serving_size))
-    
+        return self.calories
+
     def get_adjusted_protein(self):
-        """Calculate protein based on serving size"""
-        return int(self.protein * float(self.serving_size))
-    
+        return self.protein
+
     def get_adjusted_carbs(self):
-        """Calculate carbs based on serving size"""
-        return int(self.carbs * float(self.serving_size))
-    
+        return self.carbs
+
     def get_adjusted_fats(self):
-        """Calculate fats based on serving size"""
-        return int(self.fats * float(self.serving_size))
+        return self.fats
 
 
 class Workout(models.Model):
@@ -394,3 +390,29 @@ class MealSupplement(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.meal.name}"
+
+
+# ===== FOOD DATABASE =====
+
+class FoodDatabase(models.Model):
+    SERVING_UNIT_CHOICES = [
+        ('grams', 'Grams (g)'),
+        ('ounces', 'Ounces (oz)'),
+        ('cups', 'Cups'),
+    ]
+
+    name = models.CharField(max_length=200, unique=True, db_index=True)
+    calories = models.PositiveIntegerField()
+    protein = models.DecimalField(max_digits=6, decimal_places=1, default=0)
+    carbs = models.DecimalField(max_digits=6, decimal_places=1, default=0)
+    fats = models.DecimalField(max_digits=6, decimal_places=1, default=0)
+    serving_size = models.DecimalField(max_digits=6, decimal_places=1, default=100)
+    serving_unit = models.CharField(max_length=20, choices=SERVING_UNIT_CHOICES, default='grams')
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Food Database Entry'
+        verbose_name_plural = 'Food Database'
+
+    def __str__(self):
+        return f"{self.name} ({self.calories} kcal per {self.serving_size}{self.serving_unit})"
