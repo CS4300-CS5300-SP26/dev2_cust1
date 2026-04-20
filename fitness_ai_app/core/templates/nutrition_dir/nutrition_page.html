@@ -299,7 +299,7 @@
                     <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:16px;">
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
-                            <input type="number" name="serving_size" id="foodServingSizeInput" placeholder="1" min="0.01" step="any" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="serving_size" id="foodServingSizeInput" placeholder="1" min="0.1" step="0.1" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
@@ -1605,22 +1605,20 @@
                 .then(data => {
                     if (data.results && data.results.length > 0) {
                         foodSearchResults.innerHTML = data.results.map(food => `
-                            <div class="food-result-item"
+                            <div class="food-result-item" 
                                  data-id="${food.id}"
                                  data-name="${food.name.replace(/"/g, '&quot;')}"
                                  data-calories="${food.calories}"
                                  data-protein="${food.protein || 0}"
                                  data-carbs="${food.carbs || 0}"
                                  data-fats="${food.fats || 0}"
-                                 data-serving-size="${food.serving_size || 1}"
-                                 data-serving-unit="${food.serving_unit || 'grams'}"
                                  style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;">
                                 <div style="color:white;font-weight:600;">${food.name}</div>
-                                <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal per ${food.serving_size || 100}${food.serving_unit === 'grams' ? 'g' : food.serving_unit === 'ounces' ? 'oz' : ' cups'} • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
+                                <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
                             </div>
                         `).join('');
                         foodSearchResults.style.display = 'block';
-
+                        
                         // Add event listeners to result items
                         document.querySelectorAll('.food-result-item').forEach(item => {
                             item.addEventListener('click', function(e) {
@@ -1632,9 +1630,7 @@
                                     this.dataset.calories,
                                     this.dataset.protein,
                                     this.dataset.carbs,
-                                    this.dataset.fats,
-                                    this.dataset.servingSize,
-                                    this.dataset.servingUnit
+                                    this.dataset.fats
                                 );
                             });
                             item.addEventListener('mouseenter', function() {
@@ -1668,16 +1664,16 @@
         });
     }
     
-    function selectFoodResult(id, name, calories, protein, carbs, fats, servingSize, servingUnit) {
+    function selectFoodResult(id, name, calories, protein, carbs, fats) {
         document.getElementById('foodNameInput').value = name;
         document.getElementById('foodCaloriesInput').value = calories;
         document.getElementById('foodProteinInput').value = protein;
         document.getElementById('foodCarbsInput').value = carbs;
         document.getElementById('foodFatsInput').value = fats;
-        document.getElementById('foodServingSizeInput').value = servingSize || 100;
-        document.getElementById('foodServingUnitInput').value = servingUnit || 'grams';
+        document.getElementById('foodServingSizeInput').value = 1;
+        document.getElementById('foodServingUnitInput').value = 'grams';
         document.getElementById('foodSearchResults').style.display = 'none';
-
+        
         // Store base values for dynamic calculation
         storeFoodBaseValues();
     }
@@ -1688,18 +1684,14 @@
         const proteinInput = document.getElementById('foodProteinInput');
         const carbsInput = document.getElementById('foodCarbsInput');
         const fatsInput = document.getElementById('foodFatsInput');
-        const servingSizeInput = document.getElementById('foodServingSizeInput');
-        const servingUnitInput = document.getElementById('foodServingUnitInput');
-
+        
         caloriesInput.dataset.baseValue = caloriesInput.value || 0;
         proteinInput.dataset.baseValue = proteinInput.value || 0;
         carbsInput.dataset.baseValue = carbsInput.value || 0;
         fatsInput.dataset.baseValue = fatsInput.value || 0;
-        caloriesInput.dataset.baseServingSize = servingSizeInput.value || 1;
-        caloriesInput.dataset.baseServingUnit = servingUnitInput.value || 'grams';
     }
-
-    // Update macros based on serving size/unit changes
+    
+    // Update macros based on serving size and unit
     function updateFoodMacrosForServingSize() {
         const servingSizeInput = document.getElementById('foodServingSizeInput');
         const servingUnitInput = document.getElementById('foodServingUnitInput');
@@ -1707,38 +1699,34 @@
         const proteinInput = document.getElementById('foodProteinInput');
         const carbsInput = document.getElementById('foodCarbsInput');
         const fatsInput = document.getElementById('foodFatsInput');
-
+        
         const servingSize = parseFloat(servingSizeInput.value) || 1;
         const servingUnit = servingUnitInput.value || 'grams';
-        const baseServingSize = parseFloat(caloriesInput.dataset.baseServingSize || 1);
-        const baseServingUnit = caloriesInput.dataset.baseServingUnit || 'grams';
-
-        const conversionToGrams = { 'grams': 1, 'ounces': 28.35, 'cups': 240 };
-
-        if (servingUnit !== baseServingUnit) {
-            // Unit changed: convert the serving_size number to express the same
-            // physical quantity in the new unit — macros stay the same
-            const baseGrams = baseServingSize * (conversionToGrams[baseServingUnit] || 1);
-            const convertedSize = baseGrams / (conversionToGrams[servingUnit] || 1);
-            servingSizeInput.value = Math.round(convertedSize * 100) / 100;
-            // Adopt the new unit/size as the new base so subsequent size edits work correctly
-            caloriesInput.dataset.baseServingSize = servingSizeInput.value;
-            caloriesInput.dataset.baseServingUnit = servingUnit;
-            return;
-        }
-
-        // Serving size number changed (same unit): scale macros proportionally
+        
+        // Get base values (or current values if no base stored)
         const baseCalories = parseFloat(caloriesInput.dataset.baseValue || caloriesInput.value || 0);
         const baseProtein = parseFloat(proteinInput.dataset.baseValue || proteinInput.value || 0);
         const baseCarbs = parseFloat(carbsInput.dataset.baseValue || carbsInput.value || 0);
         const baseFats = parseFloat(fatsInput.dataset.baseValue || fatsInput.value || 0);
-
-        const scale = baseServingSize > 0 ? servingSize / baseServingSize : servingSize;
-
-        caloriesInput.value = Math.round(baseCalories * scale);
-        proteinInput.value = Math.round(baseProtein * scale);
-        carbsInput.value = Math.round(baseCarbs * scale);
-        fatsInput.value = Math.round(baseFats * scale);
+        
+        // Get the base unit stored when values were set
+        const baseUnit = caloriesInput.dataset.baseUnit || 'grams';
+        
+        // Conversion factors to grams
+        const conversionToGrams = {
+            'grams': 1,
+            'ounces': 28.35,
+            'cups': 240
+        };
+        
+        // Convert current serving size to grams, then back to serving size in grams
+        const gramsPerServing = servingSize * (conversionToGrams[servingUnit] || 1);
+        
+        // Calculate adjusted values
+        caloriesInput.value = Math.round(baseCalories * gramsPerServing);
+        proteinInput.value = Math.round(baseProtein * gramsPerServing);
+        carbsInput.value = Math.round(baseCarbs * gramsPerServing);
+        fatsInput.value = Math.round(baseFats * gramsPerServing);
     }
     
     // Setup event listeners for dynamic macro calculation

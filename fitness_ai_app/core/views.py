@@ -24,7 +24,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, FoodDatabase, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
+from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
 
 
 def get_user_calorie_goal(user, default=2400):
@@ -892,51 +892,43 @@ def social_page(request):
 
 @login_required
 def search_foods(request):
-    """Search user FoodItem history first, then fill gaps from FoodDatabase."""
+    """Search FoodDatabase first, then fill with user FoodItem history."""
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
 
     results = {}
 
-    # User's logged history takes priority (deduplicate, prefer entry with most macros)
-    for item in (FoodItem.objects
-                 .filter(name__icontains=query)
-                 .values('id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_size', 'serving_unit')
-                 .order_by('name')[:20]):
-        key = item['name'].lower()
-        candidate = {
-            'id': item['id'],
-            'name': item['name'],
-            'calories': item['calories'],
-            'protein': item['protein'] or 0,
-            'carbs': item['carbs'] or 0,
-            'fats': item['fats'] or 0,
-            'serving_size': float(item['serving_size']),
-            'serving_unit': item['serving_unit'],
+    # FoodDatabase entries take priority
+    for food in FoodDatabase.objects.filter(name__icontains=query).order_by('name')[:20]:
+        results[food.name.lower()] = {
+            'id': food.id,
+            'name': food.name,
+            'calories': food.calories,
+            'protein': float(food.protein),
+            'carbs': float(food.carbs),
+            'fats': float(food.fats),
+            'serving_size': float(food.serving_size),
+            'serving_unit': food.serving_unit,
         }
-        if key not in results:
-            results[key] = candidate
-        else:
-            existing = results[key]
-            if (candidate['protein'] + candidate['carbs'] + candidate['fats'] >
-                    existing['protein'] + existing['carbs'] + existing['fats']):
-                results[key] = candidate
 
-    # Fill remaining slots from FoodDatabase for names not in user history
+    # Fill remaining slots from user's logged food history
     if len(results) < 20:
-        for food in FoodDatabase.objects.filter(name__icontains=query).order_by('name')[:20]:
-            key = food.name.lower()
+        for item in (FoodItem.objects
+                     .filter(name__icontains=query)
+                     .values('id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_size', 'serving_unit')
+                     .order_by('name')[:20]):
+            key = item['name'].lower()
             if key not in results:
                 results[key] = {
-                    'id': food.id,
-                    'name': food.name,
-                    'calories': food.calories,
-                    'protein': float(food.protein),
-                    'carbs': float(food.carbs),
-                    'fats': float(food.fats),
-                    'serving_size': float(food.serving_size),
-                    'serving_unit': food.serving_unit,
+                    'id': item['id'],
+                    'name': item['name'],
+                    'calories': item['calories'],
+                    'protein': item['protein'] or 0,
+                    'carbs': item['carbs'] or 0,
+                    'fats': item['fats'] or 0,
+                    'serving_size': float(item['serving_size']),
+                    'serving_unit': item['serving_unit'],
                 }
 
     result_list = sorted(results.values(), key=lambda x: x['name'])[:20]

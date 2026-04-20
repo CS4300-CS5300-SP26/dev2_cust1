@@ -1,8 +1,7 @@
 """
-Signals for social login handling and initial data population.
+Signals for social login handling.
 """
 from django.dispatch import receiver
-from django.db.models.signals import post_migrate
 from allauth.socialaccount.signals import social_account_updated
 from django.contrib.auth.models import User
 from .models import UserProfile
@@ -15,6 +14,7 @@ def handle_social_account_updated(sender, request, sociallogin, **kwargs):
     """
     user = sociallogin.user
     try:
+        # Ensure user profile exists and mark as social login user
         profile, created = UserProfile.objects.get_or_create(user=user)
         if not profile.social_login_user:
             profile.social_login_user = True
@@ -25,12 +25,13 @@ def handle_social_account_updated(sender, request, sociallogin, **kwargs):
 
 @receiver(post_migrate)
 def populate_databases(sender, **kwargs):
-    """Auto-populate food database after migrations."""
+    """Auto-populate food and supplement databases after migrations."""
     if sender.name != 'core':
         return
     try:
         from django.core.management import call_command
         call_command('populate_food_database', verbosity=0)
+        call_command('populate_supplements', verbosity=0)
     except Exception:
         pass
 
