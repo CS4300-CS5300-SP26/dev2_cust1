@@ -186,6 +186,7 @@ class Exercise(models.Model):
 
 
 class SetProgress(models.Model):
+    """Track completion status of individual sets within an exercise."""
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='set_progress')
     set_number = models.PositiveIntegerField()
     completed = models.BooleanField(default=False)
@@ -194,10 +195,10 @@ class SetProgress(models.Model):
 
     class Meta:
         ordering = ['set_number']
-        unique_together = [('exercise', 'set_number')]
+        unique_together = ('exercise', 'set_number')
 
     def __str__(self):
-        return f"Set {self.set_number} - {self.exercise.name}"
+        return f"{self.exercise.name} - Set {self.set_number} - {'✓' if self.completed else '○'}"
 
 
 # ===== EXERCISE DATABASE MODELS =====

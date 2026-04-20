@@ -1,0 +1,64 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: fitness_ai_app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: fitness_ai_app/requirements-dev.txt
+
+      - name: Install dev dependencies
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip || true
+          pip install -r requirements-dev.txt || true
+
+      - name: Run linters
+        run: |
+          bash scripts/run_linters.sh
+
+      - name: Print lint reports to logs
+        run: |
+          echo ""
+          echo "── Lint Report ────────────────────────────────────"
+          echo ""
+          echo "### Flake8"
+          if [ -f lint-reports/flake8.txt ] && [ -s lint-reports/flake8.txt ]; then
+            echo "---- flake8 (first 500 lines) ----"
+            sed -n '1,500p' lint-reports/flake8.txt || true
+          else
+            echo "No flake8 output."
+          fi
+
+          echo ""
+          echo "### Pylint (truncated)"
+          if [ -f lint-reports/pylint.json ] && [ -s lint-reports/pylint.json ]; then
+            echo "---- pylint (first 500 lines, pretty-printed) ----"
+            python -m json.tool lint-reports/pylint.json 2>/dev/null | sed -n '1,500p' || sed -n '1,500p' lint-reports/pylint.json || true
+          else
+            echo "No pylint output."
+          fi
+
+          echo ""
+          echo "Lint run completed."

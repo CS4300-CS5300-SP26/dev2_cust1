@@ -1,0 +1,1185 @@
+/* ════════════════════════════════════════════════════════════════
+   THE RIVER — Live Activity Feed
+   Fully integrated with Spotter.ai design system
+   Uses shared tokens from app.css (--background, --card, --border,
+   --accent, --accentDim, --textPrimary, --textSecondary, --textMuted)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════
+   DESKTOP SIDEBAR
+   ═══════════════════════════════════════ */
+.river-sidebar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 25;
+    overflow-x: clip;
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    display: none;
+    flex-direction: column;
+    background: var(--background);
+}
+
+@media (min-width: 768px) {
+    .river-sidebar { display: flex; }
+    body.river-active .splash-container {
+        margin-right: var(--river-width, 350px);
+        transition: margin-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+}
+
+/* ── Drag handle ── */
+.river-drag-handle {
+    position: absolute;
+    left: -7px;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+    cursor: col-resize;
+    z-index: 100;
+    transition: background 0.2s ease;
+}
+.river-drag-handle:hover,
+.river-drag-handle.river-drag-active {
+    background: var(--accentDim);
+}
+
+/* ── Sidebar border ── */
+.river-border {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    z-index: 10;
+    background: var(--border);
+}
+
+/* ── Depth fog ── */
+.river-depth-fog {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    pointer-events: none;
+}
+.river-depth-fog-top {
+    top: 46px;
+    height: 50px;
+    background: linear-gradient(180deg, var(--background) 0%, transparent 100%);
+}
+.river-depth-fog-bottom {
+    bottom: 60px;
+    height: 60px;
+    background: linear-gradient(0deg, var(--background) 0%, transparent 100%);
+}
+
+/* ── Flat background / decorative layers (disabled) ── */
+.river-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -10;
+    background: var(--background);
+}
+.river-caustics,
+.river-current-lines,
+.river-particles,
+.river-light-sweep,
+.river-border-glow,
+.river-logo-ripple,
+.pill-halo,
+.pill-avatar-glow,
+.river-ambient-waves,
+.river-mobile-caustics { display: none; }
+
+/* ═══════════════════════════════════════
+   RIVER HEADER / CONTROLS
+   ═══════════════════════════════════════ */
+.river-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 46px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    position: relative;
+    z-index: 20;
+}
+
+.river-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.river-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.river-logo,
+.river-logo-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.river-logo { width: 24px; height: 24px; }
+.river-logo-sm { width: 20px; height: 20px; }
+
+.river-logo-icon {
+    color: var(--accent);
+}
+
+.river-title-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.river-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    color: var(--accent);
+    text-transform: uppercase;
+}
+
+.river-subtitle {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: var(--textMuted);
+    text-transform: uppercase;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+/* ── Control buttons ── */
+.river-ctrl-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--textMuted);
+    transition: all 0.2s ease;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+.river-ctrl-btn:hover {
+    color: var(--accent);
+    background: var(--accentDim);
+}
+
+/* ── Speed pips ── */
+.river-pips {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.river-pip {
+    width: 3px;
+    border-radius: 9999px;
+    background: var(--border);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.river-pip.active {
+    background: var(--accent);
+}
+
+/* ── Collapse button ── */
+.river-collapse-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--textMuted);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 6px;
+}
+.river-collapse-btn:hover {
+    color: var(--accent);
+    background: var(--accentDim);
+}
+.river-collapse-btn svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.3s ease;
+}
+.river-collapse-btn.collapsed svg { transform: rotate(180deg); }
+.river-collapse-btn.collapsed { margin: 0 auto; }
+
+/* ═══════════════════════════════════════
+   COLLAPSED STATE
+   ═══════════════════════════════════════ */
+.river-collapsed-channel {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    padding: 0 4px;
+}
+
+.river-collapsed-logo {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.collapsed-icon-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.river-collapsed-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    padding: 0;
+}
+.river-collapsed-dot:hover {
+    transform: scale(1.15);
+    border-color: var(--accent);
+}
+.river-collapsed-dot-unique {
+    border-color: rgba(232, 92, 0, 0.4);
+}
+
+/* ═══════════════════════════════════════
+   RIVER CHANNEL — Where pills float
+   ═══════════════════════════════════════ */
+.river-section-hidden { display: none !important; }
+
+.river-channel {
+    flex: 1;
+    position: relative;
+    overflow: visible;
+}
+
+.pill-track {
+    position: absolute;
+    left: var(--lane);
+    top: 0;
+    z-index: calc(var(--depth, 1) * 10);
+    will-change: transform, opacity;
+    pointer-events: auto;
+    padding: 8px;
+    margin: -8px;
+}
+.pill-track:hover,
+.pill-track-paused {
+    z-index: 50 !important;
+}
+
+/* ═══════════════════════════════════════
+   RIVER PILL — Compact card style
+   ═══════════════════════════════════════ */
+.river-pill {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transform: scale(var(--depth, 1));
+    transform-origin: left center;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    opacity: calc(0.65 + var(--depth, 1) * 0.35);
+    overflow: hidden;
+    background: var(--card);
+}
+
+/* Wake trail — disabled */
+.river-pill::after { display: none; }
+
+/* Mythic: accent border pulse */
+.river-pill-unique {
+    animation: unique-accent-pulse 3s ease-in-out infinite;
+}
+@keyframes unique-accent-pulse {
+    0%, 100% { border-color: rgba(232, 92, 0, 0.5); }
+    50% { border-color: rgba(232, 92, 0, 0.2); }
+}
+
+/* Subtle shimmer on rare+ pills */
+.river-pill[data-rarity="rare"]::before,
+.river-pill[data-rarity="epic"]::before,
+.river-pill[data-rarity="legendary"]::before,
+.river-pill[data-rarity="mythic"]::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+        110deg,
+        transparent 0%, transparent 30%,
+        rgba(232, 92, 0, 0.03) 40%,
+        rgba(232, 92, 0, 0.06) 50%,
+        rgba(232, 92, 0, 0.03) 60%,
+        transparent 70%, transparent 100%
+    );
+    background-size: 300% 100%;
+    animation: pill-shimmer 6s ease-in-out infinite;
+    animation-delay: var(--wobble-delay, 0s);
+    border-radius: inherit;
+}
+@keyframes pill-shimmer {
+    0%, 75%, 100% { background-position: 200% center; }
+    35% { background-position: -100% center; }
+}
+
+/* ── Size classes ── */
+.river-pill-sm .pill-face { padding: 5px 12px 5px 9px; }
+.river-pill-sm .pill-icon { font-size: 12px; }
+.river-pill-sm .pill-username { font-size: 11px; max-width: 90px; }
+.river-pill-sm { border-radius: 10px; }
+
+.river-pill-md .pill-face { padding: 6px 14px 6px 10px; }
+.river-pill-md .pill-icon { font-size: 14px; }
+.river-pill-md .pill-username { font-size: 12px; }
+.river-pill-md { border-radius: 12px; }
+
+.river-pill-lg .pill-face { padding: 7px 16px 7px 12px; }
+.river-pill-lg .pill-icon { font-size: 15px; }
+.river-pill-lg .pill-special-text { font-size: 10px; }
+.river-pill-lg { border-radius: 14px; }
+
+/* ── Accent border for special types ── */
+.river-pill-highlight {
+    border-color: rgba(232, 92, 0, 0.25);
+}
+.river-pill-special {
+    border-color: rgba(232, 92, 0, 0.3);
+}
+.river-pill[data-type="level_up"] {
+    border-color: rgba(232, 92, 0, 0.3);
+}
+.river-pill-class-glow {
+    border-color: rgba(232, 92, 0, 0.25);
+}
+
+/* ── Pill face (collapsed view) ── */
+.pill-face {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px 6px 10px;
+    position: relative;
+    z-index: 1;
+}
+
+.pill-icon {
+    font-size: 13px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.pill-username {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--textPrimary);
+}
+
+.pill-special-text {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+.pill-badge {
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--textMuted);
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════
+   HOVER — Pill blooms into card
+   ═══════════════════════════════════════ */
+.river-pill-hovered {
+    width: 280px;
+    border-radius: 14px;
+    white-space: normal;
+    overflow: visible;
+    filter: none;
+    transform: none !important;
+    translate: var(--card-x, 0px) 0;
+    scale: 1;
+    opacity: 1;
+    transform-origin: center center;
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    animation: pill-bloom 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.river-pill-unique.river-pill-hovered {
+    border-color: rgba(232, 92, 0, 0.35) !important;
+    animation: pill-bloom 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.river-pill-hovered::before {
+    animation: none !important;
+    background: none !important;
+}
+
+@keyframes pill-bloom {
+    0% { opacity: 0.8; scale: 0.92; }
+    100% { opacity: 1; scale: 1; }
+}
+
+.river-pill-hovered .pill-face {
+    padding: 10px 14px 6px;
+    gap: 8px;
+}
+.river-pill-hovered .pill-icon { font-size: 16px; }
+.river-pill-hovered .pill-username { font-size: 13px; max-width: none; }
+.river-pill-hovered .pill-badge { font-size: 10px; opacity: 1; }
+.river-pill-hovered .pill-special-text { font-size: 11px; }
+
+/* ═══════════════════════════════════════
+   EXPANDED CARD — Matches app card pattern
+   ═══════════════════════════════════════ */
+.pill-expand {
+    padding: 0 14px 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.pill-expand::before {
+    content: '';
+    display: block;
+    height: 1px;
+    margin: 0 -4px 10px;
+    background: var(--border);
+    animation: accent-line-reveal 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+@keyframes accent-line-reveal {
+    from { transform: scaleX(0); opacity: 0; }
+    to { transform: scaleX(1); opacity: 1; }
+}
+
+.pill-expand-up {
+    position: absolute;
+    bottom: 100%;
+    left: -1px;
+    right: -1px;
+    margin-bottom: -1px;
+    padding: 12px 14px 4px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    background: var(--card);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+    animation: card-reveal-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.pill-expand-up::before { margin: 10px -4px 0; }
+
+@keyframes card-reveal-up {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Shine sweep — rare+ only, accent-tinted */
+.pill-expand-shine {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(105deg,
+        transparent 0%, transparent 40%,
+        rgba(232, 92, 0, 0.02) 45%,
+        rgba(232, 92, 0, 0.04) 50%,
+        rgba(232, 92, 0, 0.02) 55%,
+        transparent 60%, transparent 100%
+    );
+    background-size: 250% 100%;
+    animation: card-shine 2s ease-out 0.3s both;
+}
+@keyframes card-shine {
+    from { background-position: 200% center; }
+    to { background-position: -100% center; }
+}
+.river-pill[data-rarity="common"] .pill-expand-shine,
+.river-pill[data-rarity="uncommon"] .pill-expand-shine { display: none; }
+
+/* Mythic overlay — accent-tinted */
+.pill-expand-mythic::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(135deg,
+        rgba(232, 92, 0, 0.03) 0%,
+        rgba(232, 92, 0, 0.01) 50%,
+        rgba(232, 92, 0, 0.03) 100%
+    );
+    background-size: 200% 200%;
+    animation: mythic-glow 4s linear infinite;
+    z-index: 1;
+}
+@keyframes mythic-glow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Staggered cascade */
+.pill-expand .pill-expand-header,
+.pill-expand .pill-expand-title,
+.pill-expand .pill-expand-action,
+.pill-expand .pill-expand-detail,
+.pill-expand .pill-expand-link,
+.pill-expand .pill-spark-row,
+.pill-expand .pill-lifetime,
+.pill-expand .pill-comments {
+    animation: card-item-cascade 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--cascade, 1) * 0.04s);
+}
+.pill-expand .pill-expand-header { --cascade: 1; }
+.pill-expand .pill-expand-title { --cascade: 1; }
+.pill-expand .pill-expand-action { --cascade: 2; }
+.pill-expand .pill-expand-detail { --cascade: 3; }
+.pill-expand .pill-expand-link { --cascade: 4; }
+.pill-expand .pill-spark-row { --cascade: 4; }
+.pill-expand .pill-lifetime { --cascade: 5; }
+.pill-expand .pill-comments { --cascade: 6; }
+
+@keyframes card-item-cascade {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card content ── */
+.pill-expand-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.pill-avatar {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    padding: 1.5px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+.pill-avatar-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--background);
+}
+
+.pill-expand-user-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pill-expand-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.pill-expand-user {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--textPrimary);
+    text-decoration: none;
+}
+.pill-expand-user:hover { color: var(--accent); }
+
+.pill-expand-tier {
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    background: rgba(232, 92, 0, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(232, 92, 0, 0.25);
+}
+
+.pill-expand-time {
+    font-size: 9px;
+    color: var(--textMuted);
+    display: block;
+    margin-top: 1px;
+    font-family: 'Courier New', monospace;
+}
+
+.pill-expand-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--textPrimary);
+    line-height: 1.3;
+}
+
+.pill-expand-action {
+    font-size: 11.5px;
+    color: var(--textSecondary);
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+.pill-expand-detail {
+    font-size: 10px;
+    color: var(--textMuted);
+    line-height: 1.5;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+/* ── Lifetime bar — matches app progress-bar ── */
+.pill-lifetime {
+    position: relative;
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 10px 0 4px;
+}
+
+.pill-lifetime-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    background: var(--lifetime-color, var(--accent));
+    transition: width 1s linear, background 2s ease;
+}
+
+.pill-lifetime-text {
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--textMuted);
+    letter-spacing: 0.3px;
+    font-family: 'Courier New', monospace;
+}
+
+/* ── Spark button — matches app button pattern ── */
+.pill-spark-row {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.pill-spark-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--textMuted);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.pill-spark-btn:hover {
+    color: var(--accent);
+    background: var(--accentDim);
+    border-color: rgba(232, 92, 0, 0.25);
+}
+.pill-spark-btn.active {
+    color: var(--accent) !important;
+    background: rgba(232, 92, 0, 0.12) !important;
+    border-color: rgba(232, 92, 0, 0.3) !important;
+}
+.pill-spark-btn svg {
+    width: 14px;
+    height: 14px;
+}
+.pill-spark-count {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-family: 'Courier New', monospace;
+}
+
+/* ── Comments ── */
+.pill-comments {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    cursor: default;
+}
+
+.pill-comments-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.pill-comments-label {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--textMuted);
+    text-transform: uppercase;
+}
+
+.pill-comments-scroll {
+    max-height: 120px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(232, 92, 0, 0.2) transparent;
+}
+.pill-comments-scroll::-webkit-scrollbar { width: 3px; }
+.pill-comments-scroll::-webkit-scrollbar-thumb {
+    background: rgba(232, 92, 0, 0.2);
+    border-radius: 3px;
+}
+
+.pill-comment {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+}
+
+.pill-comment-avatar {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--background);
+}
+
+.pill-comment-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.pill-comment-user {
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: var(--textPrimary);
+}
+
+.pill-comment-text {
+    font-size: 9px;
+    color: var(--textMuted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pill-comment-time {
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+    font-family: 'Courier New', monospace;
+}
+
+.pill-comments-expanded {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    padding: 6px;
+    margin-left: -6px;
+    margin-right: -6px;
+    animation: comments-expand 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes comments-expand {
+    from { max-height: 30px; opacity: 0.7; }
+    to { max-height: 200px; opacity: 1; }
+}
+
+.pill-comment-input {
+    margin-top: 6px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    animation: comments-expand 0.2s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.pill-comment-field {
+    flex: 1;
+    padding: 5px 10px;
+    font-size: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--textSecondary);
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+.pill-comment-field:focus {
+    border-color: var(--accent);
+}
+.pill-comment-field::placeholder {
+    color: var(--textMuted);
+}
+
+.pill-comment-send {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(232, 92, 0, 0.15);
+    border: 1px solid rgba(232, 92, 0, 0.3);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+.pill-comment-send:hover {
+    background: rgba(232, 92, 0, 0.25);
+    border-color: rgba(232, 92, 0, 0.5);
+}
+.pill-comment-send svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ═══════════════════════════════════════
+   EMPTY STATE
+   ═══════════════════════════════════════ */
+.river-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    position: absolute;
+    inset: 0;
+}
+.river-empty p { margin: 0; }
+.river-empty .river-empty-main {
+    font-size: 11px;
+    color: var(--textMuted);
+    font-weight: 600;
+    margin-top: 12px;
+}
+.river-empty .river-empty-sub {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.15);
+    margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════
+   AMBIENT BOTTOM
+   ═══════════════════════════════════════ */
+.river-ambient {
+    flex-shrink: 0;
+    padding: 10px 10px 14px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border-top: 1px solid var(--border);
+    z-index: 20;
+    background: var(--card);
+}
+
+.river-ambient-text {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--textMuted);
+    font-weight: 600;
+}
+
+.river-ambient-icon {
+    font-size: 10px;
+    color: var(--accent);
+}
+
+/* ═══════════════════════════════════════
+   MOBILE — Bottom floating pill field
+   ═══════════════════════════════════════ */
+@media (min-width: 768px) {
+    .river-mobile { display: none !important; }
+}
+
+.river-mobile {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 68px;
+    z-index: 19;
+    height: 90px;
+    overflow: visible;
+}
+
+.river-mobile-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -10;
+    background: var(--background);
+}
+
+.river-border-h {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    z-index: 10;
+    background: var(--border);
+}
+
+.river-mobile-field {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 6px 0;
+}
+
+.river-mobile-logo {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+.river-mobile-track {
+    position: absolute;
+    top: var(--mobile-lane, 30%);
+    left: 0;
+    z-index: 1;
+    opacity: 0;
+    animation: mobile-pill-float var(--drift-dur, 20s) linear infinite;
+    will-change: transform, opacity;
+    pointer-events: auto;
+}
+.river-mobile-track-paused {
+    animation-play-state: paused !important;
+    z-index: 50 !important;
+}
+
+@keyframes mobile-pill-float {
+    0% { transform: translateX(-80px); opacity: 0; }
+    3% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateX(calc(100vw + 60px)); opacity: 0; }
+}
+
+.river-mobile-pill {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.river-mobile-pill-icon { font-size: 12px; line-height: 1; }
+.river-mobile-pill-name {
+    font-size: 10px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--textPrimary);
+}
+
+.river-mobile-pill-hovered {
+    border-color: var(--accent);
+    z-index: 100;
+}
+
+/* ── Mobile popup — matches app card pattern ── */
+.river-mobile-popup {
+    position: fixed;
+    bottom: 174px;
+    left: 16px;
+    right: 16px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    animation: mobile-popup-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes mobile-popup-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mobile-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.mobile-popup-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.mobile-popup-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.mobile-popup-info { flex: 1; min-width: 0; }
+.mobile-popup-user-row { display: flex; align-items: center; gap: 6px; }
+.mobile-popup-username {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--textPrimary);
+}
+.mobile-popup-tier {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    background: rgba(232, 92, 0, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(232, 92, 0, 0.25);
+}
+.mobile-popup-time {
+    font-size: 9px;
+    color: var(--textMuted);
+    font-family: 'Courier New', monospace;
+}
+.mobile-popup-icon { font-size: 14px; }
+.mobile-popup-action {
+    font-size: 12px;
+    color: var(--textPrimary);
+    font-weight: 700;
+    line-height: 1.3;
+}
+.mobile-popup-detail {
+    font-size: 10px;
+    color: var(--textMuted);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+.mobile-popup-comments {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+.mobile-popup-comments-label {
+    font-size: 9px;
+    color: var(--textMuted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+.mobile-popup-comment {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+}
+.mobile-popup-comment img {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-top: 2px;
+}
+.mobile-popup-comment-user {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--textPrimary);
+}
+.mobile-popup-comment-text {
+    font-size: 9px;
+    color: var(--textMuted);
+    margin-left: 4px;
+}

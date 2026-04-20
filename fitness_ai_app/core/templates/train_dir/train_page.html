@@ -211,6 +211,74 @@
                 </form>
             </div>
 
+            <!-- Active Workout Module -->
+            <div id="activeWorkoutModule" class="active-workout-module" style="display:none;">
+                <div class="active-workout-header">
+                    <div class="active-workout-title">
+                        <span class="active-workout-label">ACTIVE WORKOUT</span>
+                        <span id="activeWorkoutName" class="active-workout-name"></span>
+                    </div>
+                    <div class="active-workout-controls">
+                        <button id="closeActiveWorkoutBtn" class="active-workout-close-btn" type="button" title="Close">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                        <button id="finishActiveWorkoutBtn" class="active-workout-finish-btn" type="button" title="Finish">
+                            Finish
+                        </button>
+                    </div>
+                </div>
+                <div class="active-workout-timer-section">
+                    <div class="active-workout-timer-display" id="activeWorkoutTimerDisplay">00:00:00</div>
+                    <button id="startWorkoutTimerBtn" class="start-workout-timer-btn" type="button" title="Start Workout">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Start Workout
+                    </button>
+                </div>
+                <div class="active-workout-exercises">
+                    <div class="active-workout-exercises-label">EXERCISES</div>
+                    <div id="activeWorkoutExercisesList" class="active-workout-exercises-list">
+                        <!-- Exercises populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Edit Modal -->
+            <div id="timeEditModal" class="time-edit-modal" style="display:none;">
+                <div class="time-edit-modal-backdrop" id="timeEditModalBackdrop"></div>
+                <div class="time-edit-modal-content">
+                    <div class="time-edit-modal-header">
+                        <h2>Edit Workout Time</h2>
+                        <button id="timeEditModalClose" class="time-edit-modal-close" type="button">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="time-edit-modal-body">
+                        <div class="time-input-group">
+                            <label for="editHours">Hours</label>
+                            <input type="number" id="editHours" min="0" max="23" value="0">
+                        </div>
+                        <div class="time-input-group">
+                            <label for="editMinutes">Minutes</label>
+                            <input type="number" id="editMinutes" min="0" max="59" value="0">
+                        </div>
+                        <div class="time-input-group">
+                            <label for="editSeconds">Seconds</label>
+                            <input type="number" id="editSeconds" min="0" max="59" value="0">
+                        </div>
+                    </div>
+                    <div class="time-edit-modal-footer">
+                        <button id="timeEditCancelBtn" class="time-edit-cancel-btn" type="button">Cancel</button>
+                        <button id="timeEditSaveBtn" class="time-edit-save-btn" type="button">Save</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="workouts-list">
                 {% if workouts %}
                     {% for workout in workouts %}
@@ -220,10 +288,18 @@
                                 <span class="workout-name">{{ workout.name }}</span>
                                 <div class="workout-meta">
                                     <span class="workout-goal">{{ workout.get_goal_display }}</span>
+                                    <span class="workout-status-tag {% if workout.status == 'completed' %}completed{% else %}planned{% endif %}">
+                                        {{ workout.get_status_display }}
+                                    </span>
                                 </div>
                             </div>
                             {% if not is_past_date %}
                             <div class="workout-actions">
+                                <button class="workout-start-btn" type="button" title="Start workout" data-workout-id="{{ workout.id }}" data-workout-name="{{ workout.name }}">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                </button>
                                 <button class="workout-edit-btn" type="button" data-toggle-sibling="add-exercise-form" title="Add exercise">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -246,7 +322,7 @@
                         </div>
                         <div class="exercise-items-list">
                             {% for exercise in workout.exercises.all %}
-                            <div class="exercise-item {% if exercise.completed %}completed{% endif %}">
+                            <div class="exercise-item {% if exercise.completed %}completed{% endif %}" data-exercise-id="{{ exercise.id }}">
                                 {% if is_past_date %}
                                 <div class="checkbox {% if exercise.completed %}checked{% endif %}" style="width:16px;height:16px;border:1px solid #666;border-radius:3px;flex-shrink:0;{% if exercise.completed %}background-color:var(--accent);border-color:var(--accent);{% endif %}display:flex;align-items:center;justify-content:center;">
                                     {% if exercise.completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
@@ -353,6 +429,14 @@
                             </form>
                         </div>
                         {% endif %}
+                        {% if workout.total_duration_seconds %}
+                        <div class="workout-total-time-container" data-workout-id="{{ workout.id }}" data-seconds="{{ workout.total_duration_seconds }}">
+                            <div class="workout-total-time"></div>
+                            <button class="edit-time-btn" type="button" title="Edit time">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 {% else %}
@@ -411,6 +495,19 @@
     // Open calendar when button is clicked
     document.getElementById('calendarTrigger').addEventListener('click', function() {
         fp.open();
+    });
+
+    // Initialize workout time displays from saved data
+    document.querySelectorAll('.workout-total-time-container').forEach(function(container) {
+        const seconds = parseInt(container.dataset.seconds);
+        const timeDisplay = container.querySelector('.workout-total-time');
+        timeDisplay.textContent = formatTime(seconds);
+        
+        // Add click handler for edit button
+        container.querySelector('.edit-time-btn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            showTimeEditModal(container);
+        });
     });
 
     // Toggle form visibility
@@ -529,5 +626,852 @@
             closeDeleteConfirmation();
         }
     });
+
+    // Session Storage for persistent timer and module state across page navigation
+    const SESSION_STORAGE_KEYS = {
+        ACTIVE_WORKOUT_ID: 'activeWorkoutId',
+        TIMER_SECONDS: 'timerSeconds',
+        TIMER_RUNNING: 'timerRunning',
+        TIMER_START_TIME: 'timerStartTime',
+        SET_PROGRESS: 'setProgress'
+    };
+
+    function saveSessionState() {
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.ACTIVE_WORKOUT_ID, activeWorkoutId);
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.TIMER_SECONDS, timerSeconds);
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.TIMER_RUNNING, timerRunning);
+        if (timerRunning) {
+            // Store current timestamp so we can calculate elapsed time when page reloads
+            sessionStorage.setItem(SESSION_STORAGE_KEYS.TIMER_START_TIME, Date.now() - (timerSeconds * 1000));
+        }
+        sessionStorage.setItem(SESSION_STORAGE_KEYS.SET_PROGRESS, JSON.stringify(activeExercisesData));
+    }
+
+    function loadSessionState() {
+        const savedWorkoutId = sessionStorage.getItem(SESSION_STORAGE_KEYS.ACTIVE_WORKOUT_ID);
+        const savedTimerSeconds = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMER_SECONDS);
+        const savedTimerRunning = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMER_RUNNING);
+        const savedStartTime = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMER_START_TIME);
+        const savedSetProgress = sessionStorage.getItem(SESSION_STORAGE_KEYS.SET_PROGRESS);
+
+        if (savedWorkoutId && savedWorkoutId !== 'null') {
+            let elapsedSeconds = parseInt(savedTimerSeconds) || 0;
+            
+            // If timer was running, calculate elapsed time based on start time
+            if (savedTimerRunning === 'true' && savedStartTime) {
+                const elapsed = Math.floor((Date.now() - parseInt(savedStartTime)) / 1000);
+                elapsedSeconds = parseInt(savedTimerSeconds) + elapsed;
+            }
+            
+            return {
+                workoutId: parseInt(savedWorkoutId),
+                timerSeconds: elapsedSeconds,
+                timerRunning: savedTimerRunning === 'true',
+                setProgress: savedSetProgress ? JSON.parse(savedSetProgress) : {}
+            };
+        }
+        return null;
+    }
+
+    function clearSessionState() {
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.ACTIVE_WORKOUT_ID);
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.TIMER_SECONDS);
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.TIMER_RUNNING);
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.TIMER_START_TIME);
+        sessionStorage.removeItem(SESSION_STORAGE_KEYS.SET_PROGRESS);
+    }
+
+    // Active Workout Module Logic
+    let activeWorkoutId = null;
+
+    function populateExercisesList(workoutId) {
+        const exercisesList = document.getElementById('activeWorkoutExercisesList');
+        exercisesList.innerHTML = '';
+
+        // Find the workout card
+        const buttons = document.querySelectorAll('.workout-start-btn');
+        let workoutCard = null;
+        const workoutIdStr = String(workoutId);
+        for (let btn of buttons) {
+            if (btn.dataset.workoutId === workoutIdStr) {
+                workoutCard = btn.closest('.workout-card');
+                break;
+            }
+        }
+        
+        if (!workoutCard) return;
+
+        const exercises = workoutCard.querySelectorAll('.exercise-item');
+
+        if (exercises.length === 0) {
+            exercisesList.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--textMuted);">No exercises added yet</div>';
+            return;
+        }
+
+        exercises.forEach((exerciseItem) => {
+            const exerciseName = exerciseItem.querySelector('.exercise-name')?.textContent || 'Exercise';
+            const exerciseMuscle = exerciseItem.querySelector('.exercise-muscle')?.textContent || '';
+            const statElements = exerciseItem.querySelectorAll('.exercise-stats .stat');
+            
+            // Get exercise ID from the exercise-item data attribute or generate unique key
+            const exerciseId = exerciseItem.dataset.exerciseId || exerciseName;
+            
+            let statsText = [];
+            statElements.forEach(stat => {
+                statsText.push(stat.textContent.trim());
+            });
+
+            const exerciseDiv = document.createElement('div');
+            exerciseDiv.className = 'active-workout-exercise-item';
+            exerciseDiv.dataset.exerciseId = exerciseId;
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'active-workout-exercise-info';
+            infoDiv.innerHTML = `
+                <div class="active-workout-exercise-name">${exerciseName}</div>
+                <div class="active-workout-exercise-meta">
+                    <span class="active-workout-exercise-muscle">${exerciseMuscle}</span>
+                    <span class="active-workout-exercise-stats">
+                        ${statsText.map(s => `<span class="active-workout-exercise-stat">${s}</span>`).join('')}
+                    </span>
+                </div>
+            `;
+
+            const toggleDiv = document.createElement('div');
+            toggleDiv.className = 'active-workout-exercise-toggle';
+            toggleDiv.textContent = '▼';
+
+            exerciseDiv.appendChild(infoDiv);
+            exerciseDiv.appendChild(toggleDiv);
+
+            const setsList = document.createElement('div');
+            setsList.className = 'active-workout-sets-list';
+
+            let sets = 0;
+            let reps = 0;
+            let weight = 0;
+
+            statElements.forEach(stat => {
+                const text = stat.textContent;
+                if (text.includes('Sets')) sets = parseInt(text);
+                if (text.includes('Reps')) reps = parseInt(text);
+                if (text.includes('lb')) weight = parseInt(text);
+            });
+
+            // Track this exercise's checkboxes
+            activeExercisesData[exerciseId] = {
+                checkboxes: [],
+                totalSets: sets,
+                exerciseElement: exerciseItem
+            };
+
+            for (let i = 1; i <= sets; i++) {
+                const setItem = document.createElement('div');
+                setItem.className = 'active-workout-set-item';
+                
+                // Create styled checkbox div (matching exercise card style)
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'set-checkbox-styled';
+                checkboxDiv.style.cssText = 'width:16px;height:16px;border:1px solid #666;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s ease;background-color:transparent;';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'set-checkbox-hidden';
+                checkbox.style.cssText = 'display:none;';
+                checkbox.dataset.setNumber = i;
+                checkbox.dataset.exerciseId = exerciseId;
+                
+                // Track this checkbox
+                activeExercisesData[exerciseId].checkboxes.push(checkbox);
+                
+                const label = document.createElement('label');
+                label.className = 'set-label';
+                label.innerHTML = `<span class="set-text">Set ${i} • ${reps} Reps • ${weight} lb</span>`;
+                
+                const updateCheckbox = function() {
+                    if (checkbox.checked) {
+                        checkboxDiv.style.backgroundColor = 'var(--accent)';
+                        checkboxDiv.style.borderColor = 'var(--accent)';
+                        checkboxDiv.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                        setItem.classList.add('completed');
+                    } else {
+                        checkboxDiv.style.backgroundColor = 'transparent';
+                        checkboxDiv.style.borderColor = '#666';
+                        checkboxDiv.innerHTML = '';
+                        setItem.classList.remove('completed');
+                    }
+                    saveSetProgress();   // Save to backend
+                };
+                
+                checkbox.addEventListener('change', updateCheckbox);
+                checkboxDiv.addEventListener('click', function() {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                });
+                
+                setItem.appendChild(checkboxDiv);
+                setItem.appendChild(checkbox);
+                setItem.appendChild(label);
+                setsList.appendChild(setItem);
+            }
+
+            exerciseDiv.addEventListener('click', function() {
+                const isExpanded = this.classList.contains('expanded');
+                if (isExpanded) {
+                    this.classList.remove('expanded');
+                    setsList.classList.remove('show');
+                } else {
+                    this.classList.add('expanded');
+                    setsList.classList.add('show');
+                }
+            });
+
+            exercisesList.appendChild(exerciseDiv);
+            exercisesList.appendChild(setsList);
+        });
+    }
+
+    async function loadSetProgress(workoutId) {
+        try {
+            const response = await fetch(`/api/set_progress/get/?workout_id=${workoutId}`);
+            const data = await response.json();
+            
+            console.log('Loaded set progress data:', data);
+            
+            // Small delay to ensure DOM is ready
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            if (data.success && data.set_progress) {
+                const setProgress = data.set_progress;
+                
+                console.log('Set progress from server:', setProgress);
+                
+                // Iterate through all checkboxes and restore their state
+                const checkboxes = document.querySelectorAll('.set-checkbox-hidden');
+                console.log(`Found ${checkboxes.length} checkboxes to restore`);
+                
+                checkboxes.forEach(checkbox => {
+                    let exerciseId = checkbox.dataset.exerciseId;
+                    const setNumber = parseInt(checkbox.dataset.setNumber);
+                    
+                    // Convert to integer if it's numeric, otherwise keep as string
+                    if (!isNaN(exerciseId)) {
+                        exerciseId = parseInt(exerciseId);
+                    }
+                    
+                    console.log(`Checking exercise ${exerciseId}, set ${setNumber}`);
+                    
+                    if (setProgress[exerciseId]) {
+                        const exerciseProgress = setProgress[exerciseId];
+                        const setData = exerciseProgress.find(s => s.set_number === setNumber);
+                        
+                        if (setData) {
+                            checkbox.checked = setData.completed;
+                            console.log(`Set checkbox exercise ${exerciseId} set ${setNumber} to ${setData.completed}`);
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    } else {
+                        // If no progress data for this exercise, ensure checkbox is unchecked
+                        checkbox.checked = false;
+                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    
+                    // Also directly update the button styling to ensure it's visible
+                    const setItem = checkbox.closest('.active-workout-set-item');
+                    if (setItem) {
+                        const checkboxDiv = setItem.querySelector('.set-checkbox-styled');
+                        if (checkboxDiv) {
+                            if (checkbox.checked) {
+                                checkboxDiv.style.backgroundColor = 'var(--accent)';
+                                checkboxDiv.style.borderColor = 'var(--accent)';
+                                checkboxDiv.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                                setItem.classList.add('completed');
+                            } else {
+                                checkboxDiv.style.backgroundColor = 'transparent';
+                                checkboxDiv.style.borderColor = '#666';
+                                checkboxDiv.innerHTML = '';
+                                setItem.classList.remove('completed');
+                            }
+                        }
+                    }
+                });
+                
+                console.log('Finished restoring all set states');
+            }
+            
+            // Load saved timer value for this workout
+            if (data.success && data.timer_seconds !== undefined) {
+                timerSeconds = data.timer_seconds;
+                document.getElementById('activeWorkoutTimerDisplay').textContent = formatTime(timerSeconds);
+                console.log(`Timer set to ${timerSeconds} seconds`);
+            }
+        } catch (error) {
+            console.error('Error loading set progress:', error);
+        }
+    }
+
+    async function saveSetProgress() {
+        console.log('saveSetProgress() called');
+        if (!activeWorkoutId) {
+            console.warn('No active workout ID, cannot save progress');
+            return;
+        }
+        
+        console.log(`Active workout ID: ${activeWorkoutId}`);
+        
+        try {
+            const setData = [];
+            
+            // Collect all checkbox states
+            document.querySelectorAll('.set-checkbox-hidden').forEach(checkbox => {
+                let exerciseId = checkbox.dataset.exerciseId;
+                const setNumber = parseInt(checkbox.dataset.setNumber);
+                const completed = checkbox.checked;
+                
+                // Convert to integer if it's numeric, otherwise keep as string
+                if (!isNaN(exerciseId)) {
+                    exerciseId = parseInt(exerciseId);
+                }
+                
+                setData.push({
+                    exercise_id: exerciseId,
+                    set_number: setNumber,
+                    completed: completed
+                });
+            });
+            
+            console.log(`Saving ${setData.length} sets for workout ${activeWorkoutId}`);
+            
+            if (setData.length === 0) {
+                console.warn('No set data to save');
+                return;
+            }
+            
+            console.log('Sending data to backend:', { set_data: setData, timer_seconds: timerSeconds, workout_id: activeWorkoutId });
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+            console.log(`CSRF Token: ${csrfToken ? 'Found' : 'NOT FOUND'}`);
+            
+            const response = await fetch('/api/set_progress/save/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken || ''
+                },
+                body: JSON.stringify({ 
+                    set_data: setData,
+                    timer_seconds: timerSeconds,
+                    workout_id: activeWorkoutId
+                })
+            });
+            
+            console.log(`Response status: ${response.status}`);
+            
+            if (!response.ok) {
+                console.error(`HTTP Error: ${response.status} ${response.statusText}`);
+                const text = await response.text();
+                console.error('Response body:', text);
+                return;
+            }
+            
+            const result = await response.json();
+            console.log('Backend response:', result);
+            
+            if (!result.success) {
+                console.error('Failed to save set progress:', result.error);
+            } else {
+                console.log(`Set progress saved successfully! Saved ${result.saved_count} sets`);
+            }
+        } catch (error) {
+            console.error('Error saving set progress:', error);
+        }
+    }
+
+    function updateButtonToResume(workoutId) {
+        const buttons = document.querySelectorAll('.workout-start-btn');
+        const workoutIdStr = String(workoutId);
+        for (let btn of buttons) {
+            if (btn.dataset.workoutId === workoutIdStr) {
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M3 12v6a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-6"></path></svg>';
+                btn.title = 'Resume workout';
+                btn.classList.add('active-start-btn');
+                break;
+            }
+        }
+    }
+
+    function updateButtonToStart(workoutId) {
+        const buttons = document.querySelectorAll('.workout-start-btn');
+        const workoutIdStr = String(workoutId);
+        for (let btn of buttons) {
+            if (btn.dataset.workoutId === workoutIdStr) {
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                btn.title = 'Start workout';
+                btn.classList.remove('active-start-btn');
+                break;
+            }
+        }
+    }
+
+    // Timer state
+    let timerInterval = null;
+    let timerSeconds = 0;
+    let timerRunning = false;
+    let currentWorkoutId = null;
+    let autoSaveInterval = null;
+
+    // Exercise tracking for active workout module
+    let activeExercisesData = {}; // Maps exercise info to set counts
+
+    function formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+        if (timerRunning) return;
+        timerRunning = true;
+        const timerBtn = document.getElementById('startWorkoutTimerBtn');
+        timerBtn.classList.add('running');
+        timerBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> Pause';
+        
+        startAutoSave();
+        
+        timerInterval = setInterval(function() {
+            timerSeconds++;
+            document.getElementById('activeWorkoutTimerDisplay').textContent = formatTime(timerSeconds);
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        timerRunning = false;
+        clearInterval(timerInterval);
+        stopAutoSave();
+        saveSessionState();  // Save paused state
+        const timerBtn = document.getElementById('startWorkoutTimerBtn');
+        timerBtn.classList.remove('running');
+        timerBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Resume';
+    }
+
+    function startAutoSave() {
+        if (autoSaveInterval) {
+            clearInterval(autoSaveInterval);
+        }
+        // Auto-save every 5 seconds while timer is running
+        autoSaveInterval = setInterval(function() {
+            if (activeWorkoutId && timerRunning) {
+                saveSetProgress();
+            }
+        }, 5000);
+    }
+
+    function stopAutoSave() {
+        if (autoSaveInterval) {
+            clearInterval(autoSaveInterval);
+            autoSaveInterval = null;
+        }
+    }
+
+    function resetTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+        }
+        stopAutoSave();
+        timerRunning = false;
+        timerSeconds = 0;
+        timerInterval = null;
+        document.getElementById('activeWorkoutTimerDisplay').textContent = '00:00:00';
+        const timerBtn = document.getElementById('startWorkoutTimerBtn');
+        timerBtn.classList.remove('running');
+        timerBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Start Workout';
+    }
+
+    let editingTimeContainer = null;
+
+    function showTimeEditModal(timeContainer) {
+        editingTimeContainer = timeContainer;
+        const seconds = parseInt(timeContainer.dataset.seconds);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        document.getElementById('editHours').value = hours;
+        document.getElementById('editMinutes').value = minutes;
+        document.getElementById('editSeconds').value = secs;
+        
+        document.getElementById('timeEditModal').style.display = 'block';
+    }
+
+    function closeTimeEditModal() {
+        document.getElementById('timeEditModal').style.display = 'none';
+        editingTimeContainer = null;
+    }
+
+    function saveTimeEdit() {
+        if (!editingTimeContainer) return;
+        
+        const hours = parseInt(document.getElementById('editHours').value) || 0;
+        const minutes = parseInt(document.getElementById('editMinutes').value) || 0;
+        const seconds = parseInt(document.getElementById('editSeconds').value) || 0;
+        
+        // Validate inputs
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+            alert('Please enter valid time values');
+            return;
+        }
+        
+        const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+        const workoutId = editingTimeContainer.dataset.workoutId;
+        
+        // Save to backend
+        fetch('/api/workout/save_time/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            },
+            body: JSON.stringify({
+                workout_id: workoutId,
+                total_seconds: totalSeconds,
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                editingTimeContainer.dataset.seconds = totalSeconds;
+                editingTimeContainer.querySelector('.workout-total-time').textContent = formatTime(totalSeconds);
+                closeTimeEditModal();
+            } else {
+                alert('Error saving time: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving time');
+        });
+    }
+
+    document.getElementById('timeEditModalClose').addEventListener('click', closeTimeEditModal);
+    document.getElementById('timeEditModalBackdrop').addEventListener('click', closeTimeEditModal);
+    document.getElementById('timeEditCancelBtn').addEventListener('click', closeTimeEditModal);
+    document.getElementById('timeEditSaveBtn').addEventListener('click', saveTimeEdit);
+
+    // Allow Enter key to save
+    document.getElementById('editSeconds').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') saveTimeEdit();
+    });
+
+    document.getElementById('startWorkoutTimerBtn').addEventListener('click', function() {
+        if (timerRunning) {
+            pauseTimer();
+        } else {
+            startTimer();
+        }
+    });
+
+    document.querySelectorAll('.workout-start-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const workoutId = this.dataset.workoutId;
+            const workoutName = this.dataset.workoutName;
+            
+            const isNewWorkout = activeWorkoutId !== workoutId;
+            activeWorkoutId = workoutId;
+            
+            document.getElementById('activeWorkoutName').textContent = workoutName;
+            populateExercisesList(workoutId);
+            
+            // Only reset data if it's a new workout, not a resumed one
+            if (isNewWorkout) {
+                resetTimer();
+                activeExercisesData = {}; // Clear all tracking data
+                clearSessionState(); // Clear session storage
+                // Don't load previous progress for new workouts
+            } else {
+                // Resume existing workout - restore progress from database
+                loadSetProgress(workoutId);
+            }
+            
+            updateButtonToResume(workoutId);
+            
+            document.getElementById('activeWorkoutModule').style.display = 'block';
+            document.querySelector('.workouts-list').style.display = 'none';
+            document.querySelector('.log-workout-btn').style.display = 'none';
+            saveSessionState();  // Save state when module opens
+        });
+    });
+
+    document.getElementById('closeActiveWorkoutBtn').addEventListener('click', async function() {
+        await saveSetProgress();
+        saveSessionState();  // Save current state to sessionStorage before closing
+        document.getElementById('activeWorkoutModule').style.display = 'none';
+        document.querySelector('.workouts-list').style.display = 'flex';
+        document.querySelector('.log-workout-btn').style.display = 'block';
+    });
+
+    function completeFullyFinishedExercises() {
+        return new Promise((resolve) => {
+            const completedExerciseIds = [];
+            
+            console.log('=== completeFullyFinishedExercises called ===');
+            
+            // Strategy: Get exercises from the module DOM directly, not from activeExercisesData
+            // The module is populated with exercises and their checkboxes
+            const exercisesList = document.getElementById('activeWorkoutExercisesList');
+            if (!exercisesList) {
+                console.log('Exercise list not found');
+                resolve();
+                return;
+            }
+            
+            // Get all exercise items in the module
+            const exerciseItems = exercisesList.querySelectorAll('.active-workout-exercise-item');
+            console.log(`Found ${exerciseItems.length} exercise items in module`);
+            
+            exerciseItems.forEach((exerciseItem, idx) => {
+                const exerciseId = exerciseItem.dataset.exerciseId;
+                console.log(`[${idx}] Module exercise ID: ${exerciseId}`);
+                
+                // Find the setsList - it's the next sibling of the exerciseItem
+                const setsList = exerciseItem.nextElementSibling;
+                if (!setsList || !setsList.classList.contains('active-workout-sets-list')) {
+                    console.log(`  Exercise ${exerciseId}: No setsList found`);
+                    return;
+                }
+                
+                const checkboxes = setsList.querySelectorAll('.set-checkbox-hidden');
+                console.log(`  Exercise ${exerciseId}: ${checkboxes.length} sets`);
+                
+                // Check if all checkboxes are checked
+                const allChecked = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+                console.log(`  Exercise ${exerciseId}: allChecked=${allChecked}, checked=${Array.from(checkboxes).filter(cb => cb.checked).length}`);
+                
+                if (allChecked && checkboxes.length > 0) {
+                    const exerciseIdInt = parseInt(exerciseId);
+                    if (!isNaN(exerciseIdInt)) {
+                        completedExerciseIds.push(exerciseIdInt);
+                        console.log(`  ✓ Exercise ${exerciseIdInt} has all ${checkboxes.length} sets completed`);
+                    }
+                }
+            });
+            
+            // Send completed exercise IDs to backend
+            if (completedExerciseIds.length > 0) {
+                console.log('Sending completion for exercises:', completedExerciseIds);
+                
+                // Log all exercise items on main page for reference
+                const allExerciseItems = document.querySelectorAll('.exercise-item');
+                console.log(`Found ${allExerciseItems.length} exercise-item elements on main page:`);
+                allExerciseItems.forEach((item, idx) => {
+                    console.log(`  [${idx}] data-exercise-id="${item.dataset.exerciseId}"`);
+                });
+                
+                fetch('/api/exercises/complete_by_ids/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                    },
+                    body: JSON.stringify({
+                        exercise_ids: completedExerciseIds,
+                    })
+                })
+                .then(response => {
+                    console.log('API Response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('API Response data:', data);
+                    if (data.success) {
+                        console.log(`Marked ${data.completed_count} exercises as completed`);
+                        console.log('Exercise IDs to update:', data.exercise_ids);
+                        // Update the UI to show completed exercises
+                        data.exercise_ids.forEach(id => {
+                            // Find the specific exercise item by data-exercise-id
+                            const selector = `.exercise-item[data-exercise-id="${id}"]`;
+                            console.log(`Looking for selector: ${selector}`);
+                            const exerciseItem = document.querySelector(selector);
+                            console.log(`Found exerciseItem:`, exerciseItem);
+                            if (exerciseItem) {
+                                console.log(`Updating exercise ${id}`);
+                                exerciseItem.classList.add('completed');
+                                // Update the checkbox to show checkmark
+                                const checkbox = exerciseItem.querySelector('.checkbox');
+                                console.log(`Found checkbox:`, checkbox, 'Tag:', checkbox?.tagName);
+                                if (checkbox) {
+                                    // Add the 'checked' class
+                                    checkbox.classList.add('checked');
+                                    console.log(`Added 'checked' class, now has:`, checkbox.className);
+                                    
+                                    // Update inline styles
+                                    checkbox.style.backgroundColor = 'var(--accent)';
+                                    checkbox.style.borderColor = 'var(--accent)';
+                                    console.log(`Updated styles`);
+                                    
+                                    // Add checkmark SVG if not already there
+                                    if (!checkbox.querySelector('svg')) {
+                                        checkbox.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                                        console.log(`Added checkmark SVG`);
+                                    }
+                                    console.log(`Final checkbox:`, checkbox.outerHTML.substring(0, 100));
+                                }
+                            } else {
+                                console.log(`Exercise item not found for ID ${id}`);
+                            }
+                        });
+                    } else {
+                        console.log('API returned error:', data);
+                    }
+                    resolve();
+                })
+                .catch(error => {
+                    console.error('Error completing exercises:', error);
+                    resolve();
+                });
+            } else {
+                console.log('No completed exercises to send');
+                resolve();
+            }
+        });
+    }
+
+    document.getElementById('finishActiveWorkoutBtn').addEventListener('click', async function() {
+        // Save set progress before finishing
+        await saveSetProgress();
+        
+        // Mark exercises with all sets completed and WAIT for it to complete
+        await completeFullyFinishedExercises();
+        
+        if (activeWorkoutId) {
+            updateButtonToStart(activeWorkoutId);
+            // Update status regardless of timer
+            const workoutCards = document.querySelectorAll('.workout-card');
+            const activeWorkoutIdStr = String(activeWorkoutId);
+            for (let card of workoutCards) {
+                const startBtn = card.querySelector('.workout-start-btn');
+                if (startBtn && startBtn.dataset.workoutId === activeWorkoutIdStr) {
+                    // Update status tag from planned to completed
+                    const statusTag = card.querySelector('.workout-status-tag');
+                    if (statusTag) {
+                        statusTag.classList.remove('planned');
+                        statusTag.classList.add('completed');
+                        statusTag.textContent = 'Completed';
+                    }
+                    
+                    // Display total workout time on the card and save to database
+                    if (timerSeconds > 0) {
+                        // Find or create time display element
+                        let timeContainer = card.querySelector('.workout-total-time-container');
+                        if (!timeContainer) {
+                            timeContainer = document.createElement('div');
+                            timeContainer.className = 'workout-total-time-container';
+                            card.appendChild(timeContainer);
+                        }
+                        timeContainer.innerHTML = `
+                            <div class="workout-total-time">${formatTime(timerSeconds)}</div>
+                            <button class="edit-time-btn" type="button" title="Edit time">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
+                        `;
+                        timeContainer.dataset.workoutId = activeWorkoutId;
+                        timeContainer.dataset.seconds = timerSeconds;
+                        
+                        // Add click handler for edit button
+                        timeContainer.querySelector('.edit-time-btn').addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            showTimeEditModal(timeContainer);
+                        });
+                        
+                        // Save to database
+                        fetch('/api/workout/save_time/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                            },
+                            body: JSON.stringify({
+                                workout_id: activeWorkoutId,
+                                total_seconds: timerSeconds,
+                            })
+                        })
+                        .catch(error => console.error('Error saving workout time:', error));
+                    }
+                    
+                    // Save workout completion status to database
+                    fetch('/api/workout/complete/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                        },
+                        body: JSON.stringify({
+                            workout_id: activeWorkoutId,
+                        })
+                    })
+                    .catch(error => console.error('Error marking workout as completed:', error));
+                    
+                    break;
+                }
+            }
+        }
+        resetTimer();
+        activeExercisesData = {}; // Clear tracking data
+        document.getElementById('activeWorkoutModule').style.display = 'none';
+        document.querySelector('.workouts-list').style.display = 'flex';
+        document.querySelector('.log-workout-btn').style.display = 'block';
+        activeWorkoutId = null;
+        clearSessionState();  // Clear session state when workout finishes
+    });
+
+    // Restore session state when page loads
+    window.addEventListener('load', function() {
+        const sessionState = loadSessionState();
+        if (sessionState) {
+            console.log('Restoring session state:', sessionState);
+            activeWorkoutId = sessionState.workoutId;
+            timerSeconds = sessionState.timerSeconds;
+            activeExercisesData = sessionState.setProgress;
+            
+            // Populate the module with the workout
+            const buttons = document.querySelectorAll('.workout-start-btn');
+            for (let btn of buttons) {
+                // Convert both to strings for comparison since dataset returns strings
+                if (parseInt(btn.dataset.workoutId) === sessionState.workoutId) {
+                    const workoutName = btn.dataset.workoutName;
+                    document.getElementById('activeWorkoutName').textContent = workoutName;
+                    populateExercisesList(sessionState.workoutId);
+                    loadSetProgress(sessionState.workoutId);
+                    updateButtonToResume(sessionState.workoutId);
+                    
+                    // Show the module
+                    document.getElementById('activeWorkoutModule').style.display = 'block';
+                    document.querySelector('.workouts-list').style.display = 'none';
+                    document.querySelector('.log-workout-btn').style.display = 'none';
+                    
+                    // Update timer display
+                    document.getElementById('activeWorkoutTimerDisplay').textContent = formatTime(timerSeconds);
+                    
+                    // Restore timer state - resume the timer if it was running
+                    if (sessionState.timerRunning) {
+                        setTimeout(() => {
+                            startTimer();
+                        }, 100);
+                    }
+                    
+                    break;
+                }
+            }
+        }
+    });
+
+    // Save session state before user leaves the page
+    window.addEventListener('beforeunload', function() {
+        if (activeWorkoutId) {
+            saveSessionState();
+        }
+    });
+
 </script>
 {% endblock %}

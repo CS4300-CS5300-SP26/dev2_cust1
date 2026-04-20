@@ -1,7 +1,24 @@
+/* ── Shared design tokens (used by all authenticated pages) ── */
+:root {
+    --background: #0f0f0f;
+    --card: #181818;
+    --border: #242424;
+    --accent: #e85c00;
+    --accentDim: rgba(232, 92, 0, 0.08);
+    --textPrimary: #ffffff;
+    --textSecondary: #cccccc;
+    --textMuted: #999999;
+}
+
 /* Authenticated page overrides */
 .splash-container {
     padding-bottom: 90px;
     position: relative;
+}
+
+/* Hide logo container on authenticated app pages */
+.splash-container .logo-container {
+    display: none;
 }
 
 /* Profile bubble */
