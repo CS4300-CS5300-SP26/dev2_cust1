@@ -5,6 +5,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('core', '0016_alter_fooditem_group_cascade'),
         ('core', '0016_workout_current_session_seconds'),
     ]
 
