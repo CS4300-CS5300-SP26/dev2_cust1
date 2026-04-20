@@ -485,9 +485,6 @@ def user_logout(request):
 
 @login_required
 def home_dash(request):
-    from datetime import date
-    from django.db.models import Sum
-    
     # Redirect to onboarding if social login user hasn't completed it
     try:
         profile = request.user.profile
@@ -511,12 +508,22 @@ def home_dash(request):
     calorie_goal = get_user_calorie_goal(request.user)
     
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
+    workout_goal = 5
+    completed_exercises = Exercise.objects.filter(
+        workout__user=request.user,
+        workout__date=today,
+        completed=True,
+    ).count()
+    workout_goal_percentage = (completed_exercises / workout_goal) * 100 if workout_goal > 0 else 0
     
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
         'calorie_goal': calorie_goal,
-        'calories_percentage': calories_percentage
+        'calories_percentage': calories_percentage,
+        'workout_goal': workout_goal,
+        'completed_exercises': completed_exercises,
+        'workout_goal_percentage': workout_goal_percentage,
     })
 
 

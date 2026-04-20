@@ -2349,6 +2349,68 @@ class HomeDashViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['active_tab'], 'home')
 
+    def test_home_dash_includes_daily_workout_goal_progress(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Workout',
+            goal='strength',
+            date=date.today() - timedelta(days=1),
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Push Up',
+            muscle_group='chest',
+            completed=True,
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Squat',
+            muscle_group='legs',
+            completed=False,
+        )
+        Exercise.objects.create(
+            workout=yesterday_workout,
+            name='Pull Up',
+            muscle_group='back',
+            completed=True,
+        )
+
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['workout_goal'], 5)
+        self.assertEqual(response.context['completed_exercises'], 1)
+        self.assertEqual(response.context['workout_goal_percentage'], 20.0)
+        self.assertContains(response, 'Goal: 1/5')
+
+    def test_home_dash_updates_after_toggling_exercise_completion(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        workout = Workout.objects.create(
+            user=self.user,
+            name='Daily Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        exercise = Exercise.objects.create(
+            workout=workout,
+            name='Lunge',
+            muscle_group='legs',
+            completed=False,
+        )
+
+        self.client.post('/train/toggle_exercise/', {
+            'exercise_id': exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completed_exercises'], 1)
+        self.assertContains(response, 'Goal: 1/5')
+
 
 class TrainPageViewTests(TestCase):
     """Tests for the train_page view."""

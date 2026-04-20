@@ -60,9 +60,18 @@
     <!-- Today's Progress Container -->
     <div style="max-width:400px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;">
         <div style="font-size:0.9rem;color:#aaa;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Today's Progress</div>
-        <div style="font-size:3rem;font-weight:700;color:#f67d26;margin-bottom:6px;">{{ total_calories }}</div>
-        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;">Calories</div>
-        <div style="font-size:0.8rem;color:#bbb;">Goal: {{ calorie_goal }} kcal • {{ calories_percentage|floatformat:0 }}%</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+            <div style="padding:12px;background:#111;border:1px solid #242424;border-radius:10px;">
+                <div style="font-size:2.3rem;font-weight:700;color:#f67d26;line-height:1.1;">{{ completed_exercises }}</div>
+                <div style="font-size:0.85rem;color:#aaa;margin:6px 0 8px;">Exercises</div>
+                <div style="font-size:0.75rem;color:#bbb;">Goal: {{ completed_exercises }}/{{ workout_goal }} • {{ workout_goal_percentage|floatformat:0 }}%</div>
+            </div>
+            <div style="padding:12px;background:#111;border:1px solid #242424;border-radius:10px;">
+                <div style="font-size:2.3rem;font-weight:700;color:#f67d26;line-height:1.1;">{{ total_calories }}</div>
+                <div style="font-size:0.85rem;color:#aaa;margin:6px 0 8px;">Calories</div>
+                <div style="font-size:0.75rem;color:#bbb;">Goal: {{ calorie_goal }} kcal • {{ calories_percentage|floatformat:0 }}%</div>
+            </div>
+        </div>
     </div>
     
     <!-- Quick Links -->
