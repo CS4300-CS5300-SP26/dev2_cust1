@@ -113,9 +113,12 @@ class FoodItem(models.Model):
 
 class Workout(models.Model):
     GOAL_CHOICES = [
-        ('strength', 'Strength Training'),
         ('weight_loss', 'Weight Loss'),
-        ('flexibility', 'Flexibility'),
+        ('muscle_gain', 'Muscle Gain'),
+        ('strength', 'Strength Training'),
+        ('endurance', 'Endurance & Cardio'),
+        ('flexibility', 'Flexibility & Mobility'),
+        ('general_health', 'General Health & Wellness'),
         ('cardio', 'Cardio Health'),
     ]
 

@@ -145,14 +145,15 @@
     <!-- Tab Bar -->
     <div class="tab-bar-container">
         <div class="tab-bar">
-            <button class="tab-button active" data-tab="today">Today</button>
-            <button class="tab-button" data-tab="history">History</button>
-            <button class="tab-button" data-tab="search">Search</button>
+            <button class="tab-button {% if selected_tab == 'today' %}active{% endif %}" data-tab="today">Today</button>
+            <button class="tab-button {% if selected_tab == 'history' %}active{% endif %}" data-tab="history">History</button>
+            <button class="tab-button {% if selected_tab == 'search' %}active{% endif %}" data-tab="search">Exercise Explorer</button>
         </div>
     </div>
 
     <!-- Main Content -->
     <div class="content-container">
+        <div class="tab-panel {% if selected_tab == 'today' %}active{% endif %}" data-panel="today">
         <!-- Date Navigator -->
         <div class="date-navigator">
             <div class="date-nav-buttons">
@@ -197,11 +198,10 @@
                     <input type="hidden" name="date" value="{{ date_string }}">
                     <input type="text" name="workout_name" placeholder="Workout name (e.g., Morning Workout)" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #444;border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
                     <select name="goal" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #444;border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;cursor:pointer;">
-                        <option value="" disabled selected>Select Goal</option>
-                        <option value="strength">Strength Training</option>
-                        <option value="weight_loss">Weight Loss</option>
-                        <option value="flexibility">Flexibility</option>
-                        <option value="cardio">Cardio Health</option>
+                        <option value="" disabled {% if not default_workout_goal %}selected{% endif %}>Select Goal</option>
+                        {% for goal_value, goal_label in workout_goal_choices %}
+                        <option value="{{ goal_value }}" {% if default_workout_goal == goal_value %}selected{% endif %}>{{ goal_label }}</option>
+                        {% endfor %}
                     </select>
                     <select name="status" required style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #444;border-radius:8px;background-color:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;cursor:pointer;">
                         <option value="planned" selected>Planned</option>
@@ -457,6 +457,175 @@
             </button>
             {% endif %}
         </div>
+        </div>
+
+        <div class="tab-panel {% if selected_tab == 'history' %}active{% endif %}" data-panel="history">
+            <div class="history-section card">
+                <div class="history-header">
+                    <span class="section-label">WORKOUT HISTORY</span>
+                    <span class="history-subtitle">Previous sessions</span>
+                </div>
+                <div class="history-list">
+                    {% for workout in history_workouts %}
+                    <article class="history-item">
+                        <div class="history-item-main">
+                            <h3>{{ workout.name }}</h3>
+                            <p>{{ workout.date|date:"D, M d" }} • {{ workout.get_goal_display }}</p>
+                        </div>
+                        <div class="history-item-meta">
+                            <span class="history-status {% if workout.status == 'completed' %}completed{% else %}planned{% endif %}">{{ workout.get_status_display }}</span>
+                            <span>{{ workout.exercises.all|length }} exercise{{ workout.exercises.all|length|pluralize }}</span>
+                        </div>
+                    </article>
+                    {% empty %}
+                    <div class="history-empty">No previous workouts yet. Finish a few sessions and your history will show here.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-panel {% if selected_tab == 'search' %}active{% endif %}" data-panel="search">
+            <section class="exercise-library card">
+                <div class="exercise-library-header">
+                    <div>
+                        <span class="section-label">EXERCISE DATABASE</span>
+                        <h2>Exercise Explorer</h2>
+                        <p>Search and filter {{ exercise_database_count }} exercises, then add them directly to today’s workout.</p>
+                    </div>
+                </div>
+
+                {% if exercise_database_count > 0 %}
+                <div class="exercise-library-toolbar">
+                    <div class="library-field">
+                        <label for="libraryWorkoutSelect">Add to workout</label>
+                        <select id="libraryWorkoutSelect">
+                            <option value="">Select a workout</option>
+                            {% for workout in workouts %}
+                            <option value="{{ workout.id }}">{{ workout.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="library-field">
+                        <label for="librarySearchInput">Search</label>
+                        <input type="text" id="librarySearchInput" placeholder="Name, instructions, muscle..." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="exercise-library-filters">
+                    <div class="library-filter-grid">
+                        <div class="library-field">
+                            <label for="filterExerciseType">Exercise Type</label>
+                            <select id="filterExerciseType">
+                                <option value="">All types</option>
+                                {% for exercise_type in exercise_types %}
+                                <option value="{{ exercise_type.id }}">{{ exercise_type.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="library-field">
+                            <label for="filterMuscleGroup">Muscle Group</label>
+                            <select id="filterMuscleGroup">
+                                <option value="">All groups</option>
+                                {% for muscle_group in muscle_groups %}
+                                <option value="{{ muscle_group.id }}">{{ muscle_group.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="library-field">
+                            <label for="filterMuscle">Specific Muscle</label>
+                            <select id="filterMuscle">
+                                <option value="">All muscles</option>
+                                {% for muscle in muscles %}
+                                <option value="{{ muscle.id }}" data-group-id="{{ muscle.muscle_group_id }}">{{ muscle.name }} ({{ muscle.muscle_group__name }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="library-field">
+                            <label for="filterDifficulty">Difficulty</label>
+                            <select id="filterDifficulty">
+                                <option value="">All levels</option>
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                        </div>
+                        <div class="library-field">
+                            <label for="filterLocation">Location</label>
+                            <select id="filterLocation">
+                                <option value="">Home + Gym</option>
+                                <option value="home">Home</option>
+                                <option value="gym">Gym</option>
+                                <option value="both">Both only</option>
+                            </select>
+                        </div>
+                        <div class="library-field">
+                            <label for="filterSort">Sort</label>
+                            <select id="filterSort">
+                                <option value="name_asc">Name (A-Z)</option>
+                                <option value="name_desc">Name (Z-A)</option>
+                                <option value="difficulty_asc">Difficulty (Easy-Hard)</option>
+                                <option value="difficulty_desc">Difficulty (Hard-Easy)</option>
+                                <option value="newest">Recently Added</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="library-filters-row">
+                        <div class="library-equipment-group">
+                            <label>Equipment</label>
+                            <div class="library-equipment-list">
+                                {% for equipment in equipment_options %}
+                                <label class="library-checkbox-chip">
+                                    <input type="checkbox" class="equipment-filter-checkbox" value="{{ equipment.id }}">
+                                    <span>{{ equipment.name }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="library-filter-toggles">
+                            <label class="library-toggle">
+                                <input type="checkbox" id="filterExcludeInjured" checked>
+                                <span>Exclude injured areas</span>
+                            </label>
+                            <label class="library-toggle">
+                                <input type="checkbox" id="filterExcludeHighImpact">
+                                <span>Low-impact only</span>
+                            </label>
+                            <label class="library-toggle">
+                                <input type="checkbox" id="filterTimedOnly">
+                                <span>Timed exercises only</span>
+                            </label>
+                            <div class="library-field">
+                                <label for="filterEquipmentMode">Equipment Matching</label>
+                                <select id="filterEquipmentMode">
+                                    <option value="any">Any selected equipment</option>
+                                    <option value="all">Must match all selected equipment</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="library-actions">
+                        <button id="exerciseLibrarySearchBtn" type="button" class="library-action-btn primary">Search Exercises</button>
+                        <button id="exerciseLibraryClearBtn" type="button" class="library-action-btn">Clear Filters</button>
+                    </div>
+                </div>
+
+                <div class="exercise-library-results">
+                    <div class="exercise-library-results-header">
+                        <span id="exerciseLibraryResultsCount">0 results</span>
+                        <span id="exerciseLibraryResultsMeta">Use filters to narrow your list.</span>
+                    </div>
+                    <div id="exerciseLibraryLoading" class="exercise-library-loading" style="display:none;">Loading exercises...</div>
+                    <div id="exerciseLibraryResults" class="exercise-library-results-grid"></div>
+                </div>
+                {% else %}
+                <div class="exercise-library-empty">
+                    No exercise records found. Run <code>python manage.py populate_exercise_db</code> to load the full exercise database.
+                </div>
+                {% endif %}
+            </section>
+        </div>
     </div>
 </div>
 
@@ -471,6 +640,20 @@
         </div>
     </div>
 </div>
+
+<form id="exerciseLibraryQuickAddForm" method="POST" action="{% url 'add_exercise' %}" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="workout_id" id="libraryQuickAddWorkoutId">
+    <input type="hidden" name="exercise_name" id="libraryQuickAddExerciseName">
+    <input type="hidden" name="muscle_group" id="libraryQuickAddMuscleGroup">
+    <input type="hidden" name="sets" id="libraryQuickAddSets">
+    <input type="hidden" name="reps" id="libraryQuickAddReps">
+    <input type="hidden" name="weight" id="libraryQuickAddWeight">
+    <input type="hidden" name="status" value="planned">
+    <input type="hidden" name="date" value="{{ date_string }}">
+    <input type="hidden" name="tab" value="search">
+    <input type="hidden" name="training_exercise_id" id="libraryQuickAddTrainingExerciseId">
+</form>
 
 {% endblock %}
 
@@ -584,14 +767,342 @@
     });
 
     // Tab switching
-    document.querySelectorAll('.tab-button').forEach(function(btn) {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    function activateTab(tabName, shouldUpdateUrl) {
+        tabButtons.forEach(function(button) {
+            button.classList.toggle('active', button.dataset.tab === tabName);
+        });
+        tabPanels.forEach(function(panel) {
+            panel.classList.toggle('active', panel.dataset.panel === tabName);
+        });
+
+        if (shouldUpdateUrl) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tabName);
+            window.history.replaceState({}, '', url.toString());
+        }
+    }
+
+    tabButtons.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.tab-button').forEach(function(b) {
-                b.classList.remove('active');
-            });
-            this.classList.add('active');
+            activateTab(this.dataset.tab, true);
+            if (this.dataset.tab === 'search') {
+                loadExerciseLibrary();
+            }
         });
     });
+
+    activateTab('{{ selected_tab|default:"today" }}', false);
+
+    // Exercise explorer logic
+    const libraryState = {
+        loaded: false,
+        loading: false,
+    };
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getSelectedEquipmentIds() {
+        return Array.from(document.querySelectorAll('.equipment-filter-checkbox:checked')).map(function(checkbox) {
+            return checkbox.value;
+        });
+    }
+
+    function resolveLegacyMuscleGroup(exercise) {
+        const muscleNames = []
+            .concat(exercise.primary_muscles || [])
+            .concat(exercise.secondary_muscles || [])
+            .map(function(muscle) { return (muscle.name || '').toLowerCase(); });
+
+        const checks = [
+            ['arms', ['bicep', 'tricep', 'forearm']],
+            ['chest', ['chest', 'pec']],
+            ['back', ['back', 'lat']],
+            ['shoulders', ['shoulder', 'deltoid']],
+            ['legs', ['quad', 'hamstring', 'glute', 'calf', 'hip', 'adductor']],
+            ['core', ['abs', 'oblique', 'core', 'abdominis']],
+        ];
+
+        for (const [legacyGroup, keywords] of checks) {
+            const hasMatch = muscleNames.some(function(name) {
+                return keywords.some(function(keyword) {
+                    return name.includes(keyword);
+                });
+            });
+            if (hasMatch) return legacyGroup;
+        }
+
+        const groupNames = (exercise.muscle_groups || []).map(function(group) {
+            return (group.name || '').toLowerCase();
+        });
+        if (groupNames.some(function(name) { return name.includes('core'); })) return 'core';
+        if (groupNames.some(function(name) { return name.includes('lower') || name.includes('leg'); })) return 'legs';
+        if (groupNames.some(function(name) { return name.includes('upper'); })) return 'chest';
+        return 'core';
+    }
+
+    function collectExerciseLibraryFilters() {
+        const query = document.getElementById('librarySearchInput');
+        const exerciseType = document.getElementById('filterExerciseType');
+        const muscleGroup = document.getElementById('filterMuscleGroup');
+        const muscle = document.getElementById('filterMuscle');
+        const difficulty = document.getElementById('filterDifficulty');
+        const location = document.getElementById('filterLocation');
+        const sort = document.getElementById('filterSort');
+        const equipmentMode = document.getElementById('filterEquipmentMode');
+        const excludeInjured = document.getElementById('filterExcludeInjured');
+        const excludeHighImpact = document.getElementById('filterExcludeHighImpact');
+        const timedOnly = document.getElementById('filterTimedOnly');
+
+        const params = new URLSearchParams();
+        if (query && query.value.trim()) params.set('q', query.value.trim());
+        if (exerciseType && exerciseType.value) params.set('exercise_type', exerciseType.value);
+        if (muscleGroup && muscleGroup.value) params.set('muscle_group', muscleGroup.value);
+        if (muscle && muscle.value) params.set('muscle', muscle.value);
+        if (difficulty && difficulty.value) params.set('difficulty', difficulty.value);
+        if (location && location.value) params.set('location', location.value);
+        if (sort && sort.value) params.set('sort', sort.value);
+        if (excludeInjured && excludeInjured.checked) params.set('exclude_injured', 'true');
+        if (excludeHighImpact && excludeHighImpact.checked) params.set('exclude_high_impact', 'true');
+        if (timedOnly && timedOnly.checked) params.set('timed_only', 'true');
+
+        const equipmentIds = getSelectedEquipmentIds();
+        if (equipmentIds.length) {
+            params.set('equipment', equipmentIds.join(','));
+            if (equipmentMode && equipmentMode.value) {
+                params.set('equipment_mode', equipmentMode.value);
+            }
+        }
+
+        return params;
+    }
+
+    function renderExerciseLibraryResults(data) {
+        const resultsRoot = document.getElementById('exerciseLibraryResults');
+        const resultsCount = document.getElementById('exerciseLibraryResultsCount');
+        const resultsMeta = document.getElementById('exerciseLibraryResultsMeta');
+        if (!resultsRoot || !resultsCount || !resultsMeta) return;
+
+        const exercises = data.exercises || [];
+        resultsRoot.innerHTML = '';
+        resultsCount.textContent = `${data.count || exercises.length} result${(data.count || exercises.length) === 1 ? '' : 's'}`;
+        resultsMeta.textContent = exercises.length
+            ? 'Tap an exercise to add it to a workout.'
+            : 'No matching exercises. Try broader filters.';
+
+        if (!exercises.length) {
+            resultsRoot.innerHTML = '<div class="exercise-library-empty">No exercises matched your search.</div>';
+            return;
+        }
+
+        exercises.forEach(function(exercise) {
+            const card = document.createElement('article');
+            card.className = 'exercise-library-card';
+
+            const primaryMuscles = (exercise.primary_muscles || []).map(function(m) { return m.name; }).join(', ');
+            const secondaryMuscles = (exercise.secondary_muscles || []).map(function(m) { return m.name; }).join(', ');
+            const equipment = (exercise.equipment || []).map(function(e) { return e.name; }).join(', ');
+            const repsOrDuration = exercise.default_duration_seconds
+                ? `${Math.floor(exercise.default_duration_seconds / 60)} min`
+                : `${exercise.default_reps || 0} reps`;
+
+            card.innerHTML = `
+                <header class="exercise-library-card-header">
+                    <div>
+                        <h3>${escapeHtml(exercise.name)}</h3>
+                        <p>${escapeHtml(exercise.exercise_type?.name || 'Exercise')} • ${escapeHtml(exercise.difficulty || '')} • ${escapeHtml(exercise.location || '')}</p>
+                    </div>
+                    <span class="exercise-library-impact ${exercise.high_impact ? 'high' : 'low'}">${exercise.high_impact ? 'High Impact' : 'Low Impact'}</span>
+                </header>
+                <p class="exercise-library-description">${escapeHtml(exercise.description || '')}</p>
+                <div class="exercise-library-meta">
+                    <span><strong>Primary:</strong> ${escapeHtml(primaryMuscles || 'General')}</span>
+                    <span><strong>Secondary:</strong> ${escapeHtml(secondaryMuscles || '—')}</span>
+                    <span><strong>Equipment:</strong> ${escapeHtml(equipment || 'Bodyweight')}</span>
+                    <span><strong>Default:</strong> ${escapeHtml((exercise.default_sets || 0) + ' sets × ' + repsOrDuration)}</span>
+                </div>
+                <footer class="exercise-library-card-footer">
+                    <button type="button" class="library-add-btn">Add to workout</button>
+                </footer>
+            `;
+
+            const addButton = card.querySelector('.library-add-btn');
+            addButton.addEventListener('click', function() {
+                const workoutSelect = document.getElementById('libraryWorkoutSelect');
+                const selectedWorkout = workoutSelect ? workoutSelect.value : '';
+                if (!selectedWorkout) {
+                    alert('Select a workout first so we know where to add this exercise.');
+                    if (workoutSelect) workoutSelect.focus();
+                    return;
+                }
+
+                const quickAddForm = document.getElementById('exerciseLibraryQuickAddForm');
+                if (!quickAddForm) return;
+
+                document.getElementById('libraryQuickAddWorkoutId').value = selectedWorkout;
+                document.getElementById('libraryQuickAddExerciseName').value = exercise.name || '';
+                document.getElementById('libraryQuickAddMuscleGroup').value = resolveLegacyMuscleGroup(exercise);
+                document.getElementById('libraryQuickAddSets').value = exercise.default_sets || '';
+                document.getElementById('libraryQuickAddReps').value = exercise.default_reps || '';
+                document.getElementById('libraryQuickAddWeight').value = '';
+                document.getElementById('libraryQuickAddTrainingExerciseId').value = exercise.id || '';
+                quickAddForm.submit();
+            });
+
+            resultsRoot.appendChild(card);
+        });
+    }
+
+    async function loadExerciseLibrary() {
+        const loading = document.getElementById('exerciseLibraryLoading');
+        const resultsRoot = document.getElementById('exerciseLibraryResults');
+        if (!loading || !resultsRoot || libraryState.loading) return;
+
+        libraryState.loading = true;
+        loading.style.display = 'block';
+        resultsRoot.innerHTML = '';
+
+        try {
+            const params = collectExerciseLibraryFilters();
+            const response = await fetch(`/api/exercises/filter/?${params.toString()}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load exercises.');
+            }
+
+            renderExerciseLibraryResults(data);
+            libraryState.loaded = true;
+        } catch (error) {
+            resultsRoot.innerHTML = `<div class="exercise-library-empty">${escapeHtml(error.message || 'Something went wrong while loading exercises.')}</div>`;
+        } finally {
+            loading.style.display = 'none';
+            libraryState.loading = false;
+        }
+    }
+
+    function resetExerciseLibraryFilters() {
+        const fieldIds = [
+            'librarySearchInput',
+            'filterExerciseType',
+            'filterMuscleGroup',
+            'filterMuscle',
+            'filterDifficulty',
+            'filterLocation',
+            'filterSort',
+            'filterEquipmentMode',
+        ];
+        fieldIds.forEach(function(fieldId) {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+            if (field.tagName === 'SELECT') {
+                field.selectedIndex = 0;
+            } else {
+                field.value = '';
+            }
+        });
+
+        const toggles = ['filterExcludeInjured', 'filterExcludeHighImpact', 'filterTimedOnly'];
+        toggles.forEach(function(toggleId, index) {
+            const toggle = document.getElementById(toggleId);
+            if (!toggle) return;
+            toggle.checked = index === 0;
+        });
+
+        document.querySelectorAll('.equipment-filter-checkbox').forEach(function(checkbox) {
+            checkbox.checked = false;
+        });
+
+        const muscleOptions = document.querySelectorAll('#filterMuscle option');
+        muscleOptions.forEach(function(option) {
+            option.hidden = false;
+        });
+    }
+
+    function updateMuscleFilterByGroup() {
+        const selectedGroup = document.getElementById('filterMuscleGroup');
+        const muscleSelect = document.getElementById('filterMuscle');
+        if (!selectedGroup || !muscleSelect) return;
+
+        const groupId = selectedGroup.value;
+        Array.from(muscleSelect.options).forEach(function(option, index) {
+            if (index === 0) {
+                option.hidden = false;
+                return;
+            }
+            const shouldShow = !groupId || option.dataset.groupId === groupId;
+            option.hidden = !shouldShow;
+            if (!shouldShow && option.selected) {
+                option.selected = false;
+                muscleSelect.selectedIndex = 0;
+            }
+        });
+    }
+
+    const librarySearchBtn = document.getElementById('exerciseLibrarySearchBtn');
+    if (librarySearchBtn) {
+        librarySearchBtn.addEventListener('click', loadExerciseLibrary);
+    }
+
+    const libraryClearBtn = document.getElementById('exerciseLibraryClearBtn');
+    if (libraryClearBtn) {
+        libraryClearBtn.addEventListener('click', function() {
+            resetExerciseLibraryFilters();
+            loadExerciseLibrary();
+        });
+    }
+
+    const librarySearchInput = document.getElementById('librarySearchInput');
+    if (librarySearchInput) {
+        librarySearchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadExerciseLibrary();
+            }
+        });
+    }
+
+    const filterMuscleGroup = document.getElementById('filterMuscleGroup');
+    if (filterMuscleGroup) {
+        filterMuscleGroup.addEventListener('change', function() {
+            updateMuscleFilterByGroup();
+            loadExerciseLibrary();
+        });
+    }
+
+    [
+        'filterExerciseType',
+        'filterMuscle',
+        'filterDifficulty',
+        'filterLocation',
+        'filterSort',
+        'filterExcludeInjured',
+        'filterExcludeHighImpact',
+        'filterTimedOnly',
+        'filterEquipmentMode',
+    ].forEach(function(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener('change', loadExerciseLibrary);
+        }
+    });
+
+    document.querySelectorAll('.equipment-filter-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', loadExerciseLibrary);
+    });
+
+    if ('{{ selected_tab|default:"today" }}' === 'search') {
+        loadExerciseLibrary();
+    }
 
     // Delete confirmation modal
     let currentDeleteForm = null;
