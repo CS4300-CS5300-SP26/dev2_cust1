@@ -25,13 +25,12 @@ def handle_social_account_updated(sender, request, sociallogin, **kwargs):
 
 @receiver(post_migrate)
 def populate_databases(sender, **kwargs):
-    """Auto-populate food and supplement databases after migrations."""
+    """Auto-populate food database after migrations."""
     if sender.name != 'core':
         return
     try:
         from django.core.management import call_command
         call_command('populate_food_database', verbosity=0)
-        call_command('populate_supplements', verbosity=0)
     except Exception:
         pass
 
