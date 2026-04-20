@@ -1,0 +1,885 @@
+./core/adapter.py:8:1: W293 blank line contains whitespace
+./core/adapter.py:13:1: W293 blank line contains whitespace
+./core/adapter.py:19:1: W293 blank line contains whitespace
+./core/adapter.py:26:1: W293 blank line contains whitespace
+./core/adapter.py:34:1: W293 blank line contains whitespace
+./core/adapter.py:43:1: W293 blank line contains whitespace
+./core/adapter.py:45:1: W293 blank line contains whitespace
+./core/adapter.py:53:9: E722 do not use bare 'except'
+./core/adapter.py:55:1: W293 blank line contains whitespace
+./core/adapter.py:61:1: W293 blank line contains whitespace
+./core/adapter.py:66:1: W293 blank line contains whitespace
+./core/adapter.py:71:1: W293 blank line contains whitespace
+./core/adapter.py:77:1: W293 blank line contains whitespace
+./core/adapter.py:93:1: W293 blank line contains whitespace
+./core/adapter.py:99:13: E722 do not use bare 'except'
+./core/adapter.py:103:1: W293 blank line contains whitespace
+./core/adapter.py:108:1: W293 blank line contains whitespace
+./core/adapter.py:112:1: W293 blank line contains whitespace
+./core/adapter.py:118:9: E722 do not use bare 'except'
+./core/adapter.py:124:1: W391 blank line at end of file
+./core/apps.py:7:1: W293 blank line contains whitespace
+./core/apps.py:9:9: F401 'core.signals' imported but unused
+./core/exercise_api.py:9:1: F401 'django.db.models.Prefetch' imported but unused
+./core/exercise_api.py:37:1: W293 blank line contains whitespace
+./core/exercise_api.py:41:1: W293 blank line contains whitespace
+./core/exercise_api.py:58:1: W293 blank line contains whitespace
+./core/exercise_api.py:68:1: W293 blank line contains whitespace
+./core/exercise_api.py:76:1: W293 blank line contains whitespace
+./core/exercise_api.py:81:1: W293 blank line contains whitespace
+./core/exercise_api.py:86:1: W293 blank line contains whitespace
+./core/exercise_api.py:93:1: W293 blank line contains whitespace
+./core/exercise_api.py:100:1: W293 blank line contains whitespace
+./core/exercise_api.py:105:1: W293 blank line contains whitespace
+./core/exercise_api.py:111:1: W293 blank line contains whitespace
+./core/exercise_api.py:119:1: W293 blank line contains whitespace
+./core/exercise_api.py:124:1: W293 blank line contains whitespace
+./core/exercise_api.py:161:1: W293 blank line contains whitespace
+./core/exercise_api.py:173:1: W293 blank line contains whitespace
+./core/exercise_api.py:179:1: W293 blank line contains whitespace
+./core/exercise_api.py:181:1: W293 blank line contains whitespace
+./core/exercise_api.py:188:1: W293 blank line contains whitespace
+./core/exercise_api.py:190:5: F841 local variable 'user_injuries' is assigned to but never used
+./core/exercise_api.py:194:1: W293 blank line contains whitespace
+./core/exercise_api.py:200:1: W293 blank line contains whitespace
+./core/exercise_api.py:203:1: W293 blank line contains whitespace
+./core/exercise_api.py:207:1: W293 blank line contains whitespace
+./core/exercise_api.py:211:1: W293 blank line contains whitespace
+./core/exercise_api.py:216:1: W293 blank line contains whitespace
+./core/exercise_api.py:231:1: W293 blank line contains whitespace
+./core/exercise_api.py:279:1: W293 blank line contains whitespace
+./core/exercise_api.py:287:1: W293 blank line contains whitespace
+./core/exercise_api.py:305:1: W293 blank line contains whitespace
+./core/exercise_api.py:310:1: W293 blank line contains whitespace
+./core/management/commands/populate_exercise_db.py:150:121: E501 line too long (161 > 120 characters)
+./core/management/commands/populate_exercise_db.py:165:121: E501 line too long (131 > 120 characters)
+./core/management/commands/populate_exercise_db.py:179:121: E501 line too long (149 > 120 characters)
+./core/management/commands/populate_exercise_db.py:193:121: E501 line too long (141 > 120 characters)
+./core/management/commands/populate_exercise_db.py:202:1: W293 blank line contains whitespace
+./core/management/commands/populate_exercise_db.py:209:121: E501 line too long (173 > 120 characters)
+./core/management/commands/populate_exercise_db.py:224:121: E501 line too long (157 > 120 characters)
+./core/management/commands/populate_exercise_db.py:238:121: E501 line too long (182 > 120 characters)
+./core/management/commands/populate_exercise_db.py:254:121: E501 line too long (167 > 120 characters)
+./core/management/commands/populate_exercise_db.py:269:121: E501 line too long (147 > 120 characters)
+./core/management/commands/populate_exercise_db.py:285:121: E501 line too long (152 > 120 characters)
+./core/management/commands/populate_exercise_db.py:300:121: E501 line too long (145 > 120 characters)
+./core/management/commands/populate_exercise_db.py:313:121: E501 line too long (154 > 120 characters)
+./core/management/commands/populate_exercise_db.py:328:121: E501 line too long (143 > 120 characters)
+./core/management/commands/populate_exercise_db.py:342:121: E501 line too long (154 > 120 characters)
+./core/management/commands/populate_exercise_db.py:358:121: E501 line too long (152 > 120 characters)
+./core/management/commands/populate_exercise_db.py:371:121: E501 line too long (171 > 120 characters)
+./core/management/commands/populate_exercise_db.py:386:121: E501 line too long (154 > 120 characters)
+./core/management/commands/populate_exercise_db.py:400:121: E501 line too long (138 > 120 characters)
+./core/management/commands/populate_supplements.py:24:1: W293 blank line contains whitespace
+./core/management/commands/populate_supplements.py:38:1: W293 blank line contains whitespace
+./core/management/commands/populate_supplements.py:47:1: W293 blank line contains whitespace
+./core/management/commands/populate_supplements.py:59:1: W293 blank line contains whitespace
+./core/management/commands/populate_supplements.py:72:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:15:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:20:121: E501 line too long (147 > 120 characters)
+./core/management/commands/setup_social_apps.py:21:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:45:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:69:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:91:1: W293 blank line contains whitespace
+./core/management/commands/setup_social_apps.py:113:1: W293 blank line contains whitespace
+./core/middleware.py:13:1: W293 blank line contains whitespace
+./core/middleware.py:18:1: W293 blank line contains whitespace
+./core/middleware.py:22:1: W293 blank line contains whitespace
+./core/middleware.py:28:9: E722 do not use bare 'except'
+./core/middleware.py:30:1: W293 blank line contains whitespace
+./core/models.py:6:1: E302 expected 2 blank lines, found 1
+./core/models.py:15:1: W293 blank line contains whitespace
+./core/models.py:21:1: W293 blank line contains whitespace
+./core/models.py:30:1: W293 blank line contains whitespace
+./core/models.py:43:1: W293 blank line contains whitespace
+./core/models.py:55:121: E501 line too long (136 > 120 characters)
+./core/models.py:132:121: E501 line too long (126 > 120 characters)
+./core/models.py:191:1: W293 blank line contains whitespace
+./core/models.py:194:1: W293 blank line contains whitespace
+./core/models.py:203:1: W293 blank line contains whitespace
+./core/models.py:206:1: W293 blank line contains whitespace
+./core/models.py:216:1: W293 blank line contains whitespace
+./core/models.py:219:1: W293 blank line contains whitespace
+./core/models.py:228:1: W293 blank line contains whitespace
+./core/models.py:231:1: W293 blank line contains whitespace
+./core/models.py:243:1: W293 blank line contains whitespace
+./core/models.py:249:1: W293 blank line contains whitespace
+./core/models.py:255:1: W293 blank line contains whitespace
+./core/models.py:261:1: W293 blank line contains whitespace
+./core/models.py:265:1: W293 blank line contains whitespace
+./core/models.py:270:1: W293 blank line contains whitespace
+./core/models.py:273:121: E501 line too long (127 > 120 characters)
+./core/models.py:274:1: W293 blank line contains whitespace
+./core/models.py:279:1: W293 blank line contains whitespace
+./core/models.py:286:1: W293 blank line contains whitespace
+./core/models.py:298:1: W293 blank line contains whitespace
+./core/models.py:307:1: W293 blank line contains whitespace
+./core/models.py:310:1: W293 blank line contains whitespace
+./core/models.py:321:1: W293 blank line contains whitespace
+./core/signals.py:6:1: F401 'django.contrib.auth.models.User' imported but unused
+./core/signals.py:22:5: E722 do not use bare 'except'
+./core/signals.py:24:1: W391 blank line at end of file
+./core/tests.py:20:1: E266 too many leading '#' for block comment
+./core/tests.py:21:121: E501 line too long (171 > 120 characters)
+./core/tests.py:125:9: F841 local variable 'user' is assigned to but never used
+./core/tests.py:467:1: E266 too many leading '#' for block comment
+./core/tests.py:468:121: E501 line too long (171 > 120 characters)
+./core/tests.py:474:1: E402 module level import not at top of file
+./core/tests.py:475:1: E402 module level import not at top of file
+./core/tests.py:538:9: F841 local variable 'a' is assigned to but never used
+./core/tests.py:539:9: F841 local variable 'b' is assigned to but never used
+./core/tests.py:772:9: F841 local variable 'r' is assigned to but never used
+./core/tests.py:871:1: F811 redefinition of unused 'json' from line 4
+./core/tests.py:871:1: E402 module level import not at top of file
+./core/tests.py:872:1: E402 module level import not at top of file
+./core/tests.py:873:1: E402 module level import not at top of file
+./core/tests.py:939:1: F811 redefinition of unused 'date' from line 474
+./core/tests.py:939:1: E402 module level import not at top of file
+./core/tests.py:940:1: E402 module level import not at top of file
+./core/tests.py:941:1: F811 redefinition of unused 'Meal' from line 475
+./core/tests.py:941:1: F811 redefinition of unused 'FoodItem' from line 475
+./core/tests.py:941:1: E402 module level import not at top of file
+./core/tests.py:1119:121: E501 line too long (171 > 120 characters)
+./core/tests.py:1121:121: E501 line too long (171 > 120 characters)
+./core/tests.py:1123:1: F811 redefinition of unused 'date' from line 939
+./core/tests.py:1123:1: E305 expected 2 blank lines after class or function definition, found 1
+./core/tests.py:1123:1: E402 module level import not at top of file
+./core/tests.py:1124:1: E402 module level import not at top of file
+./core/tests.py:1184:9: F841 local variable 'workout_today' is assigned to but never used
+./core/tests.py:1187:9: F841 local variable 'workout_yesterday' is assigned to but never used
+./core/tests.py:1581:1: E303 too many blank lines (3)
+./core/tests.py:1588:1: W293 blank line contains whitespace
+./core/tests.py:1595:1: W293 blank line contains whitespace
+./core/tests.py:1598:1: W293 blank line contains whitespace
+./core/tests.py:1606:1: W293 blank line contains whitespace
+./core/tests.py:1613:1: W293 blank line contains whitespace
+./core/tests.py:1616:1: W293 blank line contains whitespace
+./core/tests.py:1624:1: W293 blank line contains whitespace
+./core/tests.py:1631:1: W293 blank line contains whitespace
+./core/tests.py:1634:1: W293 blank line contains whitespace
+./core/tests.py:1642:1: W293 blank line contains whitespace
+./core/tests.py:1649:1: W293 blank line contains whitespace
+./core/tests.py:1652:1: W293 blank line contains whitespace
+./core/tests.py:1659:1: W293 blank line contains whitespace
+./core/tests.py:1666:1: W293 blank line contains whitespace
+./core/tests.py:1672:1: W293 blank line contains whitespace
+./core/tests.py:1675:1: W293 blank line contains whitespace
+./core/tests.py:1683:1: W293 blank line contains whitespace
+./core/tests.py:1690:1: W293 blank line contains whitespace
+./core/tests.py:1696:1: W293 blank line contains whitespace
+./core/tests.py:1699:1: W293 blank line contains whitespace
+./core/tests.py:1706:1: W293 blank line contains whitespace
+./core/tests.py:1712:1: W293 blank line contains whitespace
+./core/tests.py:1715:1: W293 blank line contains whitespace
+./core/tests.py:1723:1: W293 blank line contains whitespace
+./core/tests.py:1729:1: W293 blank line contains whitespace
+./core/tests.py:1736:1: W293 blank line contains whitespace
+./core/tests.py:1738:1: W293 blank line contains whitespace
+./core/tests.py:1748:1: W293 blank line contains whitespace
+./core/tests.py:1750:1: W293 blank line contains whitespace
+./core/tests.py:1753:1: W293 blank line contains whitespace
+./core/tests.py:1760:1: W293 blank line contains whitespace
+./core/tests.py:1764:1: W293 blank line contains whitespace
+./core/tests.py:1766:1: W293 blank line contains whitespace
+./core/tests.py:1769:13: F841 local variable 'result' is assigned to but never used
+./core/tests.py:1770:1: W293 blank line contains whitespace
+./core/tests.py:1773:1: W293 blank line contains whitespace
+./core/tests.py:1779:1: W293 blank line contains whitespace
+./core/tests.py:1781:1: W293 blank line contains whitespace
+./core/tests.py:1786:1: W293 blank line contains whitespace
+./core/tests.py:1793:1: W293 blank line contains whitespace
+./core/tests.py:1797:1: W293 blank line contains whitespace
+./core/tests.py:1799:1: W293 blank line contains whitespace
+./core/tests.py:1802:13: F841 local variable 'result' is assigned to but never used
+./core/tests.py:1803:1: W293 blank line contains whitespace
+./core/tests.py:1806:1: W293 blank line contains whitespace
+./core/tests.py:1812:1: W293 blank line contains whitespace
+./core/tests.py:1814:1: W293 blank line contains whitespace
+./core/tests.py:1816:1: W293 blank line contains whitespace
+./core/tests.py:1822:1: W293 blank line contains whitespace
+./core/tests.py:1827:1: W293 blank line contains whitespace
+./core/tests.py:1829:1: W293 blank line contains whitespace
+./core/tests.py:1832:1: W293 blank line contains whitespace
+./core/tests.py:1835:1: W293 blank line contains whitespace
+./core/tests.py:1840:1: W293 blank line contains whitespace
+./core/tests.py:1844:1: W293 blank line contains whitespace
+./core/tests.py:1857:1: W293 blank line contains whitespace
+./core/tests.py:1864:1: W293 blank line contains whitespace
+./core/tests.py:1872:1: W293 blank line contains whitespace
+./core/tests.py:1879:1: W293 blank line contains whitespace
+./core/tests.py:1891:1: W293 blank line contains whitespace
+./core/tests.py:1899:1: W293 blank line contains whitespace
+./core/tests.py:1905:1: W293 blank line contains whitespace
+./core/tests.py:1907:9: F841 local variable 'google' is assigned to but never used
+./core/tests.py:1913:1: W293 blank line contains whitespace
+./core/tests.py:1915:9: F841 local variable 'facebook' is assigned to but never used
+./core/tests.py:1921:1: W293 blank line contains whitespace
+./core/tests.py:1935:1: W293 blank line contains whitespace
+./core/tests.py:1941:1: W293 blank line contains whitespace
+./core/tests.py:1950:1: W293 blank line contains whitespace
+./core/tests.py:1956:1: W293 blank line contains whitespace
+./core/tests.py:1963:1: W293 blank line contains whitespace
+./core/tests.py:1970:1: W293 blank line contains whitespace
+./core/tests.py:1976:1: W293 blank line contains whitespace
+./core/tests.py:1985:1: W293 blank line contains whitespace
+./core/tests.py:1991:1: W293 blank line contains whitespace
+./core/tests.py:2020:1: W293 blank line contains whitespace
+./core/tests.py:2024:1: W293 blank line contains whitespace
+./core/tests.py:2036:1: W293 blank line contains whitespace
+./core/tests.py:2046:1: W293 blank line contains whitespace
+./core/tests.py:2056:1: W293 blank line contains whitespace
+./core/tests.py:2065:1: W293 blank line contains whitespace
+./core/tests.py:2075:1: W293 blank line contains whitespace
+./core/tests.py:2081:1: W293 blank line contains whitespace
+./core/tests.py:2085:1: W293 blank line contains whitespace
+./core/tests.py:2094:1: W293 blank line contains whitespace
+./core/tests.py:2099:1: W293 blank line contains whitespace
+./core/tests.py:2108:1: W293 blank line contains whitespace
+./core/tests.py:2116:1: W293 blank line contains whitespace
+./core/tests.py:2122:1: W293 blank line contains whitespace
+./core/tests.py:2130:1: W293 blank line contains whitespace
+./core/tests.py:2135:1: W293 blank line contains whitespace
+./core/tests.py:2138:1: W293 blank line contains whitespace
+./core/tests.py:2147:1: W293 blank line contains whitespace
+./core/tests.py:2152:1: W293 blank line contains whitespace
+./core/tests.py:2155:1: W293 blank line contains whitespace
+./core/tests.py:2163:1: W293 blank line contains whitespace
+./core/tests.py:2175:1: W293 blank line contains whitespace
+./core/tests.py:2184:1: W293 blank line contains whitespace
+./core/tests.py:2190:1: W293 blank line contains whitespace
+./core/tests.py:2201:1: W293 blank line contains whitespace
+./core/tests.py:2210:1: W293 blank line contains whitespace
+./core/tests.py:2216:1: W293 blank line contains whitespace
+./core/tests.py:2225:1: F811 redefinition of unused 'TrainPageViewTests' from line 1127
+./core/tests.py:2227:1: W293 blank line contains whitespace
+./core/tests.py:2236:1: W293 blank line contains whitespace
+./core/tests.py:2242:1: W293 blank line contains whitespace
+./core/tests.py:2253:1: W293 blank line contains whitespace
+./core/tests.py:2262:1: W293 blank line contains whitespace
+./core/tests.py:2268:1: W293 blank line contains whitespace
+./core/tests.py:2279:1: W293 blank line contains whitespace
+./core/tests.py:2282:1: W293 blank line contains whitespace
+./core/tests.py:2290:1: W293 blank line contains whitespace
+./core/tests.py:2295:1: W293 blank line contains whitespace
+./core/tests.py:2297:1: W293 blank line contains whitespace
+./core/tests.py:2300:1: W293 blank line contains whitespace
+./core/tests.py:2306:1: W293 blank line contains whitespace
+./core/tests.py:2308:1: W293 blank line contains whitespace
+./core/tests.py:2311:1: W293 blank line contains whitespace
+./core/tests.py:2314:1: W293 blank line contains whitespace
+./core/tests.py:2318:1: W293 blank line contains whitespace
+./core/tests.py:2320:1: W293 blank line contains whitespace
+./core/tests.py:2323:1: W293 blank line contains whitespace
+./core/tests.py:2327:1: W293 blank line contains whitespace
+./core/tests.py:2331:1: W293 blank line contains whitespace
+./core/tests.py:2335:1: W293 blank line contains whitespace
+./core/tests.py:2342:1: W293 blank line contains whitespace
+./core/tests.py:2351:1: W293 blank line contains whitespace
+./core/tests.py:2355:1: W293 blank line contains whitespace
+./core/tests.py:2359:1: W293 blank line contains whitespace
+./core/tests.py:2366:1: W293 blank line contains whitespace
+./core/tests.py:2369:1: W293 blank line contains whitespace
+./core/tests.py:2376:1: W293 blank line contains whitespace
+./core/tests.py:2384:1: W293 blank line contains whitespace
+./core/tests.py:2387:9: F841 local variable 'user' is assigned to but never used
+./core/tests.py:2394:1: W293 blank line contains whitespace
+./core/tests.py:2398:1: W293 blank line contains whitespace
+./core/tests.py:2407:1: W293 blank line contains whitespace
+./core/tests.py:2411:1: W293 blank line contains whitespace
+./core/tests.py:2414:1: W293 blank line contains whitespace
+./core/tests.py:2420:1: W293 blank line contains whitespace
+./core/tests.py:2426:1: W293 blank line contains whitespace
+./core/tests.py:2430:1: W293 blank line contains whitespace
+./core/tests.py:2433:1: W293 blank line contains whitespace
+./core/tests.py:2436:1: W293 blank line contains whitespace
+./core/tests.py:2442:1: W293 blank line contains whitespace
+./core/tests.py:2448:1: W293 blank line contains whitespace
+./core/tests.py:2455:1: W293 blank line contains whitespace
+./core/tests.py:2463:1: W293 blank line contains whitespace
+./core/tests.py:2468:1: W293 blank line contains whitespace
+./core/tests.py:2472:1: W293 blank line contains whitespace
+./core/tests.py:2480:1: W293 blank line contains whitespace
+./core/tests.py:2485:1: W293 blank line contains whitespace
+./core/tests.py:2487:1: W293 blank line contains whitespace
+./core/tests.py:2491:1: W293 blank line contains whitespace
+./core/tests.py:2495:1: W293 blank line contains whitespace
+./core/tests.py:2505:1: W293 blank line contains whitespace
+./core/tests.py:2508:1: W293 blank line contains whitespace
+./core/tests.py:2511:1: W293 blank line contains whitespace
+./core/tests.py:2516:1: W293 blank line contains whitespace
+./core/tests.py:2527:1: W293 blank line contains whitespace
+./core/tests.py:2537:1: W293 blank line contains whitespace
+./core/tests.py:2540:1: W293 blank line contains whitespace
+./core/tests.py:2543:1: W293 blank line contains whitespace
+./core/tests.py:2547:1: W293 blank line contains whitespace
+./core/tests.py:2557:1: W293 blank line contains whitespace
+./core/tests.py:2560:1: W293 blank line contains whitespace
+./core/tests.py:2563:1: W293 blank line contains whitespace
+./core/tests.py:2565:1: W293 blank line contains whitespace
+./core/tests.py:2575:1: W293 blank line contains whitespace
+./core/tests.py:2578:1: W293 blank line contains whitespace
+./core/tests.py:2581:1: W293 blank line contains whitespace
+./core/tests.py:2583:1: W293 blank line contains whitespace
+./core/tests.py:2593:1: W293 blank line contains whitespace
+./core/tests.py:2596:1: W293 blank line contains whitespace
+./core/tests.py:2599:1: W293 blank line contains whitespace
+./core/tests.py:2601:1: W293 blank line contains whitespace
+./core/tests.py:2612:1: W293 blank line contains whitespace
+./core/tests.py:2621:1: W293 blank line contains whitespace
+./core/tests.py:2624:1: W293 blank line contains whitespace
+./core/tests.py:2627:1: W293 blank line contains whitespace
+./core/tests.py:2638:1: W293 blank line contains whitespace
+./core/tests.py:2647:1: W293 blank line contains whitespace
+./core/tests.py:2650:1: W293 blank line contains whitespace
+./core/tests.py:2653:1: W293 blank line contains whitespace
+./core/tests.py:2664:1: W293 blank line contains whitespace
+./core/tests.py:2673:1: W293 blank line contains whitespace
+./core/tests.py:2676:1: W293 blank line contains whitespace
+./core/tests.py:2682:1: E303 too many blank lines (3)
+./core/tests.py:2686:1: E302 expected 2 blank lines, found 3
+./core/tests.py:2758:1: W293 blank line contains whitespace
+./core/tests.py:2836:1: W293 blank line contains whitespace
+./core/tests.py:2844:1: W293 blank line contains whitespace
+./core/tests.py:2852:1: W293 blank line contains whitespace
+./core/tests.py:2860:1: W293 blank line contains whitespace
+./core/tests.py:2869:1: W293 blank line contains whitespace
+./core/tests.py:2876:1: W293 blank line contains whitespace
+./core/tests.py:2885:1: W293 blank line contains whitespace
+./core/tests.py:2892:1: W293 blank line contains whitespace
+./core/tests.py:2913:1: W293 blank line contains whitespace
+./core/tests.py:2915:1: W293 blank line contains whitespace
+./core/tests.py:2923:1: W293 blank line contains whitespace
+./core/tests.py:2925:1: W293 blank line contains whitespace
+./core/tests.py:2934:1: W293 blank line contains whitespace
+./core/tests.py:2943:1: W293 blank line contains whitespace
+./core/tests.py:2952:1: W293 blank line contains whitespace
+./core/tests.py:2962:1: W293 blank line contains whitespace
+./core/tests.py:2980:1: W293 blank line contains whitespace
+./core/tests.py:3033:1: W293 blank line contains whitespace
+./core/tests.py:3050:1: W293 blank line contains whitespace
+./core/tests.py:3058:1: W293 blank line contains whitespace
+./core/tests.py:3079:1: W293 blank line contains whitespace
+./core/tests.py:3086:1: W293 blank line contains whitespace
+./core/tests.py:3093:1: W293 blank line contains whitespace
+./core/tests.py:3101:1: W293 blank line contains whitespace
+./core/tests.py:3108:1: W293 blank line contains whitespace
+./core/tests.py:3116:1: W293 blank line contains whitespace
+./core/tests.py:3125:1: W293 blank line contains whitespace
+./core/tests.py:3728:1: E302 expected 2 blank lines, found 0
+./core/tests.py:3730:1: W293 blank line contains whitespace
+./core/tests.py:3741:1: W293 blank line contains whitespace
+./core/tests.py:3747:1: W293 blank line contains whitespace
+./core/tests.py:3753:1: W293 blank line contains whitespace
+./core/tests.py:3756:9: F841 local variable 'response' is assigned to but never used
+./core/tests.py:3759:1: W293 blank line contains whitespace
+./core/tests.py:3762:1: W293 blank line contains whitespace
+./core/tests.py:3767:1: W293 blank line contains whitespace
+./core/tests.py:3769:1: W293 blank line contains whitespace
+./core/tests.py:3772:1: W293 blank line contains whitespace
+./core/tests.py:3778:1: W293 blank line contains whitespace
+./core/tests.py:3781:1: W293 blank line contains whitespace
+./core/tests.py:3787:1: W293 blank line contains whitespace
+./core/tests.py:3790:1: W293 blank line contains whitespace
+./core/tests.py:3796:1: W293 blank line contains whitespace
+./core/tests.py:3799:1: W293 blank line contains whitespace
+./core/tests.py:3805:1: W293 blank line contains whitespace
+./core/tests.py:3808:1: W293 blank line contains whitespace
+./core/tests.py:3812:1: W293 blank line contains whitespace
+./core/tests.py:3817:1: W293 blank line contains whitespace
+./core/tests.py:3821:1: W293 blank line contains whitespace
+./core/tests.py:3827:1: W293 blank line contains whitespace
+./core/tests.py:3830:1: W293 blank line contains whitespace
+./core/tests.py:3834:1: W293 blank line contains whitespace
+./core/tests.py:3839:1: W293 blank line contains whitespace
+./core/tests.py:3843:1: W293 blank line contains whitespace
+./core/tests.py:3849:1: W293 blank line contains whitespace
+./core/tests.py:3852:1: W293 blank line contains whitespace
+./core/tests.py:3856:1: W293 blank line contains whitespace
+./core/tests.py:3861:1: W293 blank line contains whitespace
+./core/tests.py:3865:1: W293 blank line contains whitespace
+./core/tests.py:3871:1: W293 blank line contains whitespace
+./core/tests.py:3874:1: W293 blank line contains whitespace
+./core/tests.py:3880:1: W293 blank line contains whitespace
+./core/tests.py:3883:1: W293 blank line contains whitespace
+./core/tests.py:3889:1: W293 blank line contains whitespace
+./core/tests.py:3893:1: W293 blank line contains whitespace
+./core/tests.py:3900:1: W293 blank line contains whitespace
+./core/tests.py:3904:1: W293 blank line contains whitespace
+./core/tests.py:3912:1: W293 blank line contains whitespace
+./core/tests.py:3916:1: W293 blank line contains whitespace
+./core/tests.py:3919:1: W293 blank line contains whitespace
+./core/tests.py:3926:1: W293 blank line contains whitespace
+./core/tests.py:3931:1: W293 blank line contains whitespace
+./core/tests.py:3934:1: W293 blank line contains whitespace
+./core/tests.py:3941:1: W293 blank line contains whitespace
+./core/tests.py:3944:1: W293 blank line contains whitespace
+./core/tests.py:3951:1: W293 blank line contains whitespace
+./core/tests.py:3954:1: W293 blank line contains whitespace
+./core/tests.py:3960:1: W293 blank line contains whitespace
+./core/tests.py:3963:1: W293 blank line contains whitespace
+./core/tests.py:3970:1: W293 blank line contains whitespace
+./core/tests.py:3973:1: W293 blank line contains whitespace
+./core/tests.py:3990:1: W293 blank line contains whitespace
+./core/tests.py:3993:1: W293 blank line contains whitespace
+./core/tests.py:4000:1: W293 blank line contains whitespace
+./core/tests.py:4016:1: W293 blank line contains whitespace
+./core/tests.py:4022:1: W293 blank line contains whitespace
+./core/tests.py:4025:1: W293 blank line contains whitespace
+./core/tests.py:4031:1: W293 blank line contains whitespace
+./core/tests.py:4034:1: W293 blank line contains whitespace
+./core/tests.py:4040:1: W293 blank line contains whitespace
+./core/tests.py:4043:1: W293 blank line contains whitespace
+./core/tests.py:4049:1: W293 blank line contains whitespace
+./core/tests.py:4052:1: W293 blank line contains whitespace
+./core/tests.py:4058:1: W293 blank line contains whitespace
+./core/tests.py:4061:1: W293 blank line contains whitespace
+./core/tests.py:4068:1: W293 blank line contains whitespace
+./core/tests.py:4073:1: W293 blank line contains whitespace
+./core/tests.py:4077:1: W293 blank line contains whitespace
+./core/tests.py:4085:1: W293 blank line contains whitespace
+./core/tests.py:4092:1: W293 blank line contains whitespace
+./core/tests.py:4101:1: W293 blank line contains whitespace
+./core/tests.py:4108:1: W293 blank line contains whitespace
+./core/tests.py:4114:1: W293 blank line contains whitespace
+./core/tests.py:4115:1: E302 expected 2 blank lines, found 1
+./core/tests.py:4117:1: W293 blank line contains whitespace
+./core/tests.py:4127:1: W293 blank line contains whitespace
+./core/tests.py:4134:1: W293 blank line contains whitespace
+./core/tests.py:4139:1: W293 blank line contains whitespace
+./core/tests.py:4146:1: W293 blank line contains whitespace
+./core/tests.py:4150:1: W293 blank line contains whitespace
+./core/tests.py:4158:1: W293 blank line contains whitespace
+./core/tests.py:4163:1: W293 blank line contains whitespace
+./core/tests.py:4169:1: W293 blank line contains whitespace
+./core/tests.py:4174:1: W293 blank line contains whitespace
+./core/tests.py:4181:1: W293 blank line contains whitespace
+./core/tests.py:4185:1: W293 blank line contains whitespace
+./core/tests.py:4190:1: W293 blank line contains whitespace
+./core/tests.py:4202:1: W293 blank line contains whitespace
+./core/tests.py:4212:1: W293 blank line contains whitespace
+./core/tests.py:4218:1: W293 blank line contains whitespace
+./core/tests.py:4222:1: W293 blank line contains whitespace
+./core/tests.py:4227:1: W293 blank line contains whitespace
+./core/tests.py:4232:1: W293 blank line contains whitespace
+./core/tests.py:4235:1: W293 blank line contains whitespace
+./core/tests.py:4238:1: W293 blank line contains whitespace
+./core/tests.py:4245:1: W293 blank line contains whitespace
+./core/tests.py:4248:1: W293 blank line contains whitespace
+./core/tests.py:4255:1: W293 blank line contains whitespace
+./core/tests.py:4258:1: W293 blank line contains whitespace
+./core/tests.py:4262:1: W293 blank line contains whitespace
+./core/tests.py:4266:1: W293 blank line contains whitespace
+./core/tests.py:4269:1: W293 blank line contains whitespace
+./core/tests.py:4275:1: W293 blank line contains whitespace
+./core/tests.py:4278:9: F841 local variable 'response' is assigned to but never used
+./core/tests.py:4283:1: W293 blank line contains whitespace
+./core/tests.py:4287:1: W293 blank line contains whitespace
+./core/tests.py:4290:9: F841 local variable 'response' is assigned to but never used
+./core/tests.py:4291:1: W293 blank line contains whitespace
+./core/tests.py:4299:1: W293 blank line contains whitespace
+./core/tests.py:4302:1: W293 blank line contains whitespace
+./core/tests.py:4312:1: W293 blank line contains whitespace
+./core/tests.py:4315:1: W293 blank line contains whitespace
+./core/tests.py:4318:9: F401 'core.models.UserProfile' imported but unused
+./core/tests.py:4318:9: F401 'core.models.EmailVerification' imported but unused
+./core/tests.py:4319:1: W293 blank line contains whitespace
+./core/tests.py:4327:1: W293 blank line contains whitespace
+./core/tests.py:4330:1: W293 blank line contains whitespace
+./core/tests.py:4333:1: W293 blank line contains whitespace
+./core/tests.py:4338:1: W293 blank line contains whitespace
+./core/tests.py:4345:1: W293 blank line contains whitespace
+./core/tests.py:4348:1: W293 blank line contains whitespace
+./core/tests.py:4352:1: W293 blank line contains whitespace
+./core/tests.py:4359:1: W293 blank line contains whitespace
+./core/tests.py:4361:9: F841 local variable 'profile' is assigned to but never used
+./core/tests.py:4366:1: W293 blank line contains whitespace
+./core/tests.py:4368:1: W293 blank line contains whitespace
+./core/tests.py:4373:1: W293 blank line contains whitespace
+./core/tests.py:4377:1: W293 blank line contains whitespace
+./core/tests.py:4384:1: W293 blank line contains whitespace
+./core/tests.py:4386:9: F841 local variable 'profile' is assigned to but never used
+./core/tests.py:4391:1: W293 blank line contains whitespace
+./core/tests.py:4393:1: W293 blank line contains whitespace
+./core/tests.py:4397:1: W293 blank line contains whitespace
+./core/tests.py:4401:1: W293 blank line contains whitespace
+./core/tests.py:4408:1: W293 blank line contains whitespace
+./core/tests.py:4410:9: F841 local variable 'profile' is assigned to but never used
+./core/tests.py:4415:1: W293 blank line contains whitespace
+./core/tests.py:4417:1: W293 blank line contains whitespace
+./core/tests.py:4421:1: W293 blank line contains whitespace
+./core/tests.py:4425:1: W293 blank line contains whitespace
+./core/tests.py:4432:1: W293 blank line contains whitespace
+./core/tests.py:4434:9: F841 local variable 'profile' is assigned to but never used
+./core/tests.py:4439:1: W293 blank line contains whitespace
+./core/tests.py:4441:1: W293 blank line contains whitespace
+./core/tests.py:4449:1: W293 blank line contains whitespace
+./core/tests.py:4452:1: W293 blank line contains whitespace
+./core/tests.py:4455:9: F401 'core.models.UserProfile' imported but unused
+./core/tests.py:4455:9: F401 'core.models.EmailVerification' imported but unused
+./core/tests.py:4456:1: W293 blank line contains whitespace
+./core/tests.py:4464:1: W293 blank line contains whitespace
+./core/tests.py:4467:1: W293 blank line contains whitespace
+./core/tests.py:4472:1: W293 blank line contains whitespace
+./core/tests.py:4475:1: W293 blank line contains whitespace
+./core/tests.py:4480:1: W293 blank line contains whitespace
+./core/tests.py:4483:1: W293 blank line contains whitespace
+./core/tests.py:4487:1: W293 blank line contains whitespace
+./core/tests.py:4496:1: W293 blank line contains whitespace
+./core/tests.py:4498:1: W293 blank line contains whitespace
+./core/tests.py:4500:9: F841 local variable 'response' is assigned to but never used
+./core/tests.py:4510:1: W293 blank line contains whitespace
+./core/tests.py:4521:1: E302 expected 2 blank lines, found 1
+./core/tests.py:4523:1: W293 blank line contains whitespace
+./core/tests.py:4536:1: W293 blank line contains whitespace
+./core/tests.py:4546:1: W293 blank line contains whitespace
+./core/tests.py:4562:1: W293 blank line contains whitespace
+./core/tests.py:4568:1: W293 blank line contains whitespace
+./core/tests.py:4576:1: W293 blank line contains whitespace
+./core/tests.py:4579:121: E501 line too long (132 > 120 characters)
+./core/tests.py:4586:1: W293 blank line contains whitespace
+./core/tests.py:4590:1: W293 blank line contains whitespace
+./core/tests.py:4604:1: W293 blank line contains whitespace
+./core/tests.py:4608:1: W293 blank line contains whitespace
+./core/tests.py:4621:1: W293 blank line contains whitespace
+./core/tests.py:4625:1: W293 blank line contains whitespace
+./core/tests.py:4637:1: W293 blank line contains whitespace
+./core/tests.py:4642:1: W293 blank line contains whitespace
+./core/tests.py:4646:1: W293 blank line contains whitespace
+./core/tests.py:4659:1: W293 blank line contains whitespace
+./core/tests.py:4663:1: W293 blank line contains whitespace
+./core/tests.py:4666:1: W293 blank line contains whitespace
+./core/tests.py:4668:9: F841 local variable 'entry1' is assigned to but never used
+./core/tests.py:4678:1: W293 blank line contains whitespace
+./core/tests.py:4680:9: F841 local variable 'entry2' is assigned to but never used
+./core/tests.py:4690:1: W293 blank line contains whitespace
+./core/tests.py:4699:1: W293 blank line contains whitespace
+./core/tests.py:4702:121: E501 line too long (126 > 120 characters)
+./core/tests.py:4704:1: W293 blank line contains whitespace
+./core/tests.py:4709:1: W293 blank line contains whitespace
+./core/tests.py:4717:1: W293 blank line contains whitespace
+./core/tests.py:4723:1: W293 blank line contains whitespace
+./core/tests.py:4727:1: W293 blank line contains whitespace
+./core/tests.py:4738:1: W293 blank line contains whitespace
+./core/tests.py:4743:1: W293 blank line contains whitespace
+./core/tests.py:4748:1: W293 blank line contains whitespace
+./core/tests.py:4756:1: W293 blank line contains whitespace
+./core/tests.py:4769:1: E303 too many blank lines (3)
+./core/tests.py:4771:1: E302 expected 2 blank lines, found 3
+./core/tests.py:4773:1: W293 blank line contains whitespace
+./core/tests.py:4791:1: W293 blank line contains whitespace
+./core/tests.py:4795:1: W293 blank line contains whitespace
+./core/tests.py:4801:1: W293 blank line contains whitespace
+./core/tests.py:4805:1: W293 blank line contains whitespace
+./core/tests.py:4810:1: W293 blank line contains whitespace
+./core/tests.py:4816:1: W293 blank line contains whitespace
+./core/tests.py:4823:1: W293 blank line contains whitespace
+./core/tests.py:4827:1: W293 blank line contains whitespace
+./core/tests.py:4831:1: W293 blank line contains whitespace
+./core/tests.py:4834:1: W293 blank line contains whitespace
+./core/tests.py:4840:1: W293 blank line contains whitespace
+./core/tests.py:4868:1: W293 blank line contains whitespace
+./core/tests.py:4872:1: W293 blank line contains whitespace
+./core/tests.py:4880:1: W293 blank line contains whitespace
+./core/tests.py:4886:1: W293 blank line contains whitespace
+./core/tests.py:4891:1: W293 blank line contains whitespace
+./core/tests.py:4895:1: W293 blank line contains whitespace
+./core/tests.py:4898:1: W293 blank line contains whitespace
+./core/tests.py:4902:1: W293 blank line contains whitespace
+./core/tests.py:4908:1: W293 blank line contains whitespace
+./core/tests.py:4914:1: W293 blank line contains whitespace
+./core/tests.py:4920:1: W293 blank line contains whitespace
+./core/tests.py:4922:1: W293 blank line contains whitespace
+./core/tests.py:4925:1: W293 blank line contains whitespace
+./core/tests.py:4929:1: W293 blank line contains whitespace
+./core/tests.py:4935:1: W293 blank line contains whitespace
+./core/tests.py:4941:1: W293 blank line contains whitespace
+./core/tests.py:4943:1: W293 blank line contains whitespace
+./core/tests.py:4951:1: W293 blank line contains whitespace
+./core/tests.py:4955:1: W293 blank line contains whitespace
+./core/tests.py:4959:1: W293 blank line contains whitespace
+./core/tests.py:4965:1: W293 blank line contains whitespace
+./core/tests.py:4973:1: W293 blank line contains whitespace
+./core/tests.py:4992:1: W293 blank line contains whitespace
+./core/tests.py:4997:1: W293 blank line contains whitespace
+./core/tests.py:4999:1: W293 blank line contains whitespace
+./core/tests.py:5003:1: W293 blank line contains whitespace
+./core/tests.py:5008:1: W293 blank line contains whitespace
+./core/tests.py:5011:1: W293 blank line contains whitespace
+./core/tests.py:5017:1: W293 blank line contains whitespace
+./core/tests.py:5021:1: W293 blank line contains whitespace
+./core/tests.py:5023:1: W293 blank line contains whitespace
+./core/tests.py:5025:1: W293 blank line contains whitespace
+./core/tests.py:5029:1: W293 blank line contains whitespace
+./core/tests.py:5033:1: W293 blank line contains whitespace
+./core/tests.py:5037:1: W293 blank line contains whitespace
+./core/tests.py:5041:1: W293 blank line contains whitespace
+./core/tests.py:5044:9: F841 local variable 'other_user' is assigned to but never used
+./core/tests.py:5045:1: W293 blank line contains whitespace
+./core/tests.py:5048:1: W293 blank line contains whitespace
+./core/tests.py:5050:1: W293 blank line contains whitespace
+./core/tests.py:5056:1: W293 blank line contains whitespace
+./core/tests.py:5087:1: W293 blank line contains whitespace
+./core/tests.py:5093:1: W293 blank line contains whitespace
+./core/tests.py:5099:1: W293 blank line contains whitespace
+./core/tests.py:5104:1: W293 blank line contains whitespace
+./core/tests.py:5110:1: W293 blank line contains whitespace
+./core/tests.py:5116:1: W293 blank line contains whitespace
+./core/tests.py:5122:1: W293 blank line contains whitespace
+./core/tests.py:5124:1: W293 blank line contains whitespace
+./core/tests.py:5129:1: W293 blank line contains whitespace
+./core/tests.py:5145:1: W293 blank line contains whitespace
+./core/tests.py:5149:1: W293 blank line contains whitespace
+./core/tests.py:5155:1: W293 blank line contains whitespace
+./core/tests.py:5157:1: W293 blank line contains whitespace
+./core/tests.py:5161:1: W293 blank line contains whitespace
+./core/tests.py:5166:1: W293 blank line contains whitespace
+./core/tests.py:5170:1: W293 blank line contains whitespace
+./core/tests.py:5176:1: W293 blank line contains whitespace
+./core/tests.py:5184:1: W293 blank line contains whitespace
+./core/tests.py:5204:1: W293 blank line contains whitespace
+./core/tests.py:5208:1: W293 blank line contains whitespace
+./core/tests.py:5211:1: W293 blank line contains whitespace
+./core/tests.py:5215:1: W293 blank line contains whitespace
+./core/tests.py:5219:1: W293 blank line contains whitespace
+./core/tests.py:5222:1: W293 blank line contains whitespace
+./core/tests.py:5225:1: W293 blank line contains whitespace
+./core/tests.py:5234:1: W293 blank line contains whitespace
+./core/tests.py:5263:1: W293 blank line contains whitespace
+./core/tests.py:5267:1: W293 blank line contains whitespace
+./core/tests.py:5276:1: W293 blank line contains whitespace
+./core/tests.py:5284:1: W293 blank line contains whitespace
+./core/tests.py:5293:1: W293 blank line contains whitespace
+./core/tests.py:5301:1: W293 blank line contains whitespace
+./core/tests.py:5307:1: W293 blank line contains whitespace
+./core/tests.py:5310:9: F401 '.models.SetProgress' imported but unused
+./core/tests.py:5311:1: W293 blank line contains whitespace
+./core/tests.py:5317:1: W293 blank line contains whitespace
+./core/tests.py:5323:1: W293 blank line contains whitespace
+./core/tests.py:5331:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:17:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:25:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:32:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:39:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:53:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:56:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:67:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:75:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:79:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:89:1: W293 blank line contains whitespace
+./core/tests_supplement_modal.py:97:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:10:1: F401 'datetime.datetime' imported but unused
+./core/tests_workout_module.py:46:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:54:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:62:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:105:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:120:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:123:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:173:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:188:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:236:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:241:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:254:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:269:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:284:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:300:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:334:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:339:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:347:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:355:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:369:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:381:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:397:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:405:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:418:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:465:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:486:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:491:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:511:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:546:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:551:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:565:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:580:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:616:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:636:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:640:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:650:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:704:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:714:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:724:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:729:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:732:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:752:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:761:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:770:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:774:1: W293 blank line contains whitespace
+./core/tests_workout_module.py:777:1: W293 blank line contains whitespace
+./core/urls.py:26:121: E501 line too long (121 > 120 characters)
+./core/urls.py:61:121: E501 line too long (125 > 120 characters)
+./core/urls.py:62:121: E501 line too long (128 > 120 characters)
+./core/views.py:12:1: F401 'smtplib' imported but unused
+./core/views.py:15:1: F811 redefinition of unused 'render' from line 7
+./core/views.py:27:121: E501 line too long (134 > 120 characters)
+./core/views.py:70:5: F841 local variable 'system_prompt' is assigned to but never used
+./core/views.py:91:1: E305 expected 2 blank lines after class or function definition, found 1
+./core/views.py:91:1: E402 module level import not at top of file
+./core/views.py:92:1: E402 module level import not at top of file
+./core/views.py:96:1: E302 expected 2 blank lines, found 1
+./core/views.py:117:121: E501 line too long (145 > 120 characters)
+./core/views.py:119:121: E501 line too long (169 > 120 characters)
+./core/views.py:121:121: E501 line too long (225 > 120 characters)
+./core/views.py:123:121: E501 line too long (198 > 120 characters)
+./core/views.py:145:13: F841 local variable 'e' is assigned to but never used
+./core/views.py:165:1: W293 blank line contains whitespace
+./core/views.py:169:1: W293 blank line contains whitespace
+./core/views.py:177:1: W293 blank line contains whitespace
+./core/views.py:185:1: W293 blank line contains whitespace
+./core/views.py:193:1: W293 blank line contains whitespace
+./core/views.py:201:1: W293 blank line contains whitespace
+./core/views.py:206:1: W293 blank line contains whitespace
+./core/views.py:211:1: W293 blank line contains whitespace
+./core/views.py:216:1: W293 blank line contains whitespace
+./core/views.py:221:1: W293 blank line contains whitespace
+./core/views.py:225:1: W293 blank line contains whitespace
+./core/views.py:232:1: W293 blank line contains whitespace
+./core/views.py:236:1: W293 blank line contains whitespace
+./core/views.py:239:1: W293 blank line contains whitespace
+./core/views.py:247:1: W293 blank line contains whitespace
+./core/views.py:251:1: W293 blank line contains whitespace
+./core/views.py:254:1: W293 blank line contains whitespace
+./core/views.py:315:1: W293 blank line contains whitespace
+./core/views.py:318:1: W293 blank line contains whitespace
+./core/views.py:324:1: W293 blank line contains whitespace
+./core/views.py:327:121: E501 line too long (141 > 120 characters)
+./core/views.py:329:121: E501 line too long (132 > 120 characters)
+./core/views.py:331:121: E501 line too long (219 > 120 characters)
+./core/views.py:333:121: E501 line too long (201 > 120 characters)
+./core/views.py:336:1: W293 blank line contains whitespace
+./core/views.py:347:1: W293 blank line contains whitespace
+./core/views.py:353:1: W293 blank line contains whitespace
+./core/views.py:391:1: W293 blank line contains whitespace
+./core/views.py:394:1: W293 blank line contains whitespace
+./core/views.py:413:1: W293 blank line contains whitespace
+./core/views.py:419:5: E722 do not use bare 'except'
+./core/views.py:421:1: W293 blank line contains whitespace
+./core/views.py:425:1: W293 blank line contains whitespace
+./core/views.py:432:1: W293 blank line contains whitespace
+./core/views.py:435:1: W293 blank line contains whitespace
+./core/views.py:437:1: W293 blank line contains whitespace
+./core/views.py:634:1: W293 blank line contains whitespace
+./core/views.py:642:1: W293 blank line contains whitespace
+./core/views.py:669:1: W293 blank line contains whitespace
+./core/views.py:673:1: W293 blank line contains whitespace
+./core/views.py:679:1: W293 blank line contains whitespace
+./core/views.py:689:1: W293 blank line contains whitespace
+./core/views.py:694:1: W293 blank line contains whitespace
+./core/views.py:708:1: W293 blank line contains whitespace
+./core/views.py:712:1: W293 blank line contains whitespace
+./core/views.py:714:1: W293 blank line contains whitespace
+./core/views.py:720:1: W293 blank line contains whitespace
+./core/views.py:725:1: W293 blank line contains whitespace
+./core/views.py:732:1: W293 blank line contains whitespace
+./core/views.py:756:1: W293 blank line contains whitespace
+./core/views.py:765:1: W293 blank line contains whitespace
+./core/views.py:769:1: W293 blank line contains whitespace
+./core/views.py:778:1: W293 blank line contains whitespace
+./core/views.py:782:1: W293 blank line contains whitespace
+./core/views.py:791:1: W293 blank line contains whitespace
+./core/views.py:795:1: W293 blank line contains whitespace
+./core/views.py:810:1: W293 blank line contains whitespace
+./core/views.py:814:1: W293 blank line contains whitespace
+./core/views.py:816:1: W293 blank line contains whitespace
+./core/views.py:823:1: W293 blank line contains whitespace
+./core/views.py:847:1: W293 blank line contains whitespace
+./core/views.py:856:1: W293 blank line contains whitespace
+./core/views.py:860:1: W293 blank line contains whitespace
+./core/views.py:869:1: W293 blank line contains whitespace
+./core/views.py:873:1: W293 blank line contains whitespace
+./core/views.py:888:1: W293 blank line contains whitespace
+./core/views.py:896:1: W293 blank line contains whitespace
+./core/views.py:909:1: W293 blank line contains whitespace
+./core/views.py:923:1: W293 blank line contains whitespace
+./core/views.py:936:1: W293 blank line contains whitespace
+./core/views.py:950:1: W293 blank line contains whitespace
+./core/views.py:957:1: W293 blank line contains whitespace
+./core/views.py:960:1: W293 blank line contains whitespace
+./core/views.py:968:1: W293 blank line contains whitespace
+./core/views.py:980:1: W293 blank line contains whitespace
+./core/views.py:1005:1: W293 blank line contains whitespace
+./core/views.py:1016:1: W293 blank line contains whitespace
+./core/views.py:1041:1: W293 blank line contains whitespace
+./core/views.py:1053:1: W293 blank line contains whitespace
+./core/views.py:1060:1: W293 blank line contains whitespace
+./core/views.py:1079:1: W293 blank line contains whitespace
+./core/views.py:1084:1: W293 blank line contains whitespace
+./core/views.py:1086:1: W293 blank line contains whitespace
+./core/views.py:1092:1: W293 blank line contains whitespace
+./core/views.py:1099:1: W293 blank line contains whitespace
+./core/views.py:1102:1: W293 blank line contains whitespace
+./core/views.py:1107:1: W293 blank line contains whitespace
+./core/views.py:1114:1: W293 blank line contains whitespace
+./core/views.py:1125:1: W293 blank line contains whitespace
+./core/views.py:1148:1: W293 blank line contains whitespace
+./core/views.py:1150:1: W293 blank line contains whitespace
+./core/views.py:1153:1: W293 blank line contains whitespace
+./core/views.py:1158:1: W293 blank line contains whitespace
+./core/views.py:1161:1: W293 blank line contains whitespace
+./core/views.py:1178:1: W293 blank line contains whitespace
+./core/views.py:1184:1: W293 blank line contains whitespace
+./core/views.py:1187:1: W293 blank line contains whitespace
+./core/views.py:1203:1: W293 blank line contains whitespace
+./core/views.py:1206:1: W293 blank line contains whitespace
+./core/views.py:1209:1: W293 blank line contains whitespace
+./core/views.py:1214:1: W293 blank line contains whitespace
+./core/views.py:1219:1: W293 blank line contains whitespace
+./core/views.py:1222:1: W293 blank line contains whitespace
+./core/views.py:1239:1: W293 blank line contains whitespace
+./core/views.py:1241:1: W293 blank line contains whitespace
+./core/views.py:1244:1: W293 blank line contains whitespace
+./core/views.py:1253:1: W293 blank line contains whitespace
+./core/views.py:1272:1: W293 blank line contains whitespace
+./core/views.py:1276:1: W293 blank line contains whitespace
+./core/views.py:1279:1: W293 blank line contains whitespace
+./core/views.py:1281:9: F401 'django.db.models.Q' imported but unused
+./core/views.py:1282:1: W293 blank line contains whitespace
+./core/views.py:1288:1: W293 blank line contains whitespace
+./core/views.py:1291:1: W293 blank line contains whitespace
+./core/views.py:1294:32: W291 trailing whitespace
+./core/views.py:1297:1: W293 blank line contains whitespace
+./core/views.py:1300:1: W293 blank line contains whitespace
+./core/views.py:1309:1: W293 blank line contains whitespace
+./core/views.py:1319:1: W293 blank line contains whitespace
+./core/views.py:1334:1: W293 blank line contains whitespace
+./core/views.py:1337:1: W293 blank line contains whitespace
+./core/views.py:1340:1: W293 blank line contains whitespace
+./core/views.py:1346:1: W293 blank line contains whitespace
+./core/views.py:1349:1: W293 blank line contains whitespace
+./core/views.py:1354:1: W293 blank line contains whitespace
+./core/views.py:1364:1: W293 blank line contains whitespace
+./features/steps/authentication_steps.py:3:1: F401 'uuid' imported but unused
+./features/steps/authentication_steps.py:42:1: E302 expected 2 blank lines, found 1
+./features/steps/email_verification_steps.py:6:1: F401 'behave.then' imported but unused
+./fitness_ai_app/settings.py:34:1: E302 expected 2 blank lines, found 1
+./test_nutrition_full.py:12:1: E302 expected 2 blank lines, found 1
+./test_nutrition_full.py:16:1: W293 blank line contains whitespace
+./test_nutrition_full.py:18:1: W293 blank line contains whitespace
+./test_nutrition_full.py:27:1: W293 blank line contains whitespace
+./test_nutrition_full.py:36:1: W293 blank line contains whitespace
+./test_nutrition_full.py:46:1: W293 blank line contains whitespace
+./test_nutrition_full.py:53:23: F541 f-string is missing placeholders
+./test_nutrition_full.py:54:1: W293 blank line contains whitespace
+./test_nutrition_full.py:58:1: W293 blank line contains whitespace
+./test_nutrition_full.py:64:1: W293 blank line contains whitespace
+./test_nutrition_full.py:68:121: E501 line too long (122 > 120 characters)
+./test_nutrition_full.py:71:23: F541 f-string is missing placeholders
+./test_nutrition_full.py:72:1: W293 blank line contains whitespace
+./test_nutrition_full.py:83:1: W293 blank line contains whitespace
+./test_nutrition_full.py:85:1: W293 blank line contains whitespace
+./test_nutrition_full.py:89:1: W293 blank line contains whitespace
+./test_nutrition_full.py:94:1: W293 blank line contains whitespace
+./test_nutrition_full.py:102:1: W293 blank line contains whitespace
+./test_nutrition_full.py:107:1: W293 blank line contains whitespace
+./test_nutrition_full.py:112:1: W293 blank line contains whitespace
+./test_nutrition_full.py:121:1: W293 blank line contains whitespace
+./test_nutrition_full.py:129:1: W293 blank line contains whitespace
+./test_nutrition_full.py:132:1: W293 blank line contains whitespace
+./test_nutrition_full.py:145:1: W293 blank line contains whitespace
