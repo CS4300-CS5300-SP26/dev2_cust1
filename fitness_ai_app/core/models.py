@@ -93,14 +93,33 @@ class Meal(models.Model):
     def __str__(self):
         return f"{self.name} - {self.user.email} - {self.date}"
 
+    def ungrouped_items(self):
+        return self.items.filter(group=None)
+
+
+class FoodGroup(models.Model):
+    meal = models.ForeignKey(Meal, on_delete=models.CASCADE, related_name='food_groups')
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.meal.name})"
+
 
 class FoodItem(models.Model):
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE, related_name='items')
+    group = models.ForeignKey(FoodGroup, on_delete=models.CASCADE, null=True, blank=True, related_name='grouped_items')
     name = models.CharField(max_length=200)
     calories = models.PositiveIntegerField()
     protein = models.PositiveIntegerField(default=0)
     carbs = models.PositiveIntegerField(default=0)
     fats = models.PositiveIntegerField(default=0)
+    # Legacy columns retained to match existing dev DB schema (NOT NULL).
+    serving_size = models.DecimalField(max_digits=8, decimal_places=2, default=1)
+    serving_unit = models.CharField(max_length=20, default='serving')
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -132,8 +151,8 @@ class Workout(models.Model):
     goal = models.CharField(max_length=20, choices=GOAL_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
     date = models.DateField()
-    total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Total workout duration in seconds")
-    current_session_seconds = models.PositiveIntegerField(default=0, help_text="Current session timer in seconds")
+    total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text='Total workout duration in seconds')
+    current_session_seconds = models.PositiveIntegerField(default=0, help_text='Current session timer in seconds')
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -745,6 +745,77 @@ class AddFoodItemViewTests(TestCase):
         self.assertEqual(r.status_code, 405)
 
 
+class AddFoodItemAjaxTests(TestCase):
+    """Tests for the add_food_item_ajax JSON endpoint used by the Create-a-Meal modal."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='afajax@spotter.ai', email='afajax@spotter.ai', password='testpass123'
+        )
+        self.client.login(username='afajax@spotter.ai', password='testpass123')
+        self.meal = Meal.objects.create(user=self.user, name='Snack', date=date.today())
+
+    def test_add_food_item_ajax_success(self):
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': self.meal.id,
+            'food_name': 'Apple',
+            'food_calories': '95',
+            'protein': '0',
+            'carbs': '25',
+            'fats': '0',
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data['name'], 'Apple')
+        self.assertEqual(data['calories'], 95)
+        self.assertEqual(data['carbs'], 25)
+        self.assertTrue(FoodItem.objects.filter(id=data['item_id'], meal=self.meal).exists())
+
+    def test_add_food_item_ajax_missing_fields(self):
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': '', 'food_name': '', 'food_calories': '',
+        })
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(FoodItem.objects.exists())
+
+    def test_add_food_item_ajax_invalid_calories(self):
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': self.meal.id, 'food_name': 'X', 'food_calories': 'abc',
+        })
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(FoodItem.objects.exists())
+
+    def test_add_food_item_ajax_wrong_user_meal(self):
+        other = User.objects.create_user(username='other_ajax@spotter.ai', password='pass12345')
+        other_meal = Meal.objects.create(user=other, name='Other', date=date.today())
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': other_meal.id, 'food_name': 'X', 'food_calories': '10',
+        })
+        self.assertEqual(r.status_code, 404)
+
+    def test_add_food_item_ajax_requires_login(self):
+        self.client.logout()
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': self.meal.id, 'food_name': 'X', 'food_calories': '10',
+        })
+        self.assertEqual(r.status_code, 302)
+
+    def test_add_food_item_ajax_get_not_allowed(self):
+        r = self.client.get('/nutrition/add_food_item_ajax/')
+        self.assertEqual(r.status_code, 405)
+
+    def test_add_food_item_ajax_non_numeric_macros_default_to_zero(self):
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': self.meal.id, 'food_name': 'Blob', 'food_calories': '10',
+            'protein': 'x', 'carbs': 'y', 'fats': 'z',
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data['protein'], 0)
+        self.assertEqual(data['carbs'], 0)
+        self.assertEqual(data['fats'], 0)
+
+
 class ToggleFoodItemViewTests(TestCase):
     """Tests for the toggle_food_item view"""
 
@@ -5762,3 +5833,54 @@ class ActiveWorkoutIntegrationTests(TestCase):
         self.exercise1.refresh_from_db()
         # After API call, it will be marked completed (API doesn't check sets)
         self.assertTrue(self.exercise1.completed)
+
+
+class EditFoodItemFatsTest(TestCase):
+    """Regression test: editing a food item must preserve the fats field."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='fatsuser', password='pass')
+        self.client.login(username='fatsuser', password='pass')
+        from .models import Meal, FoodItem
+        import datetime
+        self.meal = Meal.objects.create(user=self.user, name='Test Meal', date=datetime.date.today())
+        self.item = FoodItem.objects.create(
+            meal=self.meal,
+            name='Butter',
+            calories=100,
+            protein=0,
+            carbs=0,
+            fats=11,
+        )
+
+    def test_edit_preserves_fats(self):
+        from .models import FoodItem
+        response = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': self.item.id,
+            'food_name': 'Butter',
+            'food_calories': '100',
+            'protein': '0',
+            'carbs': '0',
+            'fats': '11',
+            'date': str(self.meal.date),
+        })
+        self.assertIn(response.status_code, [200, 302])
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.fats, 11)
+
+    def test_edit_updates_fats_to_new_value(self):
+        from .models import FoodItem
+        self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': self.item.id,
+            'food_name': 'Butter',
+            'food_calories': '90',
+            'protein': '1',
+            'carbs': '2',
+            'fats': '8',
+            'date': str(self.meal.date),
+        })
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.fats, 8)
+        self.assertEqual(self.item.calories, 90)
