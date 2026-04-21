@@ -17,23 +17,27 @@ APP_DIR="/var/www/fitness-ai-app"
 VENV="$APP_DIR/venv/bin/activate"
 DJANGO_DIR="$APP_DIR/fitness_ai_app"
 
-echo "==> [1/5] Pulling latest code from main..."
+echo "==> [1/6] Pulling latest code from main..."
 cd "$APP_DIR"
 git pull origin main
 
-echo "==> [2/5] Installing Python dependencies..."
+echo "==> [2/6] Installing Python dependencies..."
 # shellcheck source=/dev/null
 source "$VENV"
 pip install --quiet -r "$DJANGO_DIR/requirements.txt"
 
-echo "==> [3/5] Collecting static files..."
+echo "==> [3/6] Collecting static files..."
 cd "$DJANGO_DIR"
 python manage.py collectstatic --noinput --clear
 
-echo "==> [4/5] Running database migrations..."
+echo "==> [4/6] Running database migrations..."
 python manage.py migrate --noinput
+python manage.py populate_exercise_db --noinput
 
-echo "==> [5/5] Gracefully reloading gunicorn workers..."
+echo "==> [5/6] Setting up social app logins..."
+python manage.py setup_social_apps
+
+echo "==> [6/6] Gracefully reloading gunicorn workers..."
 # reload (SIGHUP) lets in-flight requests finish before workers are replaced.
 # If gunicorn is not running at all, fall back to a clean start.
 if systemctl is-active --quiet gunicorn; then
