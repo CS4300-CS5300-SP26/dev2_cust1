@@ -3140,6 +3140,37 @@ class SetupSocialAppsCommandTests(TestCase):
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-insta-id')
 
+    @patch.dict('os.environ', {
+        'SITE_DOMAIN': 'https://spotter-ai.dev,https://spotter-ai-vob9r.ondigitalocean.app',
+        'ALLOWED_HOSTS': 'localhost,127.0.0.1'
+    }, clear=True)
+    def test_command_uses_first_site_domain_candidate(self):
+        """Test that comma-separated SITE_DOMAIN values use first valid domain."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from io import StringIO
+
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+
+        site = Site.objects.get(id=1)
+        self.assertEqual(site.domain, 'spotter-ai.dev')
+
+    @patch.dict('os.environ', {
+        'ALLOWED_HOSTS': 'localhost,127.0.0.1,.ondigitalocean.app,spotter-ai.dev'
+    }, clear=True)
+    def test_command_derives_site_domain_from_allowed_hosts(self):
+        """Test that wildcard/local hosts are ignored when deriving site domain."""
+        from django.core.management import call_command
+        from django.contrib.sites.models import Site
+        from io import StringIO
+
+        out = StringIO()
+        call_command('setup_social_apps', stdout=out)
+
+        site = Site.objects.get(id=1)
+        self.assertEqual(site.domain, 'spotter-ai.dev')
+
 
 
 # ============================================================================

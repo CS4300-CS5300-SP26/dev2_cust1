@@ -2,6 +2,36 @@ from django.core.management.base import BaseCommand
 from django.contrib.sites.models import Site
 from allauth.socialaccount.models import SocialApp
 import os
+from urllib.parse import urlparse
+
+
+def _is_local_host(value: str) -> bool:
+    return value in {'localhost', '127.0.0.1', 'testserver'}
+
+
+def _normalize_domain(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ''
+
+    # Accept either a bare domain or a full URL.
+    parsed = urlparse(candidate if '://' in candidate else f'//{candidate}')
+    host = parsed.netloc or parsed.path
+    host = host.split(':', 1)[0].strip().lower()
+    return host
+
+
+def _pick_site_domain(csv_values: str) -> tuple[str | None, int]:
+    domains: list[str] = []
+    for raw_value in csv_values.split(','):
+        domain = _normalize_domain(raw_value)
+        if not domain or _is_local_host(domain) or domain.startswith('.'):
+            continue
+        domains.append(domain)
+
+    if not domains:
+        return None, 0
+    return domains[0], len(domains)
 
 
 class Command(BaseCommand):
@@ -13,17 +43,19 @@ class Command(BaseCommand):
         # Get or create the default site
         site = Site.objects.get_or_create(id=1)[0]
         
-        # Update site domain from SITE_DOMAIN env var or derive from ALLOWED_HOSTS
-        site_domain = os.getenv('SITE_DOMAIN')
+        # Update site domain from SITE_DOMAIN env var or derive from ALLOWED_HOSTS.
+        site_domain_env = os.getenv('SITE_DOMAIN', '')
+        site_domain, candidate_count = _pick_site_domain(site_domain_env)
         if not site_domain:
-            allowed_hosts = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-            site_domain = next((h.strip() for h in allowed_hosts if h.strip() and h.strip() not in ('localhost', '127.0.0.1', 'testserver')), None)
-        
+            site_domain, candidate_count = _pick_site_domain(os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1'))
+
         if site_domain:
             site.domain = site_domain
             site.name = site_domain
             site.save()
             self.stdout.write(self.style.SUCCESS(f'✓ Site domain updated to {site_domain}'))
+            if candidate_count > 1:
+                self.stdout.write(self.style.WARNING('⚠ Multiple domain candidates found; using the first non-local domain.'))
 
         # Google OAuth
         google_client_id = os.getenv('GOOGLE_CLIENT_ID', '')
