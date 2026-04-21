@@ -2348,6 +2348,299 @@ class HomeDashViewTests(TestCase):
         response = self.client.get('/home_dash/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['active_tab'], 'home')
+        self.assertContains(response, 'Exercises')
+        self.assertContains(response, 'Calories')
+        self.assertContains(response, 'Score Streak')
+
+    def test_home_dash_includes_daily_workout_goal_progress(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Workout',
+            goal='strength',
+            date=date.today() - timedelta(days=1),
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Push Up',
+            muscle_group='chest',
+            completed=True,
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Squat',
+            muscle_group='legs',
+            completed=False,
+        )
+        Exercise.objects.create(
+            workout=yesterday_workout,
+            name='Pull Up',
+            muscle_group='back',
+            completed=True,
+        )
+
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['workout_goal'], 5)
+        self.assertEqual(response.context['completed_exercises'], 1)
+        self.assertEqual(response.context['workout_goal_percentage'], 20.0)
+        self.assertContains(response, 'Goal: 1/5')
+
+    def test_home_dash_updates_after_toggling_exercise_completion(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        workout = Workout.objects.create(
+            user=self.user,
+            name='Daily Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        exercise = Exercise.objects.create(
+            workout=workout,
+            name='Lunge',
+            muscle_group='legs',
+            completed=False,
+        )
+
+        self.client.post('/train/toggle_exercise/', {
+            'exercise_id': exercise.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completed_exercises'], 1)
+        self.assertContains(response, 'Goal: 1/5')
+
+    def test_home_dash_streak_counts_consecutive_days_meeting_both_goals(self):
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.calorie_goal = 500
+        profile.save()
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        for offset in [0, 1]:
+            streak_day = date.today() - timedelta(days=offset)
+            meal = Meal.objects.create(
+                user=self.user,
+                name=f'Streak Meal {offset}',
+                date=streak_day,
+            )
+            FoodItem.objects.create(
+                meal=meal,
+                name=f'Streak Calories {offset}',
+                calories=500,
+                completed=True,
+            )
+            workout = Workout.objects.create(
+                user=self.user,
+                name=f'Streak Workout {offset}',
+                goal='strength',
+                date=streak_day,
+            )
+            for exercise_index in range(5):
+                Exercise.objects.create(
+                    workout=workout,
+                    name=f'Streak Exercise {offset}-{exercise_index}',
+                    muscle_group='arms',
+                    completed=True,
+                )
+
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completion_streak'], 2)
+        self.assertContains(response, '2 Day Streak')
+
+    def test_home_dash_streak_resets_to_zero_when_today_misses_a_goal(self):
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.calorie_goal = 500
+        profile.save()
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        yesterday = date.today() - timedelta(days=1)
+        yesterday_meal = Meal.objects.create(
+            user=self.user,
+            name='Yesterday Complete Meal',
+            date=yesterday,
+        )
+        FoodItem.objects.create(
+            meal=yesterday_meal,
+            name='Yesterday Calories',
+            calories=500,
+            completed=True,
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Complete Workout',
+            goal='strength',
+            date=yesterday,
+        )
+        for exercise_index in range(5):
+            Exercise.objects.create(
+                workout=yesterday_workout,
+                name=f'Yesterday Exercise {exercise_index}',
+                muscle_group='legs',
+                completed=True,
+            )
+
+        today_meal = Meal.objects.create(
+            user=self.user,
+            name='Today Incomplete Meal',
+            date=date.today(),
+        )
+        FoodItem.objects.create(
+            meal=today_meal,
+            name='Today Calories',
+            calories=500,
+            completed=True,
+        )
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Incomplete Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        for exercise_index in range(4):
+            Exercise.objects.create(
+                workout=today_workout,
+                name=f'Today Exercise {exercise_index}',
+                muscle_group='legs',
+                completed=True,
+            )
+
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completion_streak'], 0)
+        self.assertContains(response, '0 Day Streak')
+
+    def test_home_dash_streak_is_one_when_today_complete_after_gap(self):
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.calorie_goal = 500
+        profile.save()
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        two_days_ago = date.today() - timedelta(days=2)
+        two_days_ago_meal = Meal.objects.create(
+            user=self.user,
+            name='Two Days Ago Complete Meal',
+            date=two_days_ago,
+        )
+        FoodItem.objects.create(
+            meal=two_days_ago_meal,
+            name='Two Days Ago Calories',
+            calories=500,
+            completed=True,
+        )
+        two_days_ago_workout = Workout.objects.create(
+            user=self.user,
+            name='Two Days Ago Complete Workout',
+            goal='strength',
+            date=two_days_ago,
+        )
+        for exercise_index in range(5):
+            Exercise.objects.create(
+                workout=two_days_ago_workout,
+                name=f'Two Days Ago Exercise {exercise_index}',
+                muscle_group='core',
+                completed=True,
+            )
+
+        yesterday = date.today() - timedelta(days=1)
+        yesterday_meal = Meal.objects.create(
+            user=self.user,
+            name='Yesterday Incomplete Meal',
+            date=yesterday,
+        )
+        FoodItem.objects.create(
+            meal=yesterday_meal,
+            name='Yesterday Calories',
+            calories=500,
+            completed=True,
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Incomplete Workout',
+            goal='strength',
+            date=yesterday,
+        )
+        for exercise_index in range(4):
+            Exercise.objects.create(
+                workout=yesterday_workout,
+                name=f'Yesterday Exercise Gap {exercise_index}',
+                muscle_group='legs',
+                completed=True,
+            )
+
+        today_meal = Meal.objects.create(
+            user=self.user,
+            name='Today Complete Meal',
+            date=date.today(),
+        )
+        FoodItem.objects.create(
+            meal=today_meal,
+            name='Today Complete Calories',
+            calories=500,
+            completed=True,
+        )
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Complete Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        for exercise_index in range(5):
+            Exercise.objects.create(
+                workout=today_workout,
+                name=f'Today Complete Exercise {exercise_index}',
+                muscle_group='arms',
+                completed=True,
+            )
+
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completion_streak'], 1)
+        self.assertContains(response, '1 Day Streak')
+
+    def test_home_dash_streak_ignores_other_users_data(self):
+        from core.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.calorie_goal = 500
+        profile.save()
+
+        other_user = User.objects.create_user(
+            username='otherdash@example.com',
+            email='otherdash@example.com',
+            password='TestPass123!',
+        )
+        other_profile, _ = UserProfile.objects.get_or_create(user=other_user)
+        other_profile.calorie_goal = 500
+        other_profile.save()
+
+        for offset in [0, 1]:
+            day = date.today() - timedelta(days=offset)
+            meal = Meal.objects.create(user=other_user, name=f'Other Meal {offset}', date=day)
+            FoodItem.objects.create(meal=meal, name=f'Other Calories {offset}', calories=500, completed=True)
+            workout = Workout.objects.create(user=other_user, name=f'Other Workout {offset}', goal='strength', date=day)
+            for exercise_index in range(5):
+                Exercise.objects.create(
+                    workout=workout,
+                    name=f'Other Exercise {offset}-{exercise_index}',
+                    muscle_group='back',
+                    completed=True,
+                )
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        response = self.client.get('/home_dash/')
+        self.assertEqual(response.context['completion_streak'], 0)
+        self.assertEqual(response.context['completed_exercises'], 0)
+        self.assertContains(response, '0 Day Streak')
 
 
 class TrainPageViewTests(TestCase):

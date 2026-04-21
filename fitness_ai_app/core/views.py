@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
@@ -485,9 +485,6 @@ def user_logout(request):
 
 @login_required
 def home_dash(request):
-    from datetime import date
-    from django.db.models import Sum
-    
     # Redirect to onboarding if social login user hasn't completed it
     try:
         profile = request.user.profile
@@ -511,12 +508,54 @@ def home_dash(request):
     calorie_goal = get_user_calorie_goal(request.user)
     
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
+    workout_goal = 5
+    completed_exercises = Exercise.objects.filter(
+        workout__user=request.user,
+        workout__date=today,
+        completed=True,
+    ).count()
+    workout_goal_percentage = (completed_exercises / workout_goal) * 100 if workout_goal > 0 else 0
+    completed_calories_by_date = dict(
+        FoodItem.objects.filter(
+            meal__user=request.user,
+            meal__date__lte=today,
+            completed=True,
+        )
+        .values('meal__date')
+        .annotate(total_calories=Sum('calories'))
+        .values_list('meal__date', 'total_calories')
+    )
+    completed_exercises_by_date = dict(
+        Exercise.objects.filter(
+            workout__user=request.user,
+            workout__date__lte=today,
+            completed=True,
+        )
+        .values('workout__date')
+        .annotate(total_exercises=Count('id'))
+        .values_list('workout__date', 'total_exercises')
+    )
+
+    completion_streak = 0
+    streak_date = today
+    while True:
+        calories_for_day = completed_calories_by_date.get(streak_date, 0) or 0
+        exercises_for_day = completed_exercises_by_date.get(streak_date, 0) or 0
+        if calories_for_day >= calorie_goal and exercises_for_day >= workout_goal:
+            completion_streak += 1
+            streak_date -= timedelta(days=1)
+            continue
+        break
     
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
         'calorie_goal': calorie_goal,
-        'calories_percentage': calories_percentage
+        'calories_percentage': calories_percentage,
+        'workout_goal': workout_goal,
+        'completed_exercises': completed_exercises,
+        'workout_goal_percentage': workout_goal_percentage,
+        'completion_streak': completion_streak,
     })
 
 
