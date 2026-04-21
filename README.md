@@ -56,6 +56,14 @@ This command registers your OAuth applications with Django's socialaccount frame
 NOTE: Make sure you rerun the server manually when switching between False and True, and vice versa. Also
    make sure your .env file already exists. If not then run the setup_and_run.sh in the fitness_ai_app directory.
 
+### Email delivery in production (Droplet)
+
+DigitalOcean Droplets can block outbound SMTP on ports 25/465/587. If password reset or verification emails hang/fail in production:
+
+1. Use environment-based email transport settings (`EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`).
+2. Prefer an email provider API over HTTPS, or SMTP on an alternate port like `2525` if supported by your provider.
+3. Ensure `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, and `EMAIL_VERIFICATION_ENABLED=True` are set in production.
+
 ## Run tests
 
 1. Activate the virtual environment:

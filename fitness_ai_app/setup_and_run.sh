@@ -17,6 +17,10 @@ if [ ! -f ./.env ]; then
   echo "   - GOOGLE_CLIENT_SECRET"
   echo "   - (and any other provider secrets)"
   echo ""
+  echo "📧 For email delivery in production, also set:"
+  echo "   - EMAIL_BACKEND / EMAIL_HOST / EMAIL_PORT / EMAIL_USE_TLS / EMAIL_USE_SSL"
+  echo "   - EMAIL_HOST_USER / EMAIL_HOST_PASSWORD / DEFAULT_FROM_EMAIL"
+  echo ""
   echo "Then run this script again to register them."
   echo "################################################################################"
   exit 0
