@@ -5405,3 +5405,54 @@ class ActiveWorkoutIntegrationTests(TestCase):
         self.exercise1.refresh_from_db()
         # After API call, it will be marked completed (API doesn't check sets)
         self.assertTrue(self.exercise1.completed)
+
+
+class EditFoodItemFatsTest(TestCase):
+    """Regression test: editing a food item must preserve the fats field."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='fatsuser', password='pass')
+        self.client.login(username='fatsuser', password='pass')
+        from .models import Meal, FoodItem
+        import datetime
+        self.meal = Meal.objects.create(user=self.user, name='Test Meal', date=datetime.date.today())
+        self.item = FoodItem.objects.create(
+            meal=self.meal,
+            name='Butter',
+            calories=100,
+            protein=0,
+            carbs=0,
+            fats=11,
+        )
+
+    def test_edit_preserves_fats(self):
+        from .models import FoodItem
+        response = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': self.item.id,
+            'food_name': 'Butter',
+            'food_calories': '100',
+            'protein': '0',
+            'carbs': '0',
+            'fats': '11',
+            'date': str(self.meal.date),
+        })
+        self.assertIn(response.status_code, [200, 302])
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.fats, 11)
+
+    def test_edit_updates_fats_to_new_value(self):
+        from .models import FoodItem
+        self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': self.item.id,
+            'food_name': 'Butter',
+            'food_calories': '90',
+            'protein': '1',
+            'carbs': '2',
+            'fats': '8',
+            'date': str(self.meal.date),
+        })
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.fats, 8)
+        self.assertEqual(self.item.calories, 90)
