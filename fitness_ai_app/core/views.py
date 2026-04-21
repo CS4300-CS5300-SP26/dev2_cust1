@@ -24,7 +24,23 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, FoodGroup, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
+from .models import (
+    Meal,
+    FoodItem,
+    FoodGroup,
+    Workout,
+    Exercise,
+    PasswordReset,
+    UserProfile,
+    SupplementDatabase,
+    SupplementEntry,
+    MealSupplement,
+    ExerciseType,
+    MuscleGroup,
+    Muscle,
+    Equipment,
+    TrainingExercise,
+)
 
 
 def get_user_calorie_goal(user, default=2400):
@@ -36,6 +52,67 @@ def get_user_calorie_goal(user, default=2400):
         return profile.calorie_goal or default
     except UserProfile.DoesNotExist:
         return default
+
+
+def get_default_workout_goal(user):
+    """Map onboarding primary goal to train-page workout goal defaults."""
+    try:
+        user_primary_goal = user.profile.primary_goal
+    except UserProfile.DoesNotExist:
+        return ''
+
+    valid_workout_goals = {choice_value for choice_value, _ in Workout.GOAL_CHOICES}
+    return user_primary_goal if user_primary_goal in valid_workout_goals else ''
+
+
+def _parse_optional_positive_int(raw_value, field_label):
+    """Parse optional positive integer form fields with user-friendly errors."""
+    if raw_value in (None, ''):
+        return None, None
+
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        return None, f'{field_label} must be a whole number.'
+
+    if parsed < 0:
+        return None, f'{field_label} cannot be negative.'
+
+    return parsed, None
+
+
+def _infer_muscle_group_from_training_exercise(training_exercise):
+    """Map a TrainingExercise to legacy Exercise muscle groups."""
+    keyword_map = {
+        'arms': ('bicep', 'tricep', 'forearm'),
+        'chest': ('chest', 'pec'),
+        'back': ('back', 'lat'),
+        'shoulders': ('shoulder', 'deltoid'),
+        'legs': ('quad', 'hamstring', 'glute', 'calf', 'hip', 'adductor'),
+        'core': ('abs', 'oblique', 'core', 'abdominis'),
+    }
+
+    muscle_names = [
+        muscle.name.lower()
+        for muscle in training_exercise.primary_muscles.all()
+    ] + [
+        muscle.name.lower()
+        for muscle in training_exercise.secondary_muscles.all()
+    ]
+
+    for group_key, keywords in keyword_map.items():
+        if any(keyword in muscle_name for keyword in keywords for muscle_name in muscle_names):
+            return group_key
+
+    muscle_group_names = [group.name.lower() for group in training_exercise.muscle_groups.all()]
+    if any('core' in name for name in muscle_group_names):
+        return 'core'
+    if any(('lower' in name) or ('leg' in name) for name in muscle_group_names):
+        return 'legs'
+    if any('upper' in name for name in muscle_group_names):
+        return 'chest'
+
+    return 'core'
 
 
 def splash(request):
@@ -454,10 +531,34 @@ def train_page(request):
     else:
         selected_date = date.today()
 
+    selected_tab = request.GET.get('tab', 'today')
+    if selected_tab not in {'today', 'history', 'search'}:
+        selected_tab = 'today'
+
     workouts = (
         Workout.objects.filter(user=request.user, date=selected_date)
         .prefetch_related('exercises')
     )
+    history_workouts = (
+        Workout.objects.filter(user=request.user, date__lt=selected_date)
+        .prefetch_related('exercises')
+        .order_by('-date', '-created_at')[:20]
+    )
+
+    exercise_types = list(ExerciseType.objects.all().values('id', 'name'))
+    muscle_groups = list(MuscleGroup.objects.all().values('id', 'name'))
+    muscles = list(
+        Muscle.objects.select_related('muscle_group').all().values(
+            'id',
+            'name',
+            'muscle_group_id',
+            'muscle_group__name',
+        )
+    )
+    equipment_options = list(Equipment.objects.all().values('id', 'name'))
+    exercise_database_count = TrainingExercise.objects.filter(is_active=True).count()
+    default_workout_goal = get_default_workout_goal(request.user)
+    workout_goal_choices = Workout.GOAL_CHOICES
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -470,7 +571,16 @@ def train_page(request):
         'prev_date': prev_date,
         'next_date': next_date,
         'workouts': workouts,
+        'history_workouts': history_workouts,
         'is_past_date': is_past_date,
+        'selected_tab': selected_tab,
+        'exercise_types': exercise_types,
+        'muscle_groups': muscle_groups,
+        'muscles': muscles,
+        'equipment_options': equipment_options,
+        'exercise_database_count': exercise_database_count,
+        'default_workout_goal': default_workout_goal,
+        'workout_goal_choices': workout_goal_choices,
     }
     return render(request, 'train_dir/train_page.html', context)
 
@@ -515,28 +625,64 @@ def add_exercise(request):
     workout_id = request.POST.get('workout_id')
     exercise_name = request.POST.get('exercise_name', '').strip()
     muscle_group = request.POST.get('muscle_group', '').strip()
+    training_exercise_id = request.POST.get('training_exercise_id', '').strip()
     sets = request.POST.get('sets', '').strip()
     reps = request.POST.get('reps', '').strip()
     weight = request.POST.get('weight', '').strip()
     status = request.POST.get('status', 'planned').strip()
     date_param = request.POST.get('date')
+    tab_param = request.POST.get('tab', '').strip()
+
+    base_redirect_url = f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page')
+    if tab_param:
+        connector = '&' if '?' in base_redirect_url else '?'
+        base_redirect_url = f"{base_redirect_url}{connector}tab={tab_param}"
+
+    training_exercise = None
+    if training_exercise_id:
+        training_exercise = (
+            TrainingExercise.objects.filter(id=training_exercise_id, is_active=True)
+            .prefetch_related('muscle_groups', 'primary_muscles', 'secondary_muscles')
+            .first()
+        )
+        if not training_exercise:
+            messages.error(request, 'Selected exercise was not found in the exercise database.')
+            return redirect(base_redirect_url)
+
+    if training_exercise:
+        if not exercise_name:
+            exercise_name = training_exercise.name
+        if not muscle_group:
+            muscle_group = _infer_muscle_group_from_training_exercise(training_exercise)
+        if not sets and training_exercise.default_sets:
+            sets = str(training_exercise.default_sets)
+        if not reps and training_exercise.default_reps:
+            reps = str(training_exercise.default_reps)
 
     if not workout_id or not exercise_name or not muscle_group:
         messages.error(request, 'Exercise name and muscle group are required.')
-        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+        return redirect(base_redirect_url)
 
     workout = get_object_or_404(Workout, id=workout_id, user=request.user)
+    sets_value, sets_error = _parse_optional_positive_int(sets, 'Sets')
+    reps_value, reps_error = _parse_optional_positive_int(reps, 'Reps')
+    weight_value, weight_error = _parse_optional_positive_int(weight, 'Weight')
+
+    validation_error = sets_error or reps_error or weight_error
+    if validation_error:
+        messages.error(request, validation_error)
+        return redirect(base_redirect_url)
 
     Exercise.objects.create(
         workout=workout,
         name=exercise_name,
         muscle_group=muscle_group,
-        sets=int(sets) if sets else None,
-        reps=int(reps) if reps else None,
-        weight=int(weight) if weight else None,
+        sets=sets_value,
+        reps=reps_value,
+        weight=weight_value,
         completed=(status == 'completed'),
     )
-    return redirect(f"{reverse('train_page')}?date={date_param}")
+    return redirect(base_redirect_url)
 
 
 @login_required
@@ -556,11 +702,20 @@ def edit_exercise(request):
         return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
     exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    sets_value, sets_error = _parse_optional_positive_int(sets, 'Sets')
+    reps_value, reps_error = _parse_optional_positive_int(reps, 'Reps')
+    weight_value, weight_error = _parse_optional_positive_int(weight, 'Weight')
+
+    validation_error = sets_error or reps_error or weight_error
+    if validation_error:
+        messages.error(request, validation_error)
+        return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
+
     exercise.name = exercise_name
     exercise.muscle_group = muscle_group
-    exercise.sets = int(sets) if sets else None
-    exercise.reps = int(reps) if reps else None
-    exercise.weight = int(weight) if weight else None
+    exercise.sets = sets_value
+    exercise.reps = reps_value
+    exercise.weight = weight_value
     exercise.completed = (status == 'completed')
     exercise.save()
 
