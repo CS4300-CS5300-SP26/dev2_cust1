@@ -1719,7 +1719,7 @@
         saveSessionState();  // Save current state to sessionStorage before closing
         document.getElementById('activeWorkoutModule').style.display = 'none';
         document.querySelector('.workouts-list').style.display = 'flex';
-        document.querySelector('.log-workout-btn').style.display = 'block';
+        document.querySelector('.log-workout-btn').style.display = 'flex';
     });
 
     function completeFullyFinishedExercises() {
@@ -1931,7 +1931,7 @@
         activeExercisesData = {}; // Clear tracking data
         document.getElementById('activeWorkoutModule').style.display = 'none';
         document.querySelector('.workouts-list').style.display = 'flex';
-        document.querySelector('.log-workout-btn').style.display = 'block';
+        document.querySelector('.log-workout-btn').style.display = 'flex';
         activeWorkoutId = null;
         clearSessionState();  // Clear session state when workout finishes
     });
