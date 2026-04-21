@@ -24,7 +24,7 @@ from django.db.models import Q, Sum
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
-from .models import Meal, FoodItem, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
+from .models import Meal, FoodItem, FoodGroup, Workout, Exercise, PasswordReset, UserProfile, SupplementDatabase, SupplementEntry, MealSupplement
 
 
 def get_user_calorie_goal(user, default=2400):
@@ -753,8 +753,63 @@ def add_food_item(request):
             fats=fats
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def add_food_item_ajax(request):
+    """JSON endpoint: add a food item to a meal without redirecting, for the
+    continuous-add flow in the Create Meal modal."""
+    meal_id = request.POST.get('meal_id')
+    food_name = request.POST.get('food_name', '').strip()
+    food_calories = request.POST.get('food_calories', '0')
+
+    if not meal_id or not food_name or not food_calories:
+        return JsonResponse({'error': 'All fields are required.'}, status=400)
+
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+
+    try:
+        calories = int(food_calories)
+    except ValueError:
+        return JsonResponse({'error': 'Calories must be a number.'}, status=400)
+
+    try:
+        protein = int(request.POST.get('protein') or 0)
+        carbs = int(request.POST.get('carbs') or 0)
+        fats = int(request.POST.get('fats') or 0)
+    except ValueError:
+        protein = carbs = fats = 0
+
+    group_id = request.POST.get('group_id')
+    group = None
+    if group_id:
+        group = get_object_or_404(FoodGroup, id=group_id, meal__user=request.user)
+
+    item = FoodItem.objects.create(
+        meal=meal, name=food_name, calories=calories,
+        protein=protein, carbs=carbs, fats=fats, group=group,
+    )
+    return JsonResponse({
+        'item_id': item.id,
+        'name': item.name,
+        'calories': item.calories,
+        'protein': item.protein,
+        'carbs': item.carbs,
+        'fats': item.fats,
+    })
+
+
+@login_required
+@require_POST
+def create_food_group_ajax(request):
+    meal_id = request.POST.get('meal_id')
+    name = (request.POST.get('name') or '').strip() or 'My Group'
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    group = FoodGroup.objects.create(meal=meal, name=name)
+    return JsonResponse({'group_id': group.id, 'name': group.name})
 
 
 @login_required
@@ -780,6 +835,17 @@ def delete_food_item(request):
     food_item.delete()
     messages.success(request, 'Food item deleted.')
     
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
+def delete_food_group(request):
+    group_id = request.POST.get('group_id')
+    date_param = request.POST.get('date')
+    group = get_object_or_404(FoodGroup, id=group_id, meal__user=request.user)
+    group.delete()
+    messages.success(request, 'Group deleted.')
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 

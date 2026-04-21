@@ -918,6 +918,23 @@ svg {
     flex-direction: column;
 }
 
+.meal-macro-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.meal-action-row {
+    display: flex;
+    gap: 8px;
+}
+
+@media (max-width: 480px) {
+    .meal-action-row {
+        flex-direction: column;
+    }
+}
+
 /* Utility Classes */
 .flex-center {
     display: flex;
