@@ -313,6 +313,12 @@
       color: #fff;
     }
 
+    .history-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .new-chat-btn {
       border: 1px solid rgba(246, 125, 38, 0.4);
       background: rgba(246, 125, 38, 0.16);
@@ -327,6 +333,27 @@
 
     .new-chat-btn:hover {
       background: rgba(246, 125, 38, 0.26);
+    }
+
+    .history-close-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.16s ease;
+    }
+
+    .history-close-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
     }
 
     .history-list {
@@ -418,7 +445,10 @@
 <aside class="history-panel" id="historyPanel" aria-label="Chat history panel">
     <div class="history-header">
         <h3>Chat History</h3>
-        <button type="button" class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+        <div class="history-header-actions">
+            <button type="button" class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+            <button type="button" class="history-close-btn" id="historyCloseBtn" aria-label="Close chat history">X</button>
+        </div>
     </div>
     <div class="history-list" id="historyList"></div>
 </aside>
@@ -453,6 +483,8 @@
 {% block extra_js %}
 <script>
     const STORAGE_KEY_ACTIVE_CONVERSATION = 'spotter_ai_active_conversation_id';
+    const STORAGE_KEY_LAST_ACTIVITY = 'spotter_ai_last_activity_ms';
+    const CHAT_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
     const chatWindow = document.getElementById('chatWindow');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -461,11 +493,14 @@
     const historyPanel = document.getElementById('historyPanel');
     const historyList = document.getElementById('historyList');
     const newChatBtn = document.getElementById('newChatBtn');
+    const historyCloseBtn = document.getElementById('historyCloseBtn');
     const chatHeader = document.getElementById('chatHeader');
+    const chatWrapper = document.querySelector('.chat-wrapper');
 
     let history = [];
     let conversations = [];
     let currentConversationId = null;
+    let inactivityTimerId = null;
 
     function normalizeNumber(value) {
         const parsed = Number(value);
@@ -501,9 +536,60 @@
         chatHeader.textContent = getConversationTitleFromHistory() || getConversationTitleFromMessages();
     }
 
+    function getLastActivityTimestamp() {
+        const storedValue = Number(localStorage.getItem(STORAGE_KEY_LAST_ACTIVITY));
+        return Number.isFinite(storedValue) && storedValue > 0 ? storedValue : null;
+    }
+
+    function setLastActivityTimestamp(timestamp = Date.now()) {
+        localStorage.setItem(STORAGE_KEY_LAST_ACTIVITY, String(timestamp));
+    }
+
+    function isChatSessionExpired() {
+        const lastActivity = getLastActivityTimestamp();
+        if (!lastActivity) return false;
+        return (Date.now() - lastActivity) >= CHAT_INACTIVITY_TIMEOUT_MS;
+    }
+
+    function clearInactivityTimer() {
+        if (!inactivityTimerId) return;
+        clearTimeout(inactivityTimerId);
+        inactivityTimerId = null;
+    }
+
+    function handleChatInactivityTimeout() {
+        if (!history.length && !currentConversationId) {
+            setLastActivityTimestamp();
+            scheduleInactivityTimeout();
+            return;
+        }
+        startNewChat();
+        addBubble('assistant', 'Started a new chat after 30 minutes of inactivity.');
+        setLastActivityTimestamp();
+        scheduleInactivityTimeout();
+    }
+
+    function scheduleInactivityTimeout() {
+        clearInactivityTimer();
+        const lastActivity = getLastActivityTimestamp() || Date.now();
+        const elapsed = Date.now() - lastActivity;
+        const remaining = CHAT_INACTIVITY_TIMEOUT_MS - elapsed;
+        if (remaining <= 0) {
+            handleChatInactivityTimeout();
+            return;
+        }
+        inactivityTimerId = setTimeout(handleChatInactivityTimeout, remaining);
+    }
+
+    function registerUserActivity() {
+        setLastActivityTimestamp();
+        scheduleInactivityTimeout();
+    }
+
     function openHistoryPanel() {
         historyPanel.classList.add('open');
         historyBackdrop.classList.add('open');
+        registerUserActivity();
     }
 
     function closeHistoryPanel() {
@@ -563,6 +649,7 @@
             button.addEventListener('click', async () => {
                 await loadConversation(conversation.id);
                 closeHistoryPanel();
+                registerUserActivity();
             });
             historyList.appendChild(button);
         });
@@ -599,6 +686,7 @@
                 .map((message) => ({ role: message.role, content: message.content || '' }));
             setCurrentConversationId(normalizedId);
             renderCurrentConversation();
+            registerUserActivity();
             return true;
         } catch (error) {
             return false;
@@ -611,11 +699,13 @@
         renderCurrentConversation();
         closeHistoryPanel();
         userInput.focus();
+        registerUserActivity();
     }
 
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text) return;
+        registerUserActivity();
 
         history.push({ role: 'user', content: text });
         addBubble('user', text);
@@ -660,10 +750,12 @@
 
         sendBtn.disabled = false;
         userInput.focus();
+        registerUserActivity();
     }
 
     historyToggleBtn.addEventListener('click', openHistoryPanel);
     historyBackdrop.addEventListener('click', closeHistoryPanel);
+    historyCloseBtn.addEventListener('click', closeHistoryPanel);
     newChatBtn.addEventListener('click', startNewChat);
     sendBtn.addEventListener('click', sendMessage);
 
@@ -675,16 +767,40 @@
     });
 
     userInput.addEventListener('input', () => {
+        registerUserActivity();
         userInput.style.height = 'auto';
         userInput.style.height = userInput.scrollHeight + 'px';
+    });
+
+    ['pointerdown', 'touchstart', 'keydown', 'scroll'].forEach((eventName) => {
+        chatWrapper.addEventListener(eventName, registerUserActivity, { passive: true });
     });
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeHistoryPanel();
     });
 
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            if (isChatSessionExpired()) {
+                handleChatInactivityTimeout();
+                return;
+            }
+            scheduleInactivityTimeout();
+        } else {
+            clearInactivityTimer();
+        }
+    });
+
     (async () => {
         await refreshConversationList();
+        if (isChatSessionExpired()) {
+            startNewChat();
+            addBubble('assistant', 'Started a new chat after 30 minutes of inactivity.');
+            setLastActivityTimestamp();
+            scheduleInactivityTimeout();
+            return;
+        }
         const savedConversationId = normalizeNumber(localStorage.getItem(STORAGE_KEY_ACTIVE_CONVERSATION));
         if (savedConversationId) {
             const loaded = await loadConversation(savedConversationId);
@@ -694,6 +810,8 @@
         } else {
             startNewChat();
         }
+        setLastActivityTimestamp();
+        scheduleInactivityTimeout();
     })();
 </script>
 {% endblock %}
