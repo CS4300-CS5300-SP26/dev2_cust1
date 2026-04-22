@@ -41,6 +41,8 @@ from .models import (
     Equipment,
     TrainingExercise,
     UserInjury,
+    AIChatConversation,
+    AIChatMessage,
 )
 
 
@@ -127,13 +129,14 @@ def chat_page(request):
     return render(request, 'core/chat.html', {'active_tab': 'ai'})
 
 
-def _normalize_chat_messages(messages):
+def _normalize_chat_messages(messages, max_messages=30):
     """Keep only supported chat message roles/content for model calls."""
     if not isinstance(messages, list):
         return []
 
+    source_messages = messages[-max_messages:] if max_messages is not None else messages
     normalized_messages = []
-    for message in messages[-30:]:
+    for message in source_messages:
         if not isinstance(message, dict):
             continue
 
@@ -151,6 +154,57 @@ def _normalize_chat_messages(messages):
         normalized_messages.append({'role': role, 'content': clean_content})
 
     return normalized_messages
+
+
+def _build_chat_conversation_title(normalized_messages):
+    user_message = next(
+        (message['content'] for message in normalized_messages if message['role'] == 'user'),
+        '',
+    )
+    clean_title = ' '.join(user_message.split()) if user_message else ''
+    if not clean_title:
+        return 'New Chat'
+    if len(clean_title) <= 80:
+        return clean_title
+    return f'{clean_title[:80].rstrip()}...'
+
+
+def _get_user_chat_conversation(user, conversation_id, normalized_messages):
+    if not user or not user.is_authenticated:
+        return None
+
+    if conversation_id is None:
+        return AIChatConversation.objects.create(
+            user=user,
+            title=_build_chat_conversation_title(normalized_messages),
+        )
+
+    try:
+        conversation_id = int(conversation_id)
+    except (TypeError, ValueError):
+        return False
+
+    return AIChatConversation.objects.filter(id=conversation_id, user=user).first()
+
+
+def _save_chat_conversation_state(conversation, normalized_messages, reply):
+    if not conversation:
+        return
+
+    all_messages = [*normalized_messages, {'role': 'assistant', 'content': reply}]
+    conversation.messages.all().delete()
+    AIChatMessage.objects.bulk_create(
+        [
+            AIChatMessage(
+                conversation=conversation,
+                role=message['role'],
+                content=message['content'],
+            )
+            for message in all_messages
+        ]
+    )
+    conversation.title = _build_chat_conversation_title(all_messages)
+    conversation.save()
 
 
 def _build_ai_user_context(user):
@@ -281,12 +335,24 @@ def api_chat(request):
     try:
         body = json.loads(request.body)
         incoming_messages = body.get('messages', [])
+        conversation_id = body.get('conversation_id')
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid JSON body."}, status=400)
 
-    messages = _normalize_chat_messages(incoming_messages)
-    if not messages:
+    messages_for_model = _normalize_chat_messages(incoming_messages, max_messages=30)
+    if not messages_for_model:
         return JsonResponse({"error": "messages list is required."}, status=400)
+    messages_for_storage = _normalize_chat_messages(incoming_messages, max_messages=None)
+
+    conversation = _get_user_chat_conversation(
+        request.user,
+        conversation_id,
+        messages_for_storage,
+    )
+    if conversation is False:
+        return JsonResponse({"error": "conversation_id must be an integer."}, status=400)
+    if conversation_id is not None and request.user.is_authenticated and conversation is None:
+        return JsonResponse({"error": "Conversation not found."}, status=404)
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -294,7 +360,7 @@ def api_chat(request):
 
     model_name = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5-mini')
     client = OpenAI(api_key=api_key)
-    ai_messages = [_build_ai_system_prompt(request.user), *messages]
+    ai_messages = [_build_ai_system_prompt(request.user), *messages_for_model]
 
     try:
         response = client.chat.completions.create(
@@ -302,9 +368,62 @@ def api_chat(request):
             messages=ai_messages,
         )
         reply = response.choices[0].message.content
-        return JsonResponse({"reply": reply})
+        _save_chat_conversation_state(conversation, messages_for_storage, reply)
+        return JsonResponse({
+            "reply": reply,
+            "conversation_id": conversation.id if conversation else None,
+        })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_chat_history(request):
+    conversations = (
+        AIChatConversation.objects.filter(user=request.user)
+        .annotate(message_count=Count('messages'))
+        .order_by('-updated_at')
+    )
+    payload = [
+        {
+            'id': conversation.id,
+            'title': conversation.title,
+            'message_count': conversation.message_count,
+            'updated_at': conversation.updated_at.isoformat(),
+            'created_at': conversation.created_at.isoformat(),
+        }
+        for conversation in conversations
+    ]
+    return JsonResponse({'conversations': payload})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_chat_history_detail(request, conversation_id):
+    conversation = get_object_or_404(
+        AIChatConversation,
+        id=conversation_id,
+        user=request.user,
+    )
+    payload = {
+        'conversation': {
+            'id': conversation.id,
+            'title': conversation.title,
+            'updated_at': conversation.updated_at.isoformat(),
+            'created_at': conversation.created_at.isoformat(),
+        },
+        'messages': [
+            {
+                'id': message.id,
+                'role': message.role,
+                'content': message.content,
+                'created_at': message.created_at.isoformat(),
+            }
+            for message in conversation.messages.all()
+        ],
+    }
+    return JsonResponse(payload)
 
 from django.core.mail import send_mail
 from .models import EmailVerification

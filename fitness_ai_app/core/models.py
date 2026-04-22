@@ -410,3 +410,44 @@ class MealSupplement(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.meal.name}"
+
+
+class AIChatConversation(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_chat_conversations')
+    title = models.CharField(max_length=120, default='New Chat')
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['user', 'updated_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.title}"
+
+
+class AIChatMessage(models.Model):
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+    ]
+
+    conversation = models.ForeignKey(
+        AIChatConversation,
+        on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['conversation', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.conversation_id} - {self.role}"

@@ -1003,6 +1003,148 @@ class ApiChatViewTests(TestCase):
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_successful_chat_persists_conversation_for_authenticated_user(self, mock_openai_cls):
+        from core.models import AIChatConversation
+
+        user = User.objects.create_user(
+            username='persistchat@example.com',
+            email='persistchat@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='persistchat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Plan: focus on progressive overload.'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'Help my chest day'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        conversation_id = r.json().get('conversation_id')
+        self.assertIsNotNone(conversation_id)
+
+        conversation = AIChatConversation.objects.get(id=conversation_id, user=user)
+        saved_messages = list(conversation.messages.values_list('role', 'content'))
+        self.assertEqual(
+            saved_messages,
+            [
+                ('user', 'Help my chest day'),
+                ('assistant', 'Plan: focus on progressive overload.'),
+            ],
+        )
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_invalid_conversation_id_returns_400(self, mock_openai_cls):
+        user = User.objects.create_user(
+            username='invalidchatid@example.com',
+            email='invalidchatid@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='invalidchatid@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'ok'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps(
+                {
+                    'messages': [{'role': 'user', 'content': 'hi'}],
+                    'conversation_id': 'not-a-number',
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 400)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_unknown_conversation_for_user_returns_404(self, mock_openai_cls):
+        from core.models import AIChatConversation
+
+        owner = User.objects.create_user(
+            username='ownerchat@example.com',
+            email='ownerchat@example.com',
+            password='TestPass123!',
+        )
+        intruder = User.objects.create_user(
+            username='intruderchat@example.com',
+            email='intruderchat@example.com',
+            password='TestPass123!',
+        )
+        conversation = AIChatConversation.objects.create(user=owner, title='Owner conversation')
+        self.client.login(username='intruderchat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'ok'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps(
+                {
+                    'messages': [{'role': 'user', 'content': 'hi'}],
+                    'conversation_id': conversation.id,
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 404)
+
+    def test_chat_history_list_and_detail(self):
+        from core.models import AIChatConversation, AIChatMessage
+
+        user = User.objects.create_user(
+            username='historychat@example.com',
+            email='historychat@example.com',
+            password='TestPass123!',
+        )
+        conversation = AIChatConversation.objects.create(user=user, title='Leg day tweaks')
+        AIChatMessage.objects.create(conversation=conversation, role='user', content='How to warm up knees?')
+        AIChatMessage.objects.create(conversation=conversation, role='assistant', content='Start with low-impact mobility.')
+        self.client.login(username='historychat@example.com', password='TestPass123!')
+
+        list_response = self.client.get('/api/chat/history/')
+        self.assertEqual(list_response.status_code, 200)
+        conversations = list_response.json()['conversations']
+        self.assertEqual(len(conversations), 1)
+        self.assertEqual(conversations[0]['id'], conversation.id)
+        self.assertEqual(conversations[0]['title'], 'Leg day tweaks')
+
+        detail_response = self.client.get(f'/api/chat/history/{conversation.id}/')
+        self.assertEqual(detail_response.status_code, 200)
+        detail_messages = detail_response.json()['messages']
+        self.assertEqual([message['role'] for message in detail_messages], ['user', 'assistant'])
+
+    def test_chat_history_detail_blocks_other_users(self):
+        from core.models import AIChatConversation
+
+        owner = User.objects.create_user(
+            username='ownerhistory@example.com',
+            email='ownerhistory@example.com',
+            password='TestPass123!',
+        )
+        intruder = User.objects.create_user(
+            username='intruderhistory@example.com',
+            email='intruderhistory@example.com',
+            password='TestPass123!',
+        )
+        conversation = AIChatConversation.objects.create(user=owner, title='private')
+        self.client.login(username='intruderhistory@example.com', password='TestPass123!')
+
+        response = self.client.get(f'/api/chat/history/{conversation.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_user_supplied_system_messages_are_filtered(self, mock_openai_cls):
         mock_client = mock_openai_cls.return_value
         mock_resp = mock.MagicMock()
