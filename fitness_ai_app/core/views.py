@@ -126,15 +126,144 @@ def chat_page(request):
     return render(request, 'core/chat.html', {'active_tab': 'ai'})
 
 
+def _normalize_chat_messages(messages):
+    """Keep only supported chat message roles/content for model calls."""
+    if not isinstance(messages, list):
+        return []
+
+    normalized_messages = []
+    for message in messages[-30:]:
+        if not isinstance(message, dict):
+            continue
+
+        role = message.get('role')
+        content = message.get('content')
+        if role not in {'user', 'assistant'}:
+            continue
+        if not isinstance(content, str):
+            continue
+
+        clean_content = content.strip()
+        if not clean_content:
+            continue
+
+        normalized_messages.append({'role': role, 'content': clean_content})
+
+    return normalized_messages
+
+
+def _build_ai_user_context(user):
+    """Build a compact user context snapshot for personalized coaching."""
+    if not user or not user.is_authenticated:
+        return (
+            '- User session: not authenticated\n'
+            '- Guidance mode: general coaching only'
+        )
+
+    today = date.today()
+    profile = UserProfile.objects.filter(user=user).first()
+    calorie_goal = get_user_calorie_goal(user)
+
+    nutrition_totals = FoodItem.objects.filter(
+        meal__user=user,
+        meal__date=today,
+        completed=True,
+    ).aggregate(
+        total_calories=Sum('calories'),
+        total_protein=Sum('protein'),
+        total_carbs=Sum('carbs'),
+        total_fats=Sum('fats'),
+    )
+    total_calories = nutrition_totals['total_calories'] or 0
+    total_protein = nutrition_totals['total_protein'] or 0
+    total_carbs = nutrition_totals['total_carbs'] or 0
+    total_fats = nutrition_totals['total_fats'] or 0
+
+    workouts_today = Workout.objects.filter(user=user, date=today).count()
+    completed_exercises = Exercise.objects.filter(
+        workout__user=user,
+        workout__date=today,
+        completed=True,
+    ).count()
+    supplements_today_qs = SupplementEntry.objects.filter(user=user, date=today)
+    supplements_total = supplements_today_qs.count()
+    supplements_taken = supplements_today_qs.filter(taken=True).count()
+
+    profile_goal = 'Not set'
+    profile_experience = 'Not set'
+    profile_diet = 'Not set'
+    profile_home_gym = 'Not set'
+    profile_equipment = 'None listed'
+    if profile:
+        profile_goal = profile.get_primary_goal_display() if profile.primary_goal else 'Not set'
+        profile_experience = (
+            profile.get_experience_level_display() if profile.experience_level else 'Not set'
+        )
+        profile_diet = (
+            profile.get_dietary_preference_display() if profile.dietary_preference else 'Not set'
+        )
+        profile_home_gym = (
+            'Yes' if profile.has_home_gym is True else 'No' if profile.has_home_gym is False else 'Not set'
+        )
+        if profile.home_equipment:
+            equipment_labels = dict(UserProfile.HOME_EQUIPMENT_CHOICES)
+            profile_equipment = ', '.join(
+                equipment_labels.get(item, item) for item in profile.home_equipment
+            )
+
+    return (
+        f'- Date: {today.isoformat()}\n'
+        f'- Goal: {profile_goal}\n'
+        f'- Experience level: {profile_experience}\n'
+        f'- Dietary preference: {profile_diet}\n'
+        f'- Home gym available: {profile_home_gym}\n'
+        f'- Available equipment: {profile_equipment}\n'
+        f'- Daily calorie goal: {calorie_goal} kcal\n'
+        f'- Completed nutrition today: {total_calories} kcal, {total_protein}g protein, '
+        f'{total_carbs}g carbs, {total_fats}g fats\n'
+        f'- Workouts planned today: {workouts_today}\n'
+        f'- Exercises completed today: {completed_exercises}\n'
+        f'- Supplements taken today: {supplements_taken}/{supplements_total}'
+    )
+
+
+def _build_ai_system_prompt(user):
+    user_context = _build_ai_user_context(user)
+    return {
+        'role': 'system',
+        'content': (
+            'You are Spotter.ai Coach, an expert fitness assistant for beginners through advanced users. '
+            'Your scope is exercise technique/programming, calorie and macro guidance, supplement education, '
+            'recovery, and healthy lifestyle habits.\n'
+            'Always keep advice practical, evidence-aware, and tailored to the user profile/context below. '
+            'Prioritize clear next steps the user can apply in this app.\n'
+            'Use these response rules:\n'
+            '1. Stay focused on fitness, nutrition, supplements, training, and health habits.\n'
+            '2. If a prompt is unrelated, briefly redirect back to fitness.\n'
+            '3. Never claim to have changed app data or completed actions in the app.\n'
+            '4. For medical-risk topics, avoid diagnosis and advise seeing a licensed clinician.\n'
+            '5. For supplements, include concise caution about interactions/contraindications when relevant.\n'
+            '6. Keep responses concise and coach-like: usually 3-6 sentences, optionally short bullets.\n'
+            '7. If key info is missing, ask one focused follow-up question.\n'
+            'App context:\n'
+            '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
+            '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
+            '- Home dashboard tracks daily progress toward calorie and workout goals.\n\n'
+            f'User context snapshot:\n{user_context}'
+        ),
+    }
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat(request):
     try:
         body = json.loads(request.body)
-        messages = body.get("messages", [])
+        incoming_messages = body.get('messages', [])
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({"error": "Invalid JSON body."}, status=400)
 
+    messages = _normalize_chat_messages(incoming_messages)
     if not messages:
         return JsonResponse({"error": "messages list is required."}, status=400)
 
@@ -142,23 +271,14 @@ def api_chat(request):
     if not api_key:
         return JsonResponse({"error": "OPENAI_API_KEY not configured."}, status=500)
 
+    model_name = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5-mini')
     client = OpenAI(api_key=api_key)
-
-    system_prompt = {
-        "role": "system",
-        "content": (
-            "You are an AI chatbot for a fitness app called Spotter.ai. "
-            "Only discuss health, food, and fitness with the user. "
-            "If the user asks about anything else, politely redirect them "
-            "back to health, food, or fitness topics. "
-            "Keep your responses short — no more than 2-3 sentences for usability."
-        ),
-    }
+    ai_messages = [_build_ai_system_prompt(request.user), *messages]
 
     try:
         response = client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=messages,
+            model=model_name,
+            messages=ai_messages,
         )
         reply = response.choices[0].message.content
         return JsonResponse({"reply": reply})
