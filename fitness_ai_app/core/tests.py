@@ -1028,6 +1028,79 @@ class ApiChatViewTests(TestCase):
         self.assertEqual(len(create_kwargs['messages']), 2)
 
     @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_profile_bio_is_included_in_system_context(self, mock_openai_cls):
+        from core.models import UserProfile
+
+        user = User.objects.create_user(
+            username='biochat@example.com',
+            email='biochat@example.com',
+            password='TestPass123!',
+        )
+        UserProfile.objects.create(
+            user=user,
+            bio='I have an old knee injury and occasional shoulder pain.',
+        )
+        self.client.login(username='biochat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Tailored response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'help me train'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        self.assertIn(
+            'About you / bio: I have an old knee injury and occasional shoulder pain.',
+            create_kwargs['messages'][0]['content'],
+        )
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_active_injuries_are_included_in_system_context(self, mock_openai_cls):
+        from core.models import UserInjury, UserProfile
+
+        user = User.objects.create_user(
+            username='injurychat@example.com',
+            email='injurychat@example.com',
+            password='TestPass123!',
+        )
+        UserProfile.objects.create(user=user)
+        muscle_group = MuscleGroup.objects.create(name='Chat Test Group')
+        muscle = Muscle.objects.create(name='Chat Test Muscle', muscle_group=muscle_group)
+        UserInjury.objects.create(
+            user=user,
+            muscle=muscle,
+            severity='moderate',
+            notes='Avoid heavy pressing for now',
+            start_date=timezone.now().date(),
+            is_active=True,
+        )
+        self.client.login(username='injurychat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Injury-aware response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'chest workout plan'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        self.assertIn(
+            'Active injuries: Chat Test Muscle (Moderate): Avoid heavy pressing for now',
+            create_kwargs['messages'][0]['content'],
+        )
+
+    @mock.patch('core.views.OpenAI')
     @mock.patch.dict(
         os.environ,
         {'OPENAI_API_KEY': 'test-key', 'OPENAI_CHAT_MODEL': 'gpt-5.2-codex'},

@@ -40,6 +40,7 @@ from .models import (
     Muscle,
     Equipment,
     TrainingExercise,
+    UserInjury,
 )
 
 
@@ -194,6 +195,7 @@ def _build_ai_user_context(user):
     profile_diet = 'Not set'
     profile_home_gym = 'Not set'
     profile_equipment = 'None listed'
+    profile_bio = 'Not provided'
     if profile:
         profile_goal = profile.get_primary_goal_display() if profile.primary_goal else 'Not set'
         profile_experience = (
@@ -210,6 +212,23 @@ def _build_ai_user_context(user):
             profile_equipment = ', '.join(
                 equipment_labels.get(item, item) for item in profile.home_equipment
             )
+        if profile.bio:
+            profile_bio = ' '.join(profile.bio.split())
+            if len(profile_bio) > 600:
+                profile_bio = f'{profile_bio[:600]}...'
+
+    injuries_context = 'None logged'
+    active_injuries = list(
+        UserInjury.objects.filter(user=user, is_active=True)
+        .select_related('muscle')
+        .order_by('-start_date')[:5]
+    )
+    if active_injuries:
+        injuries_context = '; '.join(
+            f'{injury.muscle.name} ({injury.get_severity_display()})'
+            f'{f": {injury.notes.strip()[:120]}" if injury.notes else ""}'
+            for injury in active_injuries
+        )
 
     return (
         f'- Date: {today.isoformat()}\n'
@@ -218,6 +237,8 @@ def _build_ai_user_context(user):
         f'- Dietary preference: {profile_diet}\n'
         f'- Home gym available: {profile_home_gym}\n'
         f'- Available equipment: {profile_equipment}\n'
+        f'- About you / bio: {profile_bio}\n'
+        f'- Active injuries: {injuries_context}\n'
         f'- Daily calorie goal: {calorie_goal} kcal\n'
         f'- Completed nutrition today: {total_calories} kcal, {total_protein}g protein, '
         f'{total_carbs}g carbs, {total_fats}g fats\n'
