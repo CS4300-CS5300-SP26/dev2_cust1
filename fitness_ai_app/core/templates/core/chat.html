@@ -145,11 +145,18 @@
       flex: 1;
     }
 
+    .chat-title-wrap {
+      min-width: 0;
+      flex: 1;
+    }
+
     .chat-header {
       font-size: 1.02rem;
       font-weight: 700;
       color: var(--harvest-orange);
       margin: 0;
+      display: block;
+      width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -465,7 +472,7 @@
                 >
                   <span></span>
                 </button>
-                <div>
+                <div class="chat-title-wrap">
                 <p class="chat-header" id="chatHeader">New Chat</p>
                 <p class="chat-subtitle">Your fitness coach remembers your progress.</p>
                 </div>
