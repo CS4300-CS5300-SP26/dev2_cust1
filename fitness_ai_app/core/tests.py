@@ -1000,6 +1000,9 @@ class ApiChatViewTests(TestCase):
         self.assertEqual(create_kwargs['model'], 'gpt-5-mini')
         self.assertEqual(create_kwargs['messages'][0]['role'], 'system')
         self.assertIn('Spotter.ai Coach', create_kwargs['messages'][0]['content'])
+        self.assertIn('menu item "Profile"', create_kwargs['messages'][0]['content'])
+        self.assertIn('section "Additional Information"', create_kwargs['messages'][0]['content'])
+        self.assertIn('field label "About You"', create_kwargs['messages'][0]['content'])
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
@@ -1198,7 +1201,7 @@ class ApiChatViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         create_kwargs = mock_client.chat.completions.create.call_args.kwargs
         self.assertIn(
-            'About you / bio: I have an old knee injury and occasional shoulder pain.',
+            'About You field value: I have an old knee injury and occasional shoulder pain.',
             create_kwargs['messages'][0]['content'],
         )
 
