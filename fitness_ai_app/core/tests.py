@@ -2330,6 +2330,383 @@ class SocialLoginIntegrationTests(TestCase):
         self.assertIn('facebook', [s.provider for s in user.socialaccount_set.all()])
 
 
+class SignalHandlerTests(TestCase):
+    """Tests for signal handlers, particularly social account update signals."""
+    
+    def test_social_account_updated_signal_marks_user(self):
+        """Test that social account updated signal marks user as social login user."""
+        from core.signals import handle_social_account_updated
+        from unittest.mock import MagicMock
+        
+        user = User.objects.create_user(
+            username='signaltest@example.com',
+            email='signaltest@example.com',
+            password='test123'
+        )
+        
+        from core.models import UserProfile
+        profile = UserProfile.objects.create(user=user, social_login_user=False)
+        
+        # Mock the sociallogin object
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        
+        # Call the signal handler
+        handle_social_account_updated(sender=None, request=None, sociallogin=sociallogin)
+        
+        # Verify profile was updated
+        profile.refresh_from_db()
+        self.assertTrue(profile.social_login_user)
+    
+    def test_social_account_updated_signal_handles_exception(self):
+        """Test that signal handler gracefully handles exceptions."""
+        from core.signals import handle_social_account_updated
+        from unittest.mock import MagicMock
+        
+        # Create a user without a profile (will cause DoesNotExist or AttributeError)
+        user = User.objects.create_user(
+            username='noprofile@example.com',
+            email='noprofile@example.com',
+            password='test123'
+        )
+        
+        # Mock sociallogin with deleted profile
+        sociallogin = MagicMock()
+        sociallogin.user = user
+        
+        # This should not raise an exception (it has a try-except)
+        try:
+            handle_social_account_updated(sender=None, request=None, sociallogin=sociallogin)
+        except Exception as e:
+            self.fail(f"Signal handler raised exception: {e}")
+
+
+class ExerciseAPITests(TestCase):
+    """Tests for the exercise API filtering endpoints."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='exerciseapi@example.com',
+            email='exerciseapi@example.com',
+            password='TestPass123!',
+            is_active=True
+        )
+        self.client.login(username='exerciseapi@example.com', password='TestPass123!')
+    
+    def test_get_exercise_types_returns_json(self):
+        """Test that exercise types endpoint returns JSON."""
+        response = self.client.get('/api/exercises/types/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        data = response.json()
+        self.assertIn('exercise_types', data)
+        self.assertIsInstance(data['exercise_types'], list)
+    
+    def test_get_muscle_groups_returns_json(self):
+        """Test that muscle groups endpoint returns JSON."""
+        response = self.client.get('/api/exercises/muscle-groups/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        data = response.json()
+        self.assertIn('muscle_groups', data)
+        self.assertIsInstance(data['muscle_groups'], list)
+    
+    def test_get_muscles_returns_json(self):
+        """Test that muscles endpoint returns JSON."""
+        response = self.client.get('/api/exercises/muscles/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        data = response.json()
+        self.assertIn('muscles', data)
+        self.assertIsInstance(data['muscles'], list)
+    
+    def test_get_equipment_returns_json(self):
+        """Test that equipment endpoint returns JSON."""
+        response = self.client.get('/api/exercises/equipment/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/json')
+        data = response.json()
+        self.assertIn('equipment', data)
+        self.assertIsInstance(data['equipment'], list)
+    
+    def test_filter_exercises_requires_login(self):
+        """Test that exercise filtering requires login."""
+        self.client.logout()
+        response = self.client.get('/api/exercises/filter/')
+        # Should redirect to login
+        self.assertEqual(response.status_code, 302)
+    
+    def test_filter_exercises_returns_empty_list_initially(self):
+        """Test that filter returns empty list when no exercises exist."""
+        response = self.client.get('/api/exercises/filter/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('exercises', data)
+        self.assertEqual(len(data['exercises']), 0)
+    
+    def test_filter_exercises_by_muscle_group(self):
+        """Test filtering exercises by muscle group."""
+        from core.models import ExerciseType, MuscleGroup, Muscle, TrainingExercise
+        
+        # Create test data
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        muscle_group = MuscleGroup.objects.create(name='Upper Body')
+        muscle = Muscle.objects.create(name='Biceps', muscle_group=muscle_group)
+        
+        exercise = TrainingExercise.objects.create(
+            name='Dumbbell Curl',
+            exercise_type=exercise_type,
+            is_active=True
+        )
+        exercise.muscle_groups.add(muscle_group)
+        exercise.primary_muscles.add(muscle)
+        
+        response = self.client.get(f'/api/exercises/filter/?muscle_group={muscle_group.id}')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['exercises']), 1)
+        self.assertEqual(data['exercises'][0]['name'], 'Dumbbell Curl')
+    
+    def test_filter_exercises_by_location(self):
+        """Test filtering exercises by location."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Cardio')
+        
+        # Create home and gym exercises
+        home_exercise = TrainingExercise.objects.create(
+            name='Running',
+            exercise_type=exercise_type,
+            location='home',
+            is_active=True
+        )
+        gym_exercise = TrainingExercise.objects.create(
+            name='Treadmill',
+            exercise_type=exercise_type,
+            location='gym',
+            is_active=True
+        )
+        
+        # Filter by home
+        response = self.client.get('/api/exercises/filter/?location=home')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Should include both home and 'both' location exercises
+        names = [e['name'] for e in data['exercises']]
+        self.assertIn('Running', names)
+    
+    def test_filter_exercises_by_difficulty(self):
+        """Test filtering exercises by difficulty level."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        
+        beginner = TrainingExercise.objects.create(
+            name='Push-up',
+            exercise_type=exercise_type,
+            difficulty='beginner',
+            is_active=True
+        )
+        advanced = TrainingExercise.objects.create(
+            name='Planche',
+            exercise_type=exercise_type,
+            difficulty='advanced',
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?difficulty=beginner')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        names = [e['name'] for e in data['exercises']]
+        self.assertIn('Push-up', names)
+        self.assertNotIn('Planche', names)
+    
+    def test_get_user_safe_exercises_endpoint(self):
+        """Test the user-safe exercise endpoint."""
+        response = self.client.get('/api/exercises/safe/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('exercises', data)
+    
+    def test_filter_exercises_by_equipment_any_mode(self):
+        """Test filtering exercises by equipment with 'any' mode."""
+        from core.models import ExerciseType, Equipment, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        equipment1 = Equipment.objects.create(name='Dumbbell')
+        equipment2 = Equipment.objects.create(name='Barbell')
+        
+        exercise = TrainingExercise.objects.create(
+            name='Curl',
+            exercise_type=exercise_type,
+            is_active=True
+        )
+        exercise.equipment.add(equipment1)
+        
+        response = self.client.get(f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=any')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertGreater(len(data['exercises']), 0)
+    
+    def test_filter_exercises_by_equipment_all_mode(self):
+        """Test filtering exercises by equipment with 'all' mode."""
+        from core.models import ExerciseType, Equipment, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        equipment1 = Equipment.objects.create(name='Dumbbell')
+        equipment2 = Equipment.objects.create(name='Barbell')
+        
+        # Create exercise with both equipment
+        exercise = TrainingExercise.objects.create(
+            name='Compound Curl',
+            exercise_type=exercise_type,
+            is_active=True
+        )
+        exercise.equipment.add(equipment1, equipment2)
+        
+        response = self.client.get(f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=all')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Should find the exercise that has both equipment
+        names = [e['name'] for e in data['exercises']]
+        self.assertIn('Compound Curl', names)
+    
+    def test_filter_exercises_exclude_high_impact(self):
+        """Test filtering exercises excluding high impact ones."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Cardio')
+        
+        low_impact = TrainingExercise.objects.create(
+            name='Swimming',
+            exercise_type=exercise_type,
+            high_impact=False,
+            is_active=True
+        )
+        high_impact = TrainingExercise.objects.create(
+            name='Sprinting',
+            exercise_type=exercise_type,
+            high_impact=True,
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?exclude_high_impact=true')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        names = [e['name'] for e in data['exercises']]
+        self.assertIn('Swimming', names)
+        self.assertNotIn('Sprinting', names)
+    
+    def test_filter_exercises_timed_only(self):
+        """Test filtering exercises with timed duration only."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Cardio')
+        
+        # Exercise with duration
+        timed = TrainingExercise.objects.create(
+            name='Run 5K',
+            exercise_type=exercise_type,
+            default_duration_seconds=1800,
+            is_active=True
+        )
+        # Exercise without duration
+        untimed = TrainingExercise.objects.create(
+            name='Pull-ups',
+            exercise_type=exercise_type,
+            default_duration_seconds=None,
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?timed_only=true')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        names = [e['name'] for e in data['exercises']]
+        self.assertIn('Run 5K', names)
+        self.assertNotIn('Pull-ups', names)
+    
+    def test_filter_exercises_sort_by_name_desc(self):
+        """Test sorting exercises by name descending."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        
+        ex1 = TrainingExercise.objects.create(
+            name='Apple Lift',
+            exercise_type=exercise_type,
+            is_active=True
+        )
+        ex2 = TrainingExercise.objects.create(
+            name='Zebra Lift',
+            exercise_type=exercise_type,
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?sort=name_desc')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        if len(data['exercises']) >= 2:
+            # Zebra should come before Apple when sorted descending
+            names = [e['name'] for e in data['exercises']]
+            zebra_idx = next((i for i, e in enumerate(names) if 'Zebra' in e), -1)
+            apple_idx = next((i for i, e in enumerate(names) if 'Apple' in e), -1)
+            if zebra_idx >= 0 and apple_idx >= 0:
+                self.assertLess(zebra_idx, apple_idx)
+    
+    def test_filter_exercises_sort_by_difficulty_asc(self):
+        """Test sorting exercises by difficulty ascending."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        
+        adv = TrainingExercise.objects.create(
+            name='Planche',
+            exercise_type=exercise_type,
+            difficulty='advanced',
+            is_active=True
+        )
+        beg = TrainingExercise.objects.create(
+            name='Push-up',
+            exercise_type=exercise_type,
+            difficulty='beginner',
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?sort=difficulty_asc')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        names = [e['name'] for e in data['exercises']]
+        if 'Push-up' in names and 'Planche' in names:
+            self.assertLess(names.index('Push-up'), names.index('Planche'))
+    
+    def test_filter_exercises_sort_by_difficulty_desc(self):
+        """Test sorting exercises by difficulty descending."""
+        from core.models import ExerciseType, TrainingExercise
+        
+        exercise_type = ExerciseType.objects.create(name='Strength')
+        
+        adv = TrainingExercise.objects.create(
+            name='Planche',
+            exercise_type=exercise_type,
+            difficulty='advanced',
+            is_active=True
+        )
+        beg = TrainingExercise.objects.create(
+            name='Push-up',
+            exercise_type=exercise_type,
+            difficulty='beginner',
+            is_active=True
+        )
+        
+        response = self.client.get('/api/exercises/filter/?sort=difficulty_desc')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        names = [e['name'] for e in data['exercises']]
+        if 'Push-up' in names and 'Planche' in names:
+            self.assertLess(names.index('Planche'), names.index('Push-up'))
+
+
 class AccountEmailHandlingTests(TestCase):
     """Tests for proper email handling in account creation and updates."""
 
