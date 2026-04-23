@@ -866,11 +866,17 @@ document.addEventListener('DOMContentLoaded', function() {
   const savedHeightUnit = localStorage.getItem('spotter_height_unit');
   const savedWeightUnit = localStorage.getItem('spotter_weight_unit');
 
+  // Set default units for new users (imperial/lbs) if not saved
   if (savedHeightUnit === 'imperial' || savedHeightUnit === 'metric') {
     document.getElementById('height_unit').value = savedHeightUnit;
+  } else {
+    document.getElementById('height_unit').value = 'imperial';
   }
+  
   if (savedWeightUnit === 'lbs' || savedWeightUnit === 'kg') {
     document.getElementById('weight_unit').value = savedWeightUnit;
+  } else {
+    document.getElementById('weight_unit').value = 'lbs';
   }
 
   toggleUnitFields();

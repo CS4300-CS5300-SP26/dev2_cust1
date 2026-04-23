@@ -3,6 +3,7 @@ import smtplib
 import unittest
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 from unittest import skip
 
@@ -4557,6 +4558,14 @@ class UserProfileFormTests(TestCase):
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 302)
     
+    def test_new_user_sees_imperial_units_default(self):
+        """Test that new users see imperial units (ft/in, lbs) by default."""
+        response = self.client.get('/get_started_profile/')
+        self.assertEqual(response.status_code, 200)
+        # Check that the imperial options are set as default
+        self.assertContains(response, 'value="imperial" selected')
+        self.assertContains(response, 'value="lbs" selected')
+    
     def test_save_user_name_field(self):
         """Test that user name is saved to User.first_name."""
         response = self.client.post('/get_started_profile/', {
@@ -4603,7 +4612,7 @@ class UserProfileFormTests(TestCase):
         }, follow=True)
         
         profile = self.user.profile
-        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.weight, Decimal('74.84'))
 
     def test_save_weight_field_metric_kg(self):
         """Test that weight entered in kg is saved directly."""
@@ -4832,7 +4841,7 @@ class UserProfileFormTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'John Smith')
         self.assertEqual(profile.height, 180)
-        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.weight, Decimal('74.84'))
         self.assertEqual(profile.age, 28)
         self.assertEqual(profile.primary_goal, 'muscle_gain')
         self.assertEqual(profile.experience_level, 'intermediate')
@@ -5366,7 +5375,7 @@ class GetStartedProfileIntegrationTests(TestCase):
         profile = user.profile
         self.assertTrue(profile.onboarding_completed)
         self.assertEqual(profile.height, 180)
-        self.assertEqual(profile.weight, 75)
+        self.assertEqual(profile.weight, Decimal('74.84'))
         self.assertEqual(profile.age, 30)
 
 # ==================== SUPPLEMENT TESTS ====================
