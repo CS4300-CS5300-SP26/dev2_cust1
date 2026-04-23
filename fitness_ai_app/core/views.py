@@ -84,6 +84,23 @@ def _parse_optional_positive_int(raw_value, field_label):
     return parsed, None
 
 
+def _height_cm_to_us(height_cm):
+    """Convert stored height in cm to (feet, inches) for US display."""
+    if not height_cm:
+        return '', ''
+
+    total_inches = int(round(height_cm / 2.54))
+    return total_inches // 12, total_inches % 12
+
+
+def _weight_kg_to_lbs(weight_kg):
+    """Convert stored weight in kg to lbs for US display."""
+    if not weight_kg:
+        return ''
+
+    return int(round(weight_kg * 2.20462))
+
+
 def _infer_muscle_group_from_training_exercise(training_exercise):
     """Map a TrainingExercise to legacy Exercise muscle groups."""
     keyword_map = {
@@ -511,6 +528,10 @@ def get_started_profile(request):
         # Update or create user profile with fitness metrics
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=user)
+        min_height_cm = 122
+        max_height_cm = 272
+        min_weight_kg = 36
+        max_weight_kg = 635
         
         # Save calorie goal
         calorie_goal = request.POST.get('calorie_goal', '').strip()
@@ -520,21 +541,70 @@ def get_started_profile(request):
             except (ValueError, TypeError):
                 pass
         
-        # Save height
-        height = request.POST.get('height', '').strip()
-        if height:
-            try:
-                profile.height = int(height)
-            except (ValueError, TypeError):
-                pass
+        # Save height (supports unit selection)
+        height_unit = request.POST.get('height_unit', 'imperial').strip().lower()
+        if height_unit == 'metric':
+            height_cm = request.POST.get('height_cm', '').strip()
+            if height_cm:
+                try:
+                    parsed_height_cm = int(height_cm)
+                    if min_height_cm <= parsed_height_cm <= max_height_cm:
+                        profile.height = parsed_height_cm
+                except (ValueError, TypeError):
+                    pass
+        else:
+            height_ft = request.POST.get('height_ft', '').strip()
+            height_in = request.POST.get('height_in', '').strip()
+            if height_ft or height_in:
+                try:
+                    feet = int(height_ft) if height_ft else 0
+                    inches = int(height_in) if height_in else 0
+                    total_inches = (feet * 12) + inches
+                    if 4 <= feet <= 9 and 0 <= inches <= 11 and 48 <= total_inches <= 108:
+                        profile.height = int(round(total_inches * 2.54))
+                except (ValueError, TypeError):
+                    pass
+            else:
+                # Backward compatibility for older clients posting cm directly
+                height = request.POST.get('height', '').strip()
+                if height:
+                    try:
+                        parsed_height_cm = int(height)
+                        if min_height_cm <= parsed_height_cm <= max_height_cm:
+                            profile.height = parsed_height_cm
+                    except (ValueError, TypeError):
+                        pass
         
-        # Save weight
-        weight = request.POST.get('weight', '').strip()
-        if weight:
-            try:
-                profile.weight = int(weight)
-            except (ValueError, TypeError):
-                pass
+        # Save weight (supports unit selection)
+        weight_unit = request.POST.get('weight_unit', 'lbs').strip().lower()
+        if weight_unit == 'kg':
+            weight_kg = request.POST.get('weight_kg', '').strip()
+            if weight_kg:
+                try:
+                    parsed_weight_kg = int(weight_kg)
+                    if min_weight_kg <= parsed_weight_kg <= max_weight_kg:
+                        profile.weight = parsed_weight_kg
+                except (ValueError, TypeError):
+                    pass
+        else:
+            weight_lbs = request.POST.get('weight_lbs', '').strip()
+            if weight_lbs:
+                try:
+                    pounds = int(weight_lbs)
+                    if 80 <= pounds <= 1400:
+                        profile.weight = int(round(pounds * 0.45359237))
+                except (ValueError, TypeError):
+                    pass
+            else:
+                # Backward compatibility for older clients posting kg directly
+                weight = request.POST.get('weight', '').strip()
+                if weight:
+                    try:
+                        parsed_weight_kg = int(weight)
+                        if min_weight_kg <= parsed_weight_kg <= max_weight_kg:
+                            profile.weight = parsed_weight_kg
+                    except (ValueError, TypeError):
+                        pass
         
         # Save age
         age = request.POST.get('age', '').strip()
@@ -593,6 +663,8 @@ def get_started_profile(request):
     # GET request - pass profile data to template
     from core.models import UserProfile
     profile, created = UserProfile.objects.get_or_create(user=request.user)
+    height_feet, height_inches = _height_cm_to_us(profile.height)
+    weight_lbs = _weight_kg_to_lbs(profile.weight)
     
     # Show skip button on first-time onboarding (any user who hasn't completed it yet)
     is_first_time_onboarding = not profile.onboarding_completed
@@ -600,6 +672,9 @@ def get_started_profile(request):
     return render(request, 'profile_dir/get_started_profile.html', {
         'active_tab': 'profile',
         'profile': profile,
+        'height_feet': height_feet,
+        'height_inches': height_inches,
+        'weight_lbs': weight_lbs,
         'is_first_time_onboarding': is_first_time_onboarding
     })
 

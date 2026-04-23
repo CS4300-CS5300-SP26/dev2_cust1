@@ -4577,22 +4577,43 @@ class UserProfileFormTests(TestCase):
         self.assertEqual(self.user.first_name, 'Original Name')
     
     def test_save_height_field(self):
-        """Test that height (cm) is saved to UserProfile."""
+        """Test that height (ft/in) is converted and saved in cm."""
         self.client.post('/get_started_profile/', {
-            'height': '180',
+            'height_ft': '5',
+            'height_in': '11',
         }, follow=True)
         
         profile = self.user.profile
         self.assertEqual(profile.height, 180)
+
+    def test_save_height_field_metric_cm(self):
+        """Test that height entered in cm is saved directly."""
+        self.client.post('/get_started_profile/', {
+            'height_unit': 'metric',
+            'height_cm': '183',
+        }, follow=True)
+
+        profile = self.user.profile
+        self.assertEqual(profile.height, 183)
     
     def test_save_weight_field(self):
-        """Test that weight (kg) is saved to UserProfile."""
+        """Test that weight (lbs) is converted and saved in kg."""
         self.client.post('/get_started_profile/', {
-            'weight': '75',
+            'weight_lbs': '165',
         }, follow=True)
         
         profile = self.user.profile
         self.assertEqual(profile.weight, 75)
+
+    def test_save_weight_field_metric_kg(self):
+        """Test that weight entered in kg is saved directly."""
+        self.client.post('/get_started_profile/', {
+            'weight_unit': 'kg',
+            'weight_kg': '80',
+        }, follow=True)
+
+        profile = self.user.profile
+        self.assertEqual(profile.weight, 80)
     
     def test_save_age_field(self):
         """Test that age is saved to UserProfile."""
@@ -4782,8 +4803,9 @@ class UserProfileFormTests(TestCase):
         # Save initial data
         self.client.post('/get_started_profile/', {
             'name': 'John Smith',
-            'height': '180',
-            'weight': '75',
+            'height_ft': '5',
+            'height_in': '11',
+            'weight_lbs': '165',
             'age': '28',
             'primary_goal': 'muscle_gain',
             'experience_level': 'intermediate',
@@ -4799,8 +4821,9 @@ class UserProfileFormTests(TestCase):
         
         # Verify all data is present in the response
         self.assertContains(response, 'John Smith')
-        self.assertContains(response, '180')
-        self.assertContains(response, '75')
+        self.assertContains(response, 'Height')
+        self.assertContains(response, 'Weight')
+        self.assertContains(response, '165')
         self.assertContains(response, '28')
         self.assertContains(response, 'Fitness enthusiast')
         
@@ -4841,7 +4864,7 @@ class UserProfileFormTests(TestCase):
     def test_invalid_height_value_not_saved(self):
         """Test that invalid height value is not saved."""
         self.client.post('/get_started_profile/', {
-            'height': 'not_a_number',
+            'height_ft': 'not_a_number',
         }, follow=True)
         
         profile = self.user.profile
@@ -4850,9 +4873,28 @@ class UserProfileFormTests(TestCase):
     def test_invalid_weight_value_not_saved(self):
         """Test that invalid weight value is not saved."""
         self.client.post('/get_started_profile/', {
-            'weight': 'invalid',
+            'weight_lbs': 'invalid',
         }, follow=True)
         
+        profile = self.user.profile
+        self.assertIsNone(profile.weight)
+
+    def test_height_below_minimum_not_saved(self):
+        """Test that height below allowed minimum is not saved."""
+        self.client.post('/get_started_profile/', {
+            'height_unit': 'metric',
+            'height_cm': '100',
+        }, follow=True)
+
+        profile = self.user.profile
+        self.assertIsNone(profile.height)
+
+    def test_weight_below_minimum_not_saved(self):
+        """Test that weight below allowed minimum is not saved."""
+        self.client.post('/get_started_profile/', {
+            'weight_lbs': '70',
+        }, follow=True)
+
         profile = self.user.profile
         self.assertIsNone(profile.weight)
     
@@ -4886,7 +4928,8 @@ class UserProfileFormTests(TestCase):
         # Save some fields
         self.client.post('/get_started_profile/', {
             'name': 'Partial User',
-            'height': '175',
+            'height_ft': '5',
+            'height_in': '9',
         }, follow=True)
         
         profile = self.user.profile
@@ -4901,14 +4944,16 @@ class UserProfileFormTests(TestCase):
         # Save initial data
         self.client.post('/get_started_profile/', {
             'name': 'Original Name',
-            'height': '170',
+            'height_ft': '5',
+            'height_in': '7',
             'primary_goal': 'weight_loss',
         }, follow=True)
         
         # Update with new data
         self.client.post('/get_started_profile/', {
             'name': 'Updated Name',
-            'height': '180',
+            'height_ft': '5',
+            'height_in': '11',
             'primary_goal': 'muscle_gain',
         }, follow=True)
         
@@ -5083,8 +5128,9 @@ class OnboardingCompletionTests(TestCase):
         """Test that form submission sets onboarding_completed=True."""
         response = self.client.post('/get_started_profile/', {
             'name': 'Test User',
-            'height': '180',
-            'weight': '75',
+            'height_ft': '5',
+            'height_in': '11',
+            'weight_lbs': '165',
         }, follow=True)
         
         self.user.refresh_from_db()
@@ -5305,8 +5351,9 @@ class GetStartedProfileIntegrationTests(TestCase):
         # Submit form
         response = self.client.post('/get_started_profile/', {
             'name': 'John Doe',
-            'height': '180',
-            'weight': '75',
+            'height_ft': '5',
+            'height_in': '11',
+            'weight_lbs': '165',
             'age': '30',
             'primary_goal': 'muscle_gain',
             'experience_level': 'intermediate',

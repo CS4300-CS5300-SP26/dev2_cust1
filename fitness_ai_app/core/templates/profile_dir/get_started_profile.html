@@ -123,6 +123,26 @@
     box-sizing: border-box;
   }
 
+  .form-group select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f67d26' d='M1 4l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 32px;
+  }
+
+  .form-group select option {
+    background-color: #222;
+    color: #fff;
+    padding: 10px;
+  }
+
+  .form-group select option:checked {
+    background: linear-gradient(var(--harvest-orange), var(--harvest-orange));
+    background-color: var(--harvest-orange);
+    color: #fff;
+  }
+
   .form-group textarea {
     resize: vertical;
     min-height: 80px;
@@ -139,6 +159,53 @@
     outline: none;
     border-color: var(--harvest-orange);
     background: rgba(246, 125, 38, 0.15);
+    box-shadow: 0 0 0 3px rgba(246, 125, 38, 0.2);
+  }
+
+  .unit-select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+  }
+
+  .unit-select-wrapper select {
+    width: 100%;
+    max-width: 120px;
+    padding: 6px 24px 6px 10px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    border: 2px solid var(--harvest-orange);
+    background-color: rgba(246, 125, 38, 0.12);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+  }
+
+  .unit-select-wrapper select:hover {
+    background-color: rgba(246, 125, 38, 0.18);
+    border-color: #ff8c42;
+  }
+
+  .unit-select-wrapper select:focus {
+    outline: none;
+    background-color: rgba(246, 125, 38, 0.25);
+    box-shadow: 0 0 0 3px rgba(246, 125, 38, 0.2);
+  }
+
+  .unit-select-wrapper select option {
+    background-color: #1a1a1a;
+    color: #fff;
+    padding: 8px;
+    font-weight: 500;
+  }
+
+  .unit-select-wrapper select option:checked {
+    background: linear-gradient(rgba(246, 125, 38, 0.9), rgba(246, 125, 38, 0.9));
+    background-color: var(--harvest-orange);
+    color: #fff;
+    font-weight: 600;
   }
 
   .form-row {
@@ -547,13 +614,38 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label for="height">Height (cm)</label>
-          <input type="number" id="height" name="height" placeholder="e.g. 180" min="100" max="250" value="{{ profile.height|default:'' }}">
+          <label for="height_unit">Height</label>
+          <div class="unit-select-wrapper">
+            <select id="height_unit" name="height_unit">
+              <option value="imperial" selected>ft/in</option>
+              <option value="metric">cm</option>
+            </select>
+          </div>
+          <div id="height-imperial-fields" style="display: flex; gap: 8px; margin-top: 10px;">
+            <input type="number" id="height_ft" name="height_ft" placeholder="ft" min="4" max="9" value="{{ height_feet }}">
+            <input type="number" id="height_in" name="height_in" placeholder="in" min="0" max="11" value="{{ height_inches }}">
+          </div>
+          <div id="height-metric-fields" style="display: none; margin-top: 10px;">
+            <input type="number" id="height_cm" name="height_cm" placeholder="e.g. 180" min="122" max="272" value="{{ profile.height|default:'' }}">
+          </div>
+          <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 6px;">Range: 4-9 ft or 122-272 cm</div>
           {% if errors.height %}<div class="form-error">{{ errors.height.0 }}</div>{% endif %}
         </div>
         <div class="form-group">
-          <label for="weight">Weight (kg)</label>
-          <input type="number" id="weight" name="weight" placeholder="e.g. 75" min="30" max="300" value="{{ profile.weight|default:'' }}">
+          <label for="weight_unit">Weight</label>
+          <div class="unit-select-wrapper">
+            <select id="weight_unit" name="weight_unit">
+              <option value="lbs" selected>lb</option>
+              <option value="kg">kg</option>
+            </select>
+          </div>
+          <div id="weight-imperial-fields" style="margin-top: 10px;">
+            <input type="number" id="weight_lbs" name="weight_lbs" placeholder="e.g. 165" min="80" max="1400" value="{{ weight_lbs }}">
+          </div>
+          <div id="weight-metric-fields" style="display: none; margin-top: 10px;">
+            <input type="number" id="weight_kg" name="weight_kg" placeholder="e.g. 75" min="36" max="635" value="{{ profile.weight|default:'' }}">
+          </div>
+          <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 6px;">Range: 80-1400 lb or 36-635 kg</div>
           {% if errors.weight %}<div class="form-error">{{ errors.weight.0 }}</div>{% endif %}
         </div>
       </div>
@@ -633,6 +725,108 @@ homeGymRadios.forEach(radio => {
   });
 });
 
+function convertHeightImperialToMetric() {
+  const heightFt = document.getElementById('height_ft').value;
+  const heightIn = document.getElementById('height_in').value;
+  
+  if (heightFt || heightIn) {
+    const feet = parseInt(heightFt) || 0;
+    const inches = parseInt(heightIn) || 0;
+    const totalInches = (feet * 12) + inches;
+    const heightCm = Math.round(totalInches * 2.54);
+    document.getElementById('height_cm').value = heightCm;
+  }
+}
+
+function convertHeightMetricToImperial() {
+  const heightCm = document.getElementById('height_cm').value;
+  
+  if (heightCm) {
+    const cm = parseInt(heightCm);
+    const totalInches = Math.round(cm / 2.54);
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    document.getElementById('height_ft').value = feet;
+    document.getElementById('height_in').value = inches;
+  }
+}
+
+function convertWeightImperialToMetric() {
+  const weightLbs = document.getElementById('weight_lbs').value;
+  
+  if (weightLbs) {
+    const lbs = parseInt(weightLbs);
+    const weightKg = Math.round(lbs * 0.45359237);
+    document.getElementById('weight_kg').value = weightKg;
+  }
+}
+
+function convertWeightMetricToImperial() {
+  const weightKg = document.getElementById('weight_kg').value;
+  
+  if (weightKg) {
+    const kg = parseInt(weightKg);
+    const weightLbs = Math.round(kg * 2.20462);
+    document.getElementById('weight_lbs').value = weightLbs;
+  }
+}
+
+function toggleUnitFields() {
+  const heightUnit = document.getElementById('height_unit').value;
+  const weightUnit = document.getElementById('weight_unit').value;
+
+  const heightImperial = document.getElementById('height-imperial-fields');
+  const heightMetric = document.getElementById('height-metric-fields');
+  const heightFt = document.getElementById('height_ft');
+  const heightIn = document.getElementById('height_in');
+  const heightCm = document.getElementById('height_cm');
+
+  if (heightUnit === 'metric') {
+    heightImperial.style.display = 'none';
+    heightMetric.style.display = 'block';
+    heightFt.disabled = true;
+    heightIn.disabled = true;
+    heightCm.disabled = false;
+    convertHeightImperialToMetric();
+  } else {
+    heightImperial.style.display = 'flex';
+    heightMetric.style.display = 'none';
+    heightFt.disabled = false;
+    heightIn.disabled = false;
+    heightCm.disabled = true;
+    convertHeightMetricToImperial();
+  }
+
+  const weightImperial = document.getElementById('weight-imperial-fields');
+  const weightMetric = document.getElementById('weight-metric-fields');
+  const weightLbs = document.getElementById('weight_lbs');
+  const weightKg = document.getElementById('weight_kg');
+
+  if (weightUnit === 'kg') {
+    weightImperial.style.display = 'none';
+    weightMetric.style.display = 'block';
+    weightLbs.disabled = true;
+    weightKg.disabled = false;
+    convertWeightImperialToMetric();
+  } else {
+    weightImperial.style.display = 'block';
+    weightMetric.style.display = 'none';
+    weightLbs.disabled = false;
+    weightKg.disabled = true;
+    convertWeightMetricToImperial();
+  }
+}
+
+document.getElementById('height_unit').addEventListener('change', function() {
+  localStorage.setItem('spotter_height_unit', this.value);
+  toggleUnitFields();
+});
+
+document.getElementById('weight_unit').addEventListener('change', function() {
+  localStorage.setItem('spotter_weight_unit', this.value);
+  toggleUnitFields();
+});
+
 document.getElementById('profileForm').addEventListener('submit', function(e) {
   const button = this.querySelector('.btn-save');
   const originalText = button.textContent;
@@ -651,6 +845,17 @@ document.getElementById('profileForm').addEventListener('submit', function(e) {
 
 // Mark that user has seen this page when it loads
 document.addEventListener('DOMContentLoaded', function() {
+  const savedHeightUnit = localStorage.getItem('spotter_height_unit');
+  const savedWeightUnit = localStorage.getItem('spotter_weight_unit');
+
+  if (savedHeightUnit === 'imperial' || savedHeightUnit === 'metric') {
+    document.getElementById('height_unit').value = savedHeightUnit;
+  }
+  if (savedWeightUnit === 'lbs' || savedWeightUnit === 'kg') {
+    document.getElementById('weight_unit').value = savedWeightUnit;
+  }
+
+  toggleUnitFields();
   localStorage.setItem('spotter_onboarding_seen', 'true');
 });
 </script>
