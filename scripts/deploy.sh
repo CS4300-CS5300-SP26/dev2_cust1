@@ -33,6 +33,8 @@ python manage.py collectstatic --noinput --clear
 echo "==> [4/6] Running database migrations..."
 python manage.py migrate --noinput
 python manage.py populate_exercise_db
+python manage.py populate_food_db
+python manage.py populate_supplements
 
 echo "==> [5/6] Setting up social app logins..."
 python manage.py setup_social_apps
