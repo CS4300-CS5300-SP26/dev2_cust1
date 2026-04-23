@@ -44,7 +44,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
     height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
-    weight = models.PositiveIntegerField(null=True, blank=True, help_text="Weight in kg")
+    weight = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Weight in kg")
     age = models.PositiveIntegerField(null=True, blank=True, help_text="Age in years")
     primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES, null=True, blank=True)
     experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, null=True, blank=True)

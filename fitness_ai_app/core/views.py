@@ -98,7 +98,7 @@ def _weight_kg_to_lbs(weight_kg):
     if not weight_kg:
         return ''
 
-    return int(round(weight_kg * 2.20462))
+    return round(float(weight_kg) * 2.20462, 2)
 
 
 def _infer_muscle_group_from_training_exercise(training_exercise):
@@ -581,18 +581,18 @@ def get_started_profile(request):
             weight_kg = request.POST.get('weight_kg', '').strip()
             if weight_kg:
                 try:
-                    parsed_weight_kg = int(weight_kg)
+                    parsed_weight_kg = float(weight_kg)
                     if min_weight_kg <= parsed_weight_kg <= max_weight_kg:
-                        profile.weight = parsed_weight_kg
+                        profile.weight = round(parsed_weight_kg, 2)
                 except (ValueError, TypeError):
                     pass
         else:
             weight_lbs = request.POST.get('weight_lbs', '').strip()
             if weight_lbs:
                 try:
-                    pounds = int(weight_lbs)
+                    pounds = float(weight_lbs)
                     if 80 <= pounds <= 1400:
-                        profile.weight = int(round(pounds * 0.45359237))
+                        profile.weight = round(pounds * 0.45359237, 2)
                 except (ValueError, TypeError):
                     pass
             else:
@@ -600,9 +600,9 @@ def get_started_profile(request):
                 weight = request.POST.get('weight', '').strip()
                 if weight:
                     try:
-                        parsed_weight_kg = int(weight)
+                        parsed_weight_kg = float(weight)
                         if min_weight_kg <= parsed_weight_kg <= max_weight_kg:
-                            profile.weight = parsed_weight_kg
+                            profile.weight = round(parsed_weight_kg, 2)
                     except (ValueError, TypeError):
                         pass
         

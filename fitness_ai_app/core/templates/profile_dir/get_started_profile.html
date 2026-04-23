@@ -640,11 +640,13 @@
             </select>
           </div>
           <div id="weight-imperial-fields" style="margin-top: 10px;">
-            <input type="number" id="weight_lbs" name="weight_lbs" placeholder="e.g. 165" min="80" max="1400" value="{{ weight_lbs }}">
+            <input type="number" id="weight_lbs" name="weight_lbs" placeholder="e.g. 165.50" min="80" max="1400" step="0.01" value="{{ weight_lbs }}">
           </div>
           <div id="weight-metric-fields" style="display: none; margin-top: 10px;">
-            <input type="number" id="weight_kg" name="weight_kg" placeholder="e.g. 75" min="36" max="635" value="{{ profile.weight|default:'' }}">
+            <input type="number" id="weight_kg" name="weight_kg" placeholder="e.g. 75.50" min="36" max="635" step="0.01" value="{{ profile.weight|default:'' }}">
           </div>
+          <input type="hidden" id="weight_lbs_original" value="{{ weight_lbs }}">
+          <input type="hidden" id="weight_kg_original" value="{{ profile.weight|default:'' }}">
           <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 6px;">Range: 80-1400 lb or 36-635 kg</div>
           {% if errors.weight %}<div class="form-error">{{ errors.weight.0 }}</div>{% endif %}
         </div>
@@ -752,24 +754,40 @@ function convertHeightMetricToImperial() {
 }
 
 function convertWeightImperialToMetric() {
-  const weightLbs = document.getElementById('weight_lbs').value;
+  const originalLbs = document.getElementById('weight_lbs_original').value;
+  const currentLbs = document.getElementById('weight_lbs').value;
   
-  if (weightLbs) {
-    const lbs = parseInt(weightLbs);
-    const weightKg = Math.round(lbs * 0.45359237);
+  // Use original value if available, otherwise current
+  const lbs = originalLbs ? parseFloat(originalLbs) : parseFloat(currentLbs);
+  
+  if (lbs) {
+    const weightKg = Math.round(lbs * 0.45359237 * 100) / 100;
     document.getElementById('weight_kg').value = weightKg;
+    document.getElementById('weight_kg_original').value = weightKg;
   }
 }
 
 function convertWeightMetricToImperial() {
-  const weightKg = document.getElementById('weight_kg').value;
+  const originalKg = document.getElementById('weight_kg_original').value;
+  const currentKg = document.getElementById('weight_kg').value;
   
-  if (weightKg) {
-    const kg = parseInt(weightKg);
-    const weightLbs = Math.round(kg * 2.20462);
+  // Use original value if available, otherwise current
+  const kg = originalKg ? parseFloat(originalKg) : parseFloat(currentKg);
+  
+  if (kg) {
+    const weightLbs = Math.round(kg * 2.20462 * 100) / 100;
     document.getElementById('weight_lbs').value = weightLbs;
+    document.getElementById('weight_lbs_original').value = weightLbs;
   }
 }
+
+document.getElementById('weight_lbs').addEventListener('change', function() {
+  document.getElementById('weight_lbs_original').value = this.value;
+});
+
+document.getElementById('weight_kg').addEventListener('change', function() {
+  document.getElementById('weight_kg_original').value = this.value;
+});
 
 function toggleUnitFields() {
   const heightUnit = document.getElementById('height_unit').value;
