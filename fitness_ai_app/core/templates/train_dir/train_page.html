@@ -1177,6 +1177,36 @@
         checkbox.addEventListener('change', loadExerciseLibrary);
     });
 
+    // Persist and restore workout selection (per date)
+    const workoutSelectElement = document.getElementById('libraryWorkoutSelect');
+    if (workoutSelectElement) {
+        const currentDate = '{{ date_string }}';
+        const storageKey = `selectedWorkoutForLibrary_${currentDate}`;
+        
+        // Restore saved selection for this date
+        const savedWorkoutId = localStorage.getItem(storageKey);
+        if (savedWorkoutId) {
+            // Verify the saved workout still exists in the current options
+            const option = workoutSelectElement.querySelector(`option[value="${savedWorkoutId}"]`);
+            if (option) {
+                workoutSelectElement.value = savedWorkoutId;
+            } else {
+                // Saved workout doesn't exist (may have been deleted), reset to default
+                localStorage.removeItem(storageKey);
+                workoutSelectElement.value = '';
+            }
+        }
+
+        // Save selection when changed
+        workoutSelectElement.addEventListener('change', function() {
+            if (this.value) {
+                localStorage.setItem(storageKey, this.value);
+            } else {
+                localStorage.removeItem(storageKey);
+            }
+        });
+    }
+
     if ('{{ selected_tab|default:"today" }}' === 'search') {
         loadExerciseLibrary();
     }
