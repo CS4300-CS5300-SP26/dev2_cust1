@@ -1021,10 +1021,25 @@ def toggle_food_item(request):
 
 @login_required
 @require_POST
+def toggle_food_group(request):
+    group_id = request.POST.get('group_id')
+    date_param = request.POST.get('date')
+
+    group = get_object_or_404(FoodGroup, id=group_id, meal__user=request.user)
+    items = group.grouped_items.all()
+    # If every item in the group is already completed, uncheck all; otherwise check all.
+    all_completed = items.exists() and not items.filter(completed=False).exists()
+    items.update(completed=not all_completed)
+
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
 def delete_food_item(request):
     item_id = request.POST.get('item_id')
     date_param = request.POST.get('date')
-    
+
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.delete()
     messages.success(request, 'Food item deleted.')

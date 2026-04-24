@@ -50,6 +50,7 @@ urlpatterns = [
     path('nutrition/delete_food_group/', views.delete_food_group, name='delete_food_group'),
     path('nutrition/delete_meal/', views.delete_meal, name='delete_meal'),
     path('nutrition/add_food_item/', views.add_food_item, name='add_food_item'),
+    path('nutrition/toggle_food_group/', views.toggle_food_group, name='toggle_food_group'),
     path('nutrition/toggle_food_item/', views.toggle_food_item, name='toggle_food_item'),
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),
     path('nutrition/add_supplement_to_meal/', views.add_supplement_to_meal, name='add_supplement_to_meal'),

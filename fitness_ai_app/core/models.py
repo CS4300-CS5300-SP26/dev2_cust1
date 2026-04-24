@@ -105,6 +105,11 @@ class FoodGroup(models.Model):
     class Meta:
         ordering = ['created_at']
 
+    @property
+    def all_completed(self):
+        items = self.grouped_items.all()
+        return items.exists() and not items.filter(completed=False).exists()
+
     def __str__(self):
         return f"{self.name} ({self.meal.name})"
 
