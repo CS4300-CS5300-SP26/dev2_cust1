@@ -891,6 +891,20 @@ def add_meal(request):
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
+def _parse_serving_size(raw):
+    """Parse a serving size string (whole number, decimal, or fraction like '1/2') into a float clamped to (0, 1000]."""
+    raw = (raw or '1').strip()
+    try:
+        if '/' in raw:
+            num, den = raw.split('/', 1)
+            result = float(num) / float(den)
+        else:
+            result = float(raw)
+    except (ValueError, ZeroDivisionError):
+        result = 1.0
+    return max(0.01, min(result, 1000))
+
+
 @login_required
 @require_POST
 def add_food_item(request):
@@ -916,14 +930,17 @@ def add_food_item(request):
     protein = request.POST.get('protein', '0')
     carbs = request.POST.get('carbs', '0')
     fats = request.POST.get('fats', '0')
-    
+
     try:
         protein = int(protein) if protein else 0
         carbs = int(carbs) if carbs else 0
         fats = int(fats) if fats else 0
     except ValueError:
         protein = carbs = fats = 0
-    
+
+    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
+    serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
+
     # Check if this is an update or create
     if item_id:
         try:
@@ -933,6 +950,8 @@ def add_food_item(request):
             food_item.protein = protein
             food_item.carbs = carbs
             food_item.fats = fats
+            food_item.serving_size = serving_size
+            food_item.serving_unit = serving_unit
             food_item.save()
             messages.success(request, f'Food item "{food_name}" updated.')
         except FoodItem.DoesNotExist:
@@ -944,7 +963,9 @@ def add_food_item(request):
             calories=calories,
             protein=protein,
             carbs=carbs,
-            fats=fats
+            fats=fats,
+            serving_size=serving_size,
+            serving_unit=serving_unit,
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
 
@@ -977,6 +998,9 @@ def add_food_item_ajax(request):
     except ValueError:
         protein = carbs = fats = 0
 
+    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
+    serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
+
     group_id = request.POST.get('group_id')
     group = None
     if group_id:
@@ -985,6 +1009,7 @@ def add_food_item_ajax(request):
     item = FoodItem.objects.create(
         meal=meal, name=food_name, calories=calories,
         protein=protein, carbs=carbs, fats=fats, group=group,
+        serving_size=serving_size, serving_unit=serving_unit,
     )
     return JsonResponse({
         'item_id': item.id,
@@ -993,6 +1018,8 @@ def add_food_item_ajax(request):
         'protein': item.protein,
         'carbs': item.carbs,
         'fats': item.fats,
+        'serving_size': str(item.serving_size),
+        'serving_unit': item.serving_unit,
     })
 
 
@@ -1150,7 +1177,7 @@ def search_foods(request):
     food_items = (
         FoodItem.objects
         .filter(name__icontains=query)
-        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
+        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_unit', 'serving_size')
         .order_by('name')[:20]
     )
     
@@ -1197,6 +1224,15 @@ def get_all_foods(request):
     # Sort by name alphabetically
     results = sorted(seen_names.values(), key=lambda x: x['name'].lower())
     return JsonResponse({'foods': results, 'count': len(results)})
+
+
+@login_required
+def get_food_units(request):
+    """Return distinct serving units from the food database, always including grams, cups, and ounces."""
+    db_units = list(FoodItem.objects.values_list('serving_unit', flat=True).distinct())
+    required = ['grams', 'cups', 'ounces']
+    all_units = list(dict.fromkeys(db_units + required))
+    return JsonResponse({'units': all_units})
 
 
 @login_required

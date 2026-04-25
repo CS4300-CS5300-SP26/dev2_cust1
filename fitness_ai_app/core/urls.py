@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/search_foods/', views.search_foods, name='search_foods'),
     path('api/save_food/', views.save_food_to_database, name='save_food_to_database'),
     path('api/all_foods/', views.get_all_foods, name='get_all_foods'),
+    path('api/food_units/', views.get_food_units, name='get_food_units'),
     # Exercise Database API endpoints
     path('api/exercises/types/', exercise_api.get_exercise_types, name='get_exercise_types'),
     path('api/exercises/muscle-groups/', exercise_api.get_muscle_groups, name='get_muscle_groups'),
