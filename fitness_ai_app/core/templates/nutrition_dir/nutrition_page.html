@@ -304,15 +304,20 @@
                         </div>
                     </div>
                     <div style="margin-bottom:16px;">
-                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Serving Size</label>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                            <input type="text" id="foodServingsInput" name="serving_size" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <select id="foodUnitSelect" name="serving_unit" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
-                                <option value="serving">serving</option>
-                                <option value="grams">grams</option>
-                                <option value="cups">cups</option>
-                                <option value="ounces">ounces</option>
-                            </select>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                <input type="text" id="foodServingsInput" name="serving_size" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                <select id="foodUnitSelect" name="serving_unit" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                    <option value="serving">serving</option>
+                                    <option value="grams">grams</option>
+                                    <option value="cups">cups</option>
+                                    <option value="ounces">ounces</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="servingInputError" style="color:#e74c3c;font-size:11px;margin-top:4px;display:none;"></div>
                     </div>
@@ -411,13 +416,19 @@
                             <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-                            <input type="text" id="mealFoodServingsInput" placeholder="Servings (e.g. 1, 1/2)" value="1" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <select id="mealFoodUnitSelect" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
-                                <option value="serving">serving</option>
-                                <option value="grams">grams</option>
-                                <option value="cups">cups</option>
-                                <option value="ounces">ounces</option>
-                            </select>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                <input type="text" id="mealFoodServingsInput" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                <select id="mealFoodUnitSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                    <option value="serving">serving</option>
+                                    <option value="grams">grams</option>
+                                    <option value="cups">cups</option>
+                                    <option value="ounces">ounces</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="meal-action-row">
                             <button type="button" id="mealAddItemBtn" style="flex:1;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
@@ -697,13 +708,19 @@
                                     <input type="number" name="fats" class="food-fats-input" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 </div>
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                                    <input type="text" name="serving_size" class="food-serving-input" placeholder="Servings (e.g. 1, 1/2)" value="1" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <select name="serving_unit" class="food-unit-select" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                    <div>
+                                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                        <input type="text" name="serving_size" class="food-serving-input" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                        <select name="serving_unit" class="food-unit-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
                                         <option value="serving">serving</option>
                                         <option value="grams">grams</option>
                                         <option value="cups">cups</option>
                                         <option value="ounces">ounces</option>
                                     </select>
+                                    </div>
                                 </div>
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
                             </form>
@@ -1063,7 +1080,7 @@
                     .then(data => {
                         if (data.results && data.results.length > 0) {
                             resultsDiv.innerHTML = data.results.map(function(item) {
-                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" data-unit="${item.serving_unit || 'serving'}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
+                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" data-unit="${item.serving_unit || 'serving'}" data-size="${item.serving_size || 1}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
                                     <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
                                     <div style="font-size:11px;color:#888;margin-top:2px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
                                 </div>`;
@@ -1080,12 +1097,25 @@
                                     form.querySelector('.food-carbs-input').value = this.dataset.carbs;
                                     form.querySelector('.food-fats-input').value = this.dataset.fats;
                                     const unitSel = form.querySelector('.food-unit-select');
-                                    if (unitSel && this.dataset.unit) {
+                                    const servingIn = form.querySelector('.food-serving-input');
+                                    const unit = this.dataset.unit || 'serving';
+                                    const size = parseFloat(this.dataset.size) || 1;
+                                    if (servingIn) servingIn.value = size;
+                                    if (unitSel) {
                                         let found = false;
-                                        for (const opt of unitSel.options) { if (opt.value === this.dataset.unit) { found = true; break; } }
-                                        if (!found) { const o = document.createElement('option'); o.value = this.dataset.unit; o.textContent = this.dataset.unit; unitSel.appendChild(o); }
-                                        unitSel.value = this.dataset.unit;
+                                        for (const opt of unitSel.options) { if (opt.value === unit) { found = true; break; } }
+                                        if (!found) { const o = document.createElement('option'); o.value = unit; o.textContent = unit; unitSel.appendChild(o); }
+                                        unitSel.dataset.prevUnit = unit;
+                                        unitSel.value = unit;
                                     }
+                                    // Store nutrition anchor for live scaling
+                                    form.dataset.nutritionBase = JSON.stringify(buildNutritionBase(
+                                        parseInt(this.dataset.calories) || 0,
+                                        parseInt(this.dataset.protein)  || 0,
+                                        parseInt(this.dataset.carbs)    || 0,
+                                        parseInt(this.dataset.fats)     || 0,
+                                        size, unit
+                                    ));
                                     resultsDiv.style.display = 'none';
                                 });
                                 
@@ -2065,40 +2095,32 @@
      */
     function buildNutritionBase(calories, protein, carbs, fats, servingSize, servingUnit) {
         const unit = (servingUnit || '').toLowerCase().trim();
-        const gramsPerUnit = GRAMS_PER_UNIT[unit];
-        if (!gramsPerUnit) return null;
+        const gramsPerUnit = GRAMS_PER_UNIT[unit] || null;
         const size = parseFloat(servingSize) || 1;
-        const totalGrams = size * gramsPerUnit;
-        if (totalGrams <= 0) return null;
-        return {
-            calories, protein, carbs, fats,
-            servingSize: size,
-            servingUnit: unit,
-            totalGrams,
-        };
+        const totalGrams = gramsPerUnit ? size * gramsPerUnit : null;
+        return { calories, protein, carbs, fats, servingSize: size, servingUnit: unit, totalGrams };
     }
 
-    /**
-     * Recalculates macro fields based on the stored nutrition anchor,
-     * the current serving quantity, and the current unit.
-     */
     function applyNutritionFromBase(base, currentServings, currentUnit, calEl, protEl, carbEl, fatEl) {
         if (!base) return;
         const n = parseServingSize(String(currentServings));
         if (isNaN(n) || n <= 0) return;
 
         const unit = (currentUnit || '').toLowerCase().trim();
-        const gramsPerUnit = GRAMS_PER_UNIT[unit];
+        const gramsPerUnit = GRAMS_PER_UNIT[unit] || null;
 
         let scale;
-        if (gramsPerUnit) {
-            // Both original and current units are measurable → use gram ratio
+        if (gramsPerUnit && base.totalGrams) {
+            // Both units are measurable (grams, cups, oz, …) → scale by gram ratio
             scale = (n * gramsPerUnit) / base.totalGrams;
+        } else if (!gramsPerUnit && !base.totalGrams) {
+            // Both units are non-measurable (e.g. "serving") → scale by serving count
+            scale = n / base.servingSize;
         } else if (unit === base.servingUnit) {
-            // Same non-measurable unit (e.g. both "serving") → simple multiplier
+            // Same unit regardless of measurability → scale by serving count
             scale = n / base.servingSize;
         } else {
-            // Can't convert between incompatible units — leave values alone
+            // Incompatible (measurable ↔ non-measurable) — leave values alone
             return;
         }
 
@@ -2128,12 +2150,10 @@
             const prevUnit = unitSel.dataset.prevUnit || unitSel.value;
             const newUnit  = unitSel.value;
 
-            // If no anchor yet but the unit we were just on was measurable,
-            // build one from whatever is currently in the form fields.
+            // If no anchor yet, build one from whatever is currently in the form.
             if (!modalNutritionBase) {
-                const prevGrams = GRAMS_PER_UNIT[(prevUnit).toLowerCase().trim()];
                 const n = parseServingSize(servingsIn.value);
-                if (prevGrams && !isNaN(n) && n > 0) {
+                if (!isNaN(n) && n > 0) {
                     modalNutritionBase = buildNutritionBase(
                         parseInt(calIn.value)  || 0,
                         parseInt(protIn.value) || 0,
@@ -2178,9 +2198,8 @@
             const newUnit  = unitSel.value;
 
             if (!mealNutritionBase) {
-                const prevGrams = GRAMS_PER_UNIT[(prevUnit).toLowerCase().trim()];
                 const n = parseServingSize(servingsIn.value);
-                if (prevGrams && !isNaN(n) && n > 0) {
+                if (!isNaN(n) && n > 0) {
                     mealNutritionBase = buildNutritionBase(
                         parseInt(calIn.value)  || 0,
                         parseInt(protIn.value) || 0,
@@ -2316,21 +2335,69 @@
         }
     });
 
-    // Validate and convert fractions for inline food forms in meal cards.
+    // Wire up live macro conversion + validation for inline meal card food forms.
     document.querySelectorAll('.food-form').forEach(function(form) {
+        const servingIn = form.querySelector('.food-serving-input');
+        const unitSel   = form.querySelector('.food-unit-select');
+        const calIn     = form.querySelector('.food-calories-input');
+        const protIn    = form.querySelector('.food-protein-input');
+        const carbIn    = form.querySelector('.food-carbs-input');
+        const fatIn     = form.querySelector('.food-fats-input');
+
+        function getBase() {
+            try { return form.dataset.nutritionBase ? JSON.parse(form.dataset.nutritionBase) : null; }
+            catch(e) { return null; }
+        }
+        function clearBase() { form.dataset.nutritionBase = ''; }
+
+        if (unitSel) {
+            unitSel.dataset.prevUnit = unitSel.value;
+            unitSel.addEventListener('mousedown', function() { this.dataset.prevUnit = this.value; });
+            unitSel.addEventListener('change', function() {
+                const prevUnit = unitSel.dataset.prevUnit || unitSel.value;
+                const newUnit  = unitSel.value;
+                let base = getBase();
+                if (!base) {
+                    const n = parseServingSize(servingIn ? servingIn.value : '1');
+                    if (!isNaN(n) && n > 0) {
+                        base = buildNutritionBase(
+                            parseInt(calIn  ? calIn.value  : 0) || 0,
+                            parseInt(protIn ? protIn.value : 0) || 0,
+                            parseInt(carbIn ? carbIn.value : 0) || 0,
+                            parseInt(fatIn  ? fatIn.value  : 0) || 0,
+                            n, prevUnit
+                        );
+                        form.dataset.nutritionBase = JSON.stringify(base);
+                    }
+                }
+                applyNutritionFromBase(base, servingIn ? servingIn.value : '1', newUnit, calIn, protIn, carbIn, fatIn);
+                unitSel.dataset.prevUnit = newUnit;
+            });
+        }
+
+        if (servingIn) {
+            servingIn.addEventListener('input', function() {
+                applyNutritionFromBase(getBase(), servingIn.value, unitSel ? unitSel.value : 'serving', calIn, protIn, carbIn, fatIn);
+            });
+        }
+
+        if (calIn)  calIn.addEventListener('input',  clearBase);
+        if (protIn) protIn.addEventListener('input', clearBase);
+        if (carbIn) carbIn.addEventListener('input', clearBase);
+        if (fatIn)  fatIn.addEventListener('input',  clearBase);
+
         form.addEventListener('submit', function(e) {
-            const servingInput = form.querySelector('.food-serving-input');
-            if (!servingInput) return;
-            const val = servingInput.value.trim();
+            if (!servingIn) return;
+            const val = servingIn.value.trim();
             const err = validateServingSize(val);
             if (err) {
                 e.preventDefault();
                 alert(err);
-                servingInput.focus();
+                servingIn.focus();
                 return;
             }
             const n = parseServingSize(val);
-            servingInput.value = n.toFixed(4).replace(/\.?0+$/, '') || '1';
+            servingIn.value = n.toFixed(4).replace(/\.?0+$/, '') || '1';
         });
     });
 
