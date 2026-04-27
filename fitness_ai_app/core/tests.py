@@ -3005,6 +3005,7 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, 'Exercises')
         self.assertContains(response, 'Calories')
         self.assertContains(response, 'Score Streak')
+        self.assertContains(response, "Today's Activities")
 
     def test_home_dash_includes_daily_workout_goal_progress(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
@@ -3044,6 +3045,49 @@ class HomeDashViewTests(TestCase):
         self.assertEqual(response.context['completed_exercises'], 1)
         self.assertEqual(response.context['workout_goal_percentage'], 20.0)
         self.assertContains(response, 'Goal: 1/5')
+
+    def test_home_dash_shows_no_activities_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_todays_activities_and_train_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Workout',
+            goal='strength',
+            date=date.today() - timedelta(days=1),
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Push Up',
+            muscle_group='chest',
+            completed=False,
+        )
+        Exercise.objects.create(
+            workout=yesterday_workout,
+            name='Past Lunge',
+            muscle_group='legs',
+            completed=False,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'Push Up - Today Workout')
+        self.assertNotContains(response, 'Past Lunge')
+        self.assertContains(response, 'Go to Train Page')
 
     def test_home_dash_updates_after_toggling_exercise_completion(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')

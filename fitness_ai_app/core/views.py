@@ -878,6 +878,14 @@ def home_dash(request):
         .annotate(total_exercises=Count('id'))
         .values_list('workout__date', 'total_exercises')
     )
+    today_activities = list(
+        Exercise.objects.filter(
+            workout__user=request.user,
+            workout__date=today,
+        )
+        .select_related('workout')
+        .order_by('workout__created_at', 'created_at')
+    )
 
     completion_streak = 0
     streak_date = today
@@ -899,6 +907,7 @@ def home_dash(request):
         'completed_exercises': completed_exercises,
         'workout_goal_percentage': workout_goal_percentage,
         'completion_streak': completion_streak,
+        'today_activities': today_activities,
     })
 
 

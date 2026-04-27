@@ -79,6 +79,25 @@
         </div>
     </div>
     
+    <!-- Today's Activities Container -->
+    <div style="max-width:640px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Activities</div>
+        {% if today_activities %}
+            <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
+                {% for activity in today_activities %}
+                    <div style="padding:10px 12px;background:#111;border:1px solid #242424;border-radius:8px;font-size:0.85rem;color:#ddd;">
+                        {{ activity.name }} - {{ activity.workout.name }}
+                    </div>
+                {% endfor %}
+            </div>
+            <a href="{% url 'train_page' %}" style="display:inline-block;padding:10px 14px;background:rgba(246,125,38,0.2);border:1px solid rgba(246,125,38,0.4);border-radius:8px;text-decoration:none;color:#f67d26;font-weight:600;">
+                Go to Train Page
+            </a>
+        {% else %}
+            <div style="font-size:0.85rem;color:#bbb;">No activities for today, enjoy your day off</div>
+        {% endif %}
+    </div>
+    
     <!-- Quick Links -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:400px;margin:0 auto;">
         <a href="{% url 'nutrition_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
