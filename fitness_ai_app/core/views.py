@@ -882,6 +882,7 @@ def home_dash(request):
         Exercise.objects.filter(
             workout__user=request.user,
             workout__date=today,
+            completed=False,
         )
         .select_related('workout')
         .order_by('workout__created_at', 'created_at')
@@ -896,10 +897,12 @@ def home_dash(request):
     )
     today_nutrition = []
     for meal in today_meals:
-        food_names = [item.name for item in meal.items.all()]
-        supplement_names = [supplement.name for supplement in meal.supplements.all()]
+        food_names = [item.name for item in meal.items.all() if not item.completed]
+        supplement_names = [supplement.name for supplement in meal.supplements.all() if not supplement.taken]
         nutrition_names = food_names + supplement_names
-        foods_text = ', '.join(nutrition_names) if nutrition_names else 'No food or supplements yet'
+        if not nutrition_names:
+            continue
+        foods_text = ', '.join(nutrition_names)
         today_nutrition.append({
             'meal_name': meal.name,
             'foods_text': foods_text,
@@ -907,6 +910,7 @@ def home_dash(request):
     today_supplements = SupplementEntry.objects.filter(
         user=request.user,
         date=today,
+        taken=False,
     ).order_by('name')
     for supplement in today_supplements:
         today_nutrition.append({

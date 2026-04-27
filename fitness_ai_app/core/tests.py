@@ -3077,6 +3077,12 @@ class HomeDashViewTests(TestCase):
             completed=False,
         )
         Exercise.objects.create(
+            workout=today_workout,
+            name='Completed Curl',
+            muscle_group='arms',
+            completed=True,
+        )
+        Exercise.objects.create(
             workout=yesterday_workout,
             name='Past Lunge',
             muscle_group='legs',
@@ -3087,6 +3093,7 @@ class HomeDashViewTests(TestCase):
 
         self.assertContains(response, "Today's Activities")
         self.assertContains(response, 'Push Up - Today Workout')
+        self.assertNotContains(response, 'Completed Curl')
         self.assertNotContains(response, 'Past Lunge')
         self.assertContains(response, 'Go to Train Page')
 
@@ -3117,6 +3124,12 @@ class HomeDashViewTests(TestCase):
             calories=250,
         )
         FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Completed Banana',
+            calories=120,
+            completed=True,
+        )
+        FoodItem.objects.create(
             meal=yesterday_dinner,
             name='Steak',
             calories=500,
@@ -3126,6 +3139,7 @@ class HomeDashViewTests(TestCase):
 
         self.assertContains(response, "Today's Nutrition")
         self.assertContains(response, 'Oatmeal - Today Breakfast')
+        self.assertNotContains(response, 'Completed Banana')
         self.assertNotContains(response, 'Yesterday Dinner - Steak')
         self.assertContains(response, 'Go to Nutrition Page')
 
@@ -3194,6 +3208,87 @@ class HomeDashViewTests(TestCase):
         response = self.client.get('/home_dash/')
         self.assertEqual(response.context['completed_exercises'], 1)
         self.assertContains(response, 'Goal: 1/5')
+        self.assertNotContains(response, 'Lunge - Daily Workout')
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_updates_after_toggling_food_item_completion(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Lunch',
+            date=date.today(),
+        )
+        food_item = FoodItem.objects.create(
+            meal=meal,
+            name='Chicken Bowl',
+            calories=550,
+            completed=False,
+        )
+
+        self.client.post('/nutrition/toggle_food_item/', {
+            'item_id': food_item.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        response = self.client.get('/home_dash/')
+
+        self.assertNotContains(response, 'Chicken Bowl - Lunch')
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_only_untaken_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Dinner',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+            taken=False,
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Zinc',
+            supplement_type='mineral',
+            dosage='25',
+            unit='mg',
+            taken=True,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='500',
+            unit='mg',
+            date=date.today(),
+            taken=True,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, 'Creatine - Dinner')
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertNotContains(response, 'Zinc')
+        self.assertNotContains(response, 'Vitamin C')
+        self.assertContains(response, 'Go to Nutrition Page')
 
     def test_home_dash_streak_counts_consecutive_days_meeting_both_goals(self):
         from core.models import UserProfile
