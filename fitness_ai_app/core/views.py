@@ -101,6 +101,27 @@ def _weight_kg_to_lbs(weight_kg):
     return round(float(weight_kg) * 2.20462, 2)
 
 
+def _choice_labels(choices):
+    """Return a comma-separated list of display labels for model choices."""
+    return ', '.join(label for _, label in choices)
+
+
+def _build_profile_option_catalog():
+    """List profile fields and selectable options shown on get_started_profile."""
+    return (
+        '- Profile fields and selectable options:\n'
+        f'  - Primary Fitness Goal: {_choice_labels(UserProfile.PRIMARY_GOAL_CHOICES)}\n'
+        f'  - Experience Level: {_choice_labels(UserProfile.EXPERIENCE_LEVEL_CHOICES)}\n'
+        f'  - Dietary Preference: {_choice_labels(UserProfile.DIETARY_PREFERENCE_CHOICES)}\n'
+        '  - Fitness at Home?: Yes, No\n'
+        f'  - Available Home Equipment: {_choice_labels(UserProfile.HOME_EQUIPMENT_CHOICES)}\n'
+        '  - Height input range: 4-9 ft (plus 0-11 in) or 122-272 cm\n'
+        '  - Weight input range: 80-1400 lb or 36-635 kg\n'
+        '  - Age input range: 13-120 years\n'
+        '  - Daily Calorie Goal input range: 1000-5000 kcal (blank uses default 2400)'
+    )
+
+
 def _infer_muscle_group_from_training_exercise(training_exercise):
     """Map a TrainingExercise to legacy Exercise muscle groups."""
     keyword_map = {
@@ -226,10 +247,13 @@ def _save_chat_conversation_state(conversation, normalized_messages, reply):
 
 def _build_ai_user_context(user):
     """Build a compact user context snapshot for personalized coaching."""
+    profile_options_context = _build_profile_option_catalog()
+
     if not user or not user.is_authenticated:
         return (
             '- User session: not authenticated\n'
-            '- Guidance mode: general coaching only'
+            '- Guidance mode: general coaching only\n'
+            f'{profile_options_context}'
         )
 
     today = date.today()
@@ -267,6 +291,9 @@ def _build_ai_user_context(user):
     profile_home_gym = 'Not set'
     profile_equipment = 'None listed'
     profile_bio = 'Not provided'
+    profile_height = 'Not set'
+    profile_weight = 'Not set'
+    profile_age = 'Not set'
     if profile:
         profile_goal = profile.get_primary_goal_display() if profile.primary_goal else 'Not set'
         profile_experience = (
@@ -287,6 +314,15 @@ def _build_ai_user_context(user):
             profile_bio = ' '.join(profile.bio.split())
             if len(profile_bio) > 600:
                 profile_bio = f'{profile_bio[:600]}...'
+        if profile.height:
+            feet, inches = _height_cm_to_us(profile.height)
+            profile_height = f'{profile.height} cm ({feet} ft {inches} in)'
+        if profile.weight:
+            weight_kg = float(profile.weight)
+            weight_lbs = _weight_kg_to_lbs(profile.weight)
+            profile_weight = f'{weight_kg:.2f} kg ({weight_lbs:.2f} lb)'
+        if profile.age:
+            profile_age = f'{profile.age} years'
 
     injuries_context = 'None logged'
     active_injuries = list(
@@ -306,6 +342,9 @@ def _build_ai_user_context(user):
         f'- Goal: {profile_goal}\n'
         f'- Experience level: {profile_experience}\n'
         f'- Dietary preference: {profile_diet}\n'
+        f'- Height: {profile_height}\n'
+        f'- Weight: {profile_weight}\n'
+        f'- Age: {profile_age}\n'
         f'- Home gym available: {profile_home_gym}\n'
         f'- Available equipment: {profile_equipment}\n'
         f'- About You field value: {profile_bio}\n'
@@ -315,7 +354,8 @@ def _build_ai_user_context(user):
         f'{total_carbs}g carbs, {total_fats}g fats\n'
         f'- Workouts planned today: {workouts_today}\n'
         f'- Exercises completed today: {completed_exercises}\n'
-        f'- Supplements taken today: {supplements_taken}/{supplements_total}'
+        f'- Supplements taken today: {supplements_taken}/{supplements_total}\n'
+        f'{profile_options_context}'
     )
 
 
@@ -340,6 +380,7 @@ def _build_ai_system_prompt(user):
             '8. When giving app navigation help, use exact user-visible UI labels from this app; avoid generic or invented menus.\n'
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
+            '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'

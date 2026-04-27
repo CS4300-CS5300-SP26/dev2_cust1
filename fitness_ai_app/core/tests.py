@@ -1208,6 +1208,72 @@ class ApiChatViewTests(TestCase):
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_profile_height_weight_and_age_are_included_in_system_context(self, mock_openai_cls):
+        from core.models import UserProfile
+
+        user = User.objects.create_user(
+            username='metricschat@example.com',
+            email='metricschat@example.com',
+            password='TestPass123!',
+        )
+        UserProfile.objects.create(
+            user=user,
+            height=180,
+            weight=Decimal('75.50'),
+            age=34,
+        )
+        self.client.login(username='metricschat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Metric-aware response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'What is my height and weight?'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        self.assertIn('Height: 180 cm (5 ft 11 in)', create_kwargs['messages'][0]['content'])
+        self.assertIn('Weight: 75.50 kg (166.45 lb)', create_kwargs['messages'][0]['content'])
+        self.assertIn('Age: 34 years', create_kwargs['messages'][0]['content'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_profile_option_catalog_is_included_in_system_context(self, mock_openai_cls):
+        user = User.objects.create_user(
+            username='optionschat@example.com',
+            email='optionschat@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='optionschat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Options-aware response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'What options are there for my profile?'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        prompt = create_kwargs['messages'][0]['content']
+        self.assertIn('Profile fields and selectable options:', prompt)
+        self.assertIn('Primary Fitness Goal: Weight Loss, Muscle Gain', prompt)
+        self.assertIn('Experience Level: Beginner, Intermediate, Advanced', prompt)
+        self.assertIn('Dietary Preference: Omnivore, Vegetarian, Vegan', prompt)
+        self.assertIn('Fitness at Home?: Yes, No', prompt)
+        self.assertIn('Available Home Equipment: Dumbbells, Resistance Bands', prompt)
+        self.assertIn('Height input range: 4-9 ft (plus 0-11 in) or 122-272 cm', prompt)
+        self.assertIn('Weight input range: 80-1400 lb or 36-635 kg', prompt)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_active_injuries_are_included_in_system_context(self, mock_openai_cls):
         from core.models import UserInjury, UserProfile
 
