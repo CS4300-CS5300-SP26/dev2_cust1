@@ -891,16 +891,27 @@ def home_dash(request):
             user=request.user,
             date=today,
         )
-        .prefetch_related('items')
+        .prefetch_related('items', 'supplements')
         .order_by('created_at')
     )
     today_nutrition = []
     for meal in today_meals:
         food_names = [item.name for item in meal.items.all()]
-        foods_text = ', '.join(food_names) if food_names else 'No food items yet'
+        supplement_names = [supplement.name for supplement in meal.supplements.all()]
+        nutrition_names = food_names + supplement_names
+        foods_text = ', '.join(nutrition_names) if nutrition_names else 'No food or supplements yet'
         today_nutrition.append({
             'meal_name': meal.name,
             'foods_text': foods_text,
+        })
+    today_supplements = SupplementEntry.objects.filter(
+        user=request.user,
+        date=today,
+    ).order_by('name')
+    for supplement in today_supplements:
+        today_nutrition.append({
+            'meal_name': 'Supplements',
+            'foods_text': supplement.name,
         })
 
     completion_streak = 0

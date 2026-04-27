@@ -3129,6 +3129,49 @@ class HomeDashViewTests(TestCase):
         self.assertNotContains(response, 'Yesterday Dinner - Steak')
         self.assertContains(response, 'Go to Nutrition Page')
 
+    def test_home_dash_shows_meal_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=today_breakfast,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Creatine - Today Breakfast')
+        self.assertContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_standalone_supplements_in_todays_nutrition(self):
+        from core.models import SupplementEntry
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertContains(response, 'Go to Nutrition Page')
+
     def test_home_dash_updates_after_toggling_exercise_completion(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
         workout = Workout.objects.create(
