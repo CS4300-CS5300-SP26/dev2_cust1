@@ -886,6 +886,22 @@ def home_dash(request):
         .select_related('workout')
         .order_by('workout__created_at', 'created_at')
     )
+    today_meals = list(
+        Meal.objects.filter(
+            user=request.user,
+            date=today,
+        )
+        .prefetch_related('items')
+        .order_by('created_at')
+    )
+    today_nutrition = []
+    for meal in today_meals:
+        food_names = [item.name for item in meal.items.all()]
+        foods_text = ', '.join(food_names) if food_names else 'No food items yet'
+        today_nutrition.append({
+            'meal_name': meal.name,
+            'foods_text': foods_text,
+        })
 
     completion_streak = 0
     streak_date = today
@@ -908,6 +924,7 @@ def home_dash(request):
         'workout_goal_percentage': workout_goal_percentage,
         'completion_streak': completion_streak,
         'today_activities': today_activities,
+        'today_nutrition': today_nutrition,
     })
 
 

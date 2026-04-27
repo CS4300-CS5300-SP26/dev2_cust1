@@ -80,7 +80,7 @@
     </div>
     
     <!-- Today's Activities Container -->
-    <div style="max-width:640px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
+    <div style="max-width:640px;margin:0 auto 12px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
         <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Activities</div>
         {% if today_activities %}
             <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
@@ -95,6 +95,25 @@
             </a>
         {% else %}
             <div style="font-size:0.85rem;color:#bbb;">No activities for today, enjoy your day off</div>
+        {% endif %}
+    </div>
+
+    <!-- Today's Nutrition Container -->
+    <div style="max-width:640px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Nutrition</div>
+        {% if today_nutrition %}
+            <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
+                {% for meal in today_nutrition %}
+                    <div style="padding:10px 12px;background:#111;border:1px solid #242424;border-radius:8px;font-size:0.85rem;color:#ddd;">
+                        {{ meal.foods_text }} - {{ meal.meal_name }}
+                    </div>
+                {% endfor %}
+            </div>
+            <a href="{% url 'nutrition_page' %}" style="display:inline-block;padding:10px 14px;background:rgba(246,125,38,0.2);border:1px solid rgba(246,125,38,0.4);border-radius:8px;text-decoration:none;color:#f67d26;font-weight:600;">
+                Go to Nutrition Page
+            </a>
+        {% else %}
+            <div style="font-size:0.85rem;color:#bbb;">No meals for today, enjoy your day off</div>
         {% endif %}
     </div>
     

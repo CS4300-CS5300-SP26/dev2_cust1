@@ -3006,6 +3006,7 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, 'Calories')
         self.assertContains(response, 'Score Streak')
         self.assertContains(response, "Today's Activities")
+        self.assertContains(response, "Today's Nutrition")
 
     def test_home_dash_includes_daily_workout_goal_progress(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
@@ -3088,6 +3089,45 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, 'Push Up - Today Workout')
         self.assertNotContains(response, 'Past Lunge')
         self.assertContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_no_nutrition_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_todays_nutrition_and_nutrition_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        yesterday_dinner = Meal.objects.create(
+            user=self.user,
+            name='Yesterday Dinner',
+            date=date.today() - timedelta(days=1),
+        )
+        FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Oatmeal',
+            calories=250,
+        )
+        FoodItem.objects.create(
+            meal=yesterday_dinner,
+            name='Steak',
+            calories=500,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Oatmeal - Today Breakfast')
+        self.assertNotContains(response, 'Yesterday Dinner - Steak')
+        self.assertContains(response, 'Go to Nutrition Page')
 
     def test_home_dash_updates_after_toggling_exercise_completion(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
