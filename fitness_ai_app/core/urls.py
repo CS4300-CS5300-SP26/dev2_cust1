@@ -55,6 +55,13 @@ urlpatterns = [
     path('nutrition/add_supplement_to_meal/', views.add_supplement_to_meal, name='add_supplement_to_meal'),
     path('nutrition/toggle_meal_supplement/', views.toggle_meal_supplement, name='toggle_meal_supplement'),
     path('nutrition/delete_meal_supplement/', views.delete_meal_supplement, name='delete_meal_supplement'),
+    # Saved items
+    path('nutrition/save_food_item/', views.save_food_item, name='save_food_item'),
+    path('nutrition/save_supplement_item/', views.save_supplement_item, name='save_supplement_item'),
+    path('nutrition/save_meal_template/', views.save_meal_template, name='save_meal_template'),
+    path('nutrition/saved_items/', views.get_saved_items, name='get_saved_items'),
+    path('nutrition/delete_saved_item/', views.delete_saved_item, name='delete_saved_item'),
+    path('nutrition/add_saved_meal_to_date/', views.add_saved_meal_to_date, name='add_saved_meal_to_date'),
     path('ai/', views.chat_page, name='ai_page'),
     path('social/', views.social_page, name='social_page'),
     path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),

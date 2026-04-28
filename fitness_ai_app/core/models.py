@@ -410,3 +410,49 @@ class MealSupplement(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.meal.name}"
+
+
+class SavedFood(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_foods')
+    name = models.CharField(max_length=200)
+    calories = models.PositiveIntegerField(default=0)
+    protein = models.PositiveIntegerField(default=0)
+    carbs = models.PositiveIntegerField(default=0)
+    fats = models.PositiveIntegerField(default=0)
+    serving_size = models.DecimalField(max_digits=8, decimal_places=2, default=1)
+    serving_unit = models.CharField(max_length=20, default='serving')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"
+
+
+class SavedSupplement(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_supplements')
+    name = models.CharField(max_length=200)
+    supplement_type = models.CharField(max_length=20, default='other')
+    dosage = models.CharField(max_length=100)
+    unit = models.CharField(max_length=50)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"
+
+
+class SavedMeal(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_meals')
+    name = models.CharField(max_length=100)
+    items = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"

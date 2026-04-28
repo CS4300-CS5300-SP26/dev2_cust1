@@ -149,7 +149,7 @@
     <div class="tab-bar-container">
         <div class="tab-bar">
             <button class="tab-button active" data-tab="today">Today</button>
-            <button class="tab-button" data-tab="history">History</button>
+            <button class="tab-button" data-tab="saved" id="savedTabBtn">Saved</button>
             <button class="tab-button" data-tab="search" id="searchTabBtn">Search</button>
         </div>
     </div>
@@ -502,6 +502,12 @@
                             <span class="meal-name">{{ meal.name }}</span>
                             <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
                             <div class="meal-actions">
+                                <button type="button" class="save-meal-btn" title="{% if meal.name in saved_meal_names %}Saved{% else %}Save meal as template{% endif %}"
+                                    data-meal-id="{{ meal.id }}"
+                                    data-saved="{% if meal.name in saved_meal_names %}true{% else %}false{% endif %}"
+                                    style="border:none;background:none;cursor:pointer;padding:4px;color:{% if meal.name in saved_meal_names %}var(--accent){% else %}#888{% endif %};">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if meal.name in saved_meal_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                </button>
                                 <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}', '{{ meal.name|escapejs }}')" title="Add food or supplement">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -535,6 +541,18 @@
                                 <span class="food-name">{{ item.name }}</span>
                                 <span class="food-calories">{{ item.calories }}</span>
                                 <div style="display:flex;gap:10px;align-items:center;margin-left:auto;">
+                                    <button type="button" class="save-food-btn" title="{% if item.name in saved_food_names %}Saved{% else %}Save food item{% endif %}"
+                                        data-name="{{ item.name|escapejs }}"
+                                        data-calories="{{ item.calories }}"
+                                        data-protein="{{ item.protein }}"
+                                        data-carbs="{{ item.carbs }}"
+                                        data-fats="{{ item.fats }}"
+                                        data-serving-size="{{ item.serving_size }}"
+                                        data-serving-unit="{{ item.serving_unit|escapejs }}"
+                                        data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}"
+                                        style="border:none;background:none;cursor:pointer;padding:2px;color:{% if item.name in saved_food_names %}var(--accent){% else %}#888{% endif %};">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if item.name in saved_food_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                    </button>
                                     <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M12 20h9"></path>
@@ -593,6 +611,18 @@
                                     <span class="food-name">{{ item.name }}</span>
                                     <span class="food-calories">{{ item.calories }}</span>
                                     <div style="display:flex;gap:10px;align-items:center;margin-left:auto;">
+                                        <button type="button" class="save-food-btn" title="{% if item.name in saved_food_names %}Saved{% else %}Save food item{% endif %}"
+                                            data-name="{{ item.name|escapejs }}"
+                                            data-calories="{{ item.calories }}"
+                                            data-protein="{{ item.protein }}"
+                                            data-carbs="{{ item.carbs }}"
+                                            data-fats="{{ item.fats }}"
+                                            data-serving-size="{{ item.serving_size }}"
+                                            data-serving-unit="{{ item.serving_unit|escapejs }}"
+                                            data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}"
+                                            style="border:none;background:none;cursor:pointer;padding:2px;color:{% if item.name in saved_food_names %}var(--accent){% else %}#888{% endif %};">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if item.name in saved_food_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                        </button>
                                         <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M12 20h9"></path>
@@ -633,6 +663,15 @@
                                 <span class="supplement-name">{{ supplement.name }}</span>
                                 <span class="supplement-dosage">{{ supplement.dosage }} {{ supplement.unit }}</span>
                                 <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+                                    <button type="button" class="save-supplement-btn" title="{% if supplement.name in saved_supplement_names %}Saved{% else %}Save supplement{% endif %}"
+                                        data-name="{{ supplement.name|escapejs }}"
+                                        data-supplement-type="{{ supplement.supplement_type }}"
+                                        data-dosage="{{ supplement.dosage }}"
+                                        data-unit="{{ supplement.unit }}"
+                                        data-saved="{% if supplement.name in saved_supplement_names %}true{% else %}false{% endif %}"
+                                        style="border:none;background:none;cursor:pointer;padding:2px;color:{% if supplement.name in saved_supplement_names %}var(--accent){% else %}#888{% endif %};">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if supplement.name in saved_supplement_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                    </button>
                                     <button type="button" class="edit-supplement-btn" title="Edit supplement" onclick="editSupplement('{{ supplement.id }}', '{{ meal.id }}', '{{ supplement.name|escapejs }}', '{{ supplement.supplement_type }}', '{{ supplement.dosage }}', '{{ supplement.unit }}')">
                                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M12 20h9"></path>
@@ -715,6 +754,15 @@
                                     <div style="font-weight:500;color:white;font-size:13px;">{{ entry.name }}</div>
                                     <div style="font-size:11px;color:#888;margin-top:2px;">{{ entry.dosage }} {{ entry.unit }} • {{ entry.get_supplement_type_display }}</div>
                                 </div>
+                                <button type="button" class="save-supplement-btn" title="{% if entry.name in saved_supplement_names %}Saved{% else %}Save supplement{% endif %}"
+                                    data-name="{{ entry.name|escapejs }}"
+                                    data-supplement-type="{{ entry.supplement_type }}"
+                                    data-dosage="{{ entry.dosage }}"
+                                    data-unit="{{ entry.unit }}"
+                                    data-saved="{% if entry.name in saved_supplement_names %}true{% else %}false{% endif %}"
+                                    style="border:none;background:none;cursor:pointer;padding:4px;color:{% if entry.name in saved_supplement_names %}var(--accent){% else %}#888{% endif %};">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if entry.name in saved_supplement_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                </button>
                                 <button class="delete-supplement-btn" data-entry-id="{{ entry.id }}" style="border:none;background:none;color:#888;cursor:pointer;padding:4px;">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -775,6 +823,32 @@
         </div>
 
 
+    </div>
+</div>
+
+<!-- Saved Items Modal -->
+<div id="savedItemsModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;">
+    <div style="max-width:480px;margin:40px auto 20px;background:#1a1a1a;border-radius:16px;border:1px solid var(--border);overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <h2 style="margin:0;font-size:18px;color:white;">Saved Items</h2>
+            <button id="closeSavedModal" style="background:none;border:none;color:#888;cursor:pointer;font-size:20px;line-height:1;">&#x2715;</button>
+        </div>
+
+        <!-- Category Tabs -->
+        <div style="display:flex;border-bottom:1px solid var(--border);">
+            <button class="saved-cat-btn active" data-cat="foods" style="flex:1;padding:10px;background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--accent);">Foods</button>
+            <button class="saved-cat-btn" data-cat="supplements" style="flex:1;padding:10px;background:none;border:none;color:#888;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;">Supplements</button>
+            <button class="saved-cat-btn" data-cat="meals" style="flex:1;padding:10px;background:none;border:none;color:#888;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;">Meals</button>
+        </div>
+
+        <div style="padding:16px;">
+            <!-- Foods list -->
+            <div id="saved-foods-list" class="saved-cat-panel"></div>
+            <!-- Supplements list -->
+            <div id="saved-supplements-list" class="saved-cat-panel" style="display:none;"></div>
+            <!-- Meals list -->
+            <div id="saved-meals-list" class="saved-cat-panel" style="display:none;"></div>
+        </div>
     </div>
 </div>
 
@@ -982,9 +1056,9 @@
             }, 300);
         });
         
-        // Hide results when clicking outside or when leaving the input field
+        // Hide results when clicking outside or when leaving the input field — defer so click fires first
         input.addEventListener('blur', function() {
-            resultsDiv.style.display = 'none';
+            setTimeout(() => { resultsDiv.style.display = 'none'; }, 150);
         });
         
         // Also hide when clicking on other form inputs
@@ -1503,8 +1577,11 @@
             // Show selected tab
             if (tabName === 'today') {
                 document.querySelector('.meals-list-container').parentElement.style.display = 'block';
-            } else if (tabName === 'history') {
-                document.getElementById(tabName + '-tab').style.display = 'block';
+            } else if (tabName === 'saved') {
+                openSavedItemsModal();
+                this.classList.remove('active');
+                document.querySelector('.tab-button[data-tab="today"]').classList.add('active');
+                return;
             } else if (tabName === 'supplements') {
                 document.getElementById(tabName + '-tab').style.display = 'block';
             } else if (tabName === 'search') {
@@ -1822,9 +1899,9 @@
                 });
         });
         
-        // Close dropdown when leaving food input
+        // Close dropdown when leaving food input — defer so click fires first
         foodNameInput.addEventListener('blur', function() {
-            foodSearchResults.style.display = 'none';
+            setTimeout(() => { foodSearchResults.style.display = 'none'; }, 150);
         });
     }
     
@@ -1875,5 +1952,218 @@
         document.getElementById('supplementUnitInput').value = unit;
         document.getElementById('supplementSearchResults').style.display = 'none';
     }
+
+    // ==================== SAVED ITEMS ====================
+
+    const savedModal = document.getElementById('savedItemsModal');
+    document.getElementById('closeSavedModal').addEventListener('click', () => { savedModal.style.display = 'none'; });
+    savedModal.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
+
+    // Category tab switching inside the saved modal
+    document.querySelectorAll('.saved-cat-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.saved-cat-btn').forEach(b => {
+                b.style.color = '#888';
+                b.style.borderBottom = '2px solid transparent';
+            });
+            this.style.color = 'var(--accent)';
+            this.style.borderBottom = '2px solid var(--accent)';
+            document.querySelectorAll('.saved-cat-panel').forEach(p => p.style.display = 'none');
+            document.getElementById('saved-' + this.dataset.cat + '-list').style.display = 'block';
+        });
+    });
+
+    function openSavedItemsModal() {
+        savedModal.style.display = 'block';
+        loadSavedItems();
+    }
+
+    function loadSavedItems() {
+        ['foods', 'supplements', 'meals'].forEach(cat => {
+            document.getElementById('saved-' + cat + '-list').innerHTML =
+                '<div style="text-align:center;padding:20px;color:#888;">Loading...</div>';
+        });
+        fetch('/nutrition/saved_items/')
+            .then(r => r.json())
+            .then(data => {
+                renderSavedFoods(data.foods || []);
+                renderSavedSupplements(data.supplements || []);
+                renderSavedMeals(data.meals || []);
+            })
+            .catch(() => {
+                ['foods', 'supplements', 'meals'].forEach(cat => {
+                    document.getElementById('saved-' + cat + '-list').innerHTML =
+                        '<div style="text-align:center;padding:20px;color:#e85c5c;">Failed to load</div>';
+                });
+            });
+    }
+
+    function savedItemCard(content) {
+        return `<div style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${content}</div>`;
+    }
+
+    function renderSavedFoods(foods) {
+        const el = document.getElementById('saved-foods-list');
+        if (!foods.length) {
+            el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">No saved foods yet.<br>Click the bookmark icon on any food to save it.</div>';
+            return;
+        }
+        el.innerHTML = foods.map(f => savedItemCard(`
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div style="flex:1;">
+                    <div style="font-weight:600;color:white;font-size:14px;">${f.name}</div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;">${f.calories} kcal &bull; P:${f.protein}g C:${f.carbs}g F:${f.fats}g</div>
+                    <div style="font-size:11px;color:#666;margin-top:1px;">${f.serving_size} ${f.serving_unit} &bull; saved ${f.created_at}</div>
+                </div>
+                <button onclick="deleteSavedItem('food',${f.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;flex-shrink:0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `)).join('');
+    }
+
+    function renderSavedSupplements(supplements) {
+        const el = document.getElementById('saved-supplements-list');
+        if (!supplements.length) {
+            el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">No saved supplements yet.<br>Click the bookmark icon on any supplement to save it.</div>';
+            return;
+        }
+        el.innerHTML = supplements.map(s => savedItemCard(`
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div style="flex:1;">
+                    <div style="font-weight:600;color:white;font-size:14px;">${s.name}</div>
+                    <div style="font-size:11px;color:#888;margin-top:2px;">${s.dosage} ${s.unit} &bull; ${s.supplement_type}</div>
+                    <div style="font-size:11px;color:#666;margin-top:1px;">saved ${s.created_at}</div>
+                </div>
+                <button onclick="deleteSavedItem('supplement',${s.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;flex-shrink:0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `)).join('');
+    }
+
+    function renderSavedMeals(meals) {
+        const el = document.getElementById('saved-meals-list');
+        if (!meals.length) {
+            el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">No saved meals yet.<br>Click the bookmark icon on any meal card to save it.</div>';
+            return;
+        }
+        el.innerHTML = meals.map(m => {
+            const foodCount = (m.items || []).filter(i => i.type === 'food').length;
+            const suppCount = (m.items || []).filter(i => i.type === 'supplement').length;
+            const totalCal  = (m.items || []).filter(i => i.type === 'food').reduce((s, i) => s + (i.calories || 0), 0);
+            const parts = [];
+            if (foodCount) parts.push(`${foodCount} food${foodCount > 1 ? 's' : ''}`);
+            if (suppCount) parts.push(`${suppCount} supplement${suppCount > 1 ? 's' : ''}`);
+            return savedItemCard(`
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;color:white;font-size:14px;">${m.name}</div>
+                        <div style="font-size:11px;color:#888;margin-top:2px;">${parts.join(' &bull; ')} &bull; ${totalCal} kcal total</div>
+                        <div style="font-size:11px;color:#666;margin-top:1px;">saved ${m.created_at}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                        <button onclick="addSavedMealToday(${m.id})" title="Add to today" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;">+ Add</button>
+                        <button onclick="deleteSavedItem('meal',${m.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `);
+        }).join('');
+    }
+
+    function deleteSavedItem(type, id, btn) {
+        const card = btn.closest('div[style*="border:1px solid"]');
+        fetch('/nutrition/delete_saved_item/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+            body: JSON.stringify({type, id}),
+        })
+        .then(r => r.json())
+        .then(data => { if (data.success && card) card.remove(); });
+    }
+
+    function addSavedMealToday(savedMealId) {
+        const dateVal = document.getElementById('dateInput') ? document.getElementById('dateInput').value : '{{ date_string }}';
+        fetch('/nutrition/add_saved_meal_to_date/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+            body: JSON.stringify({saved_meal_id: savedMealId, date: dateVal}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                savedModal.style.display = 'none';
+                location.reload();
+            }
+        });
+    }
+
+    function getCsrfToken() {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    }
+
+    function markSaveBtnSaved(btn) {
+        btn.dataset.saved = 'true';
+        btn.title = 'Saved';
+        btn.style.color = 'var(--accent)';
+        const path = btn.querySelector('path');
+        if (path) path.setAttribute('fill', 'var(--accent)');
+    }
+
+    // Wire save buttons for food items
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.save-food-btn');
+        if (!btn || btn.dataset.saved === 'true') return;
+        fetch('/nutrition/save_food_item/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+            body: JSON.stringify({
+                name: btn.dataset.name,
+                calories: btn.dataset.calories,
+                protein: btn.dataset.protein,
+                carbs: btn.dataset.carbs,
+                fats: btn.dataset.fats,
+                serving_size: btn.dataset.servingSize,
+                serving_unit: btn.dataset.servingUnit,
+            }),
+        })
+        .then(r => r.json())
+        .then(data => { if (data.success) markSaveBtnSaved(btn); });
+    });
+
+    // Wire save buttons for supplements
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.save-supplement-btn');
+        if (!btn || btn.dataset.saved === 'true') return;
+        fetch('/nutrition/save_supplement_item/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+            body: JSON.stringify({
+                name: btn.dataset.name,
+                supplement_type: btn.dataset.supplementType,
+                dosage: btn.dataset.dosage,
+                unit: btn.dataset.unit,
+            }),
+        })
+        .then(r => r.json())
+        .then(data => { if (data.success) markSaveBtnSaved(btn); });
+    });
+
+    // Wire save buttons for meals
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.save-meal-btn');
+        if (!btn || btn.dataset.saved === 'true') return;
+        fetch('/nutrition/save_meal_template/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+            body: JSON.stringify({meal_id: btn.dataset.mealId}),
+        })
+        .then(r => r.json())
+        .then(data => { if (data.success) markSaveBtnSaved(btn); });
+    });
+
 </script>
 {% endblock %}
