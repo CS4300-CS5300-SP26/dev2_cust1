@@ -40,6 +40,9 @@ from .models import (
     Muscle,
     Equipment,
     TrainingExercise,
+    SavedFood,
+    SavedSupplement,
+    SavedMeal,
     UserInjury,
     AIChatConversation,
     AIChatMessage,
@@ -1180,6 +1183,17 @@ def nutrition_page(request):
     # Get supplements for the selected date
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
+    # Sets used by the template to pre-fill saved bookmark buttons
+    saved_food_names = set(
+        SavedFood.objects.filter(user=request.user).values_list('name', flat=True)
+    )
+    saved_supplement_names = set(
+        SavedSupplement.objects.filter(user=request.user).values_list('name', flat=True)
+    )
+    saved_meal_ids = set(
+        SavedMeal.objects.filter(user=request.user).values_list('name', flat=True)
+    )
+
     context = {
         'active_tab': 'nutrition',
         'meals': meals,
@@ -1194,6 +1208,9 @@ def nutrition_page(request):
         'calorie_goal': calorie_goal,
         'calories_percentage': calories_percentage,
         'supplements': supplements,
+        'saved_food_names': saved_food_names,
+        'saved_supplement_names': saved_supplement_names,
+        'saved_meal_names': saved_meal_ids,
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
@@ -1281,6 +1298,9 @@ def add_food_item(request):
         except FoodItem.DoesNotExist:
             messages.error(request, 'Food item not found.')
     else:
+        if meal.items.count() >= 30:
+            messages.error(request, 'Item limit reached (30 max per meal).')
+            return redirect(f"{reverse('nutrition_page')}?date={date_param}")
         FoodItem.objects.create(
             meal=meal,
             name=food_name,
@@ -1319,6 +1339,9 @@ def add_food_item_ajax(request):
         fats = int(request.POST.get('fats') or 0)
     except ValueError:
         protein = carbs = fats = 0
+
+    if meal.items.count() >= 30:
+        return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
 
     group_id = request.POST.get('group_id')
     group = None
@@ -1972,3 +1995,205 @@ def get_set_progress(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ==================== SAVED ITEMS ====================
+
+@login_required
+def save_food_item(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    name = data.get('name', '').strip()
+    if SavedFood.objects.filter(user=request.user, name=name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    saved = SavedFood.objects.create(
+        user=request.user,
+        name=name,
+        calories=int(data.get('calories', 0)),
+        protein=int(data.get('protein', 0)),
+        carbs=int(data.get('carbs', 0)),
+        fats=int(data.get('fats', 0)),
+        serving_size=float(data.get('serving_size', 1)),
+        serving_unit=data.get('serving_unit', 'serving').strip(),
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
+def save_supplement_item(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    name = data.get('name', '').strip()
+    if SavedSupplement.objects.filter(user=request.user, name=name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    saved = SavedSupplement.objects.create(
+        user=request.user,
+        name=name,
+        supplement_type=data.get('supplement_type', 'other').strip(),
+        dosage=data.get('dosage', '').strip(),
+        unit=data.get('unit', '').strip(),
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
+def save_meal_template(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    meal_id = data.get('meal_id')
+    try:
+        meal = Meal.objects.get(id=meal_id, user=request.user)
+    except Meal.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Meal not found'}, status=404)
+
+    items = []
+    for item in meal.items.all():
+        items.append({
+            'type': 'food',
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': str(item.serving_size),
+            'serving_unit': item.serving_unit,
+        })
+    for supp in meal.supplements.all():
+        items.append({
+            'type': 'supplement',
+            'name': supp.name,
+            'supplement_type': supp.supplement_type,
+            'dosage': supp.dosage,
+            'unit': supp.unit,
+        })
+
+    if SavedMeal.objects.filter(user=request.user, name=meal.name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    saved = SavedMeal.objects.create(
+        user=request.user,
+        name=meal.name,
+        items=items,
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
+def save_food_group_template(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    group_id = data.get('group_id')
+    try:
+        group = FoodGroup.objects.get(id=group_id, meal__user=request.user)
+    except FoodGroup.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Group not found'}, status=404)
+
+    if SavedMeal.objects.filter(user=request.user, name=group.name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+
+    items = []
+    for item in group.grouped_items.all():
+        items.append({
+            'type': 'food',
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': str(item.serving_size),
+            'serving_unit': item.serving_unit,
+        })
+
+    saved = SavedMeal.objects.create(
+        user=request.user,
+        name=group.name,
+        items=items,
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
+def get_saved_items(request):
+    foods = list(SavedFood.objects.filter(user=request.user).values(
+        'id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_size', 'serving_unit', 'created_at'
+    ))
+    for f in foods:
+        f['serving_size'] = str(f['serving_size'])
+        f['created_at'] = f['created_at'].strftime('%b %d')
+
+    supplements = list(SavedSupplement.objects.filter(user=request.user).values(
+        'id', 'name', 'supplement_type', 'dosage', 'unit', 'created_at'
+    ))
+    for s in supplements:
+        s['created_at'] = s['created_at'].strftime('%b %d')
+
+    meals = list(SavedMeal.objects.filter(user=request.user).values(
+        'id', 'name', 'items', 'created_at'
+    ))
+    for m in meals:
+        m['created_at'] = m['created_at'].strftime('%b %d')
+
+    return JsonResponse({'foods': foods, 'supplements': supplements, 'meals': meals})
+
+
+@login_required
+def delete_saved_item(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    item_type = data.get('type')
+    item_id = data.get('id')
+    model_map = {'food': SavedFood, 'supplement': SavedSupplement, 'meal': SavedMeal}
+    Model = model_map.get(item_type)
+    if not Model:
+        return JsonResponse({'success': False, 'error': 'Invalid type'}, status=400)
+    try:
+        Model.objects.get(id=item_id, user=request.user).delete()
+        return JsonResponse({'success': True})
+    except Model.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+
+
+@login_required
+def add_saved_meal_to_date(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    saved_meal_id = data.get('saved_meal_id')
+    date_str = data.get('date')
+    try:
+        saved_meal = SavedMeal.objects.get(id=saved_meal_id, user=request.user)
+    except SavedMeal.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Saved meal not found'}, status=404)
+
+    from datetime import date as date_cls
+    try:
+        target_date = date_cls.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        target_date = date_cls.today()
+
+    meal = Meal.objects.create(user=request.user, name=saved_meal.name, date=target_date)
+    for item in saved_meal.items:
+        if item.get('type') == 'food':
+            FoodItem.objects.create(
+                meal=meal,
+                name=item['name'],
+                calories=int(item.get('calories', 0)),
+                protein=int(item.get('protein', 0)),
+                carbs=int(item.get('carbs', 0)),
+                fats=int(item.get('fats', 0)),
+                serving_size=float(item.get('serving_size', 1)),
+                serving_unit=item.get('serving_unit', 'serving'),
+            )
+        elif item.get('type') == 'supplement':
+            MealSupplement.objects.create(
+                meal=meal,
+                name=item['name'],
+                supplement_type=item.get('supplement_type', 'other'),
+                dosage=item.get('dosage', ''),
+                unit=item.get('unit', ''),
+            )
+    return JsonResponse({'success': True, 'meal_id': meal.id})
