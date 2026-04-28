@@ -774,33 +774,6 @@
             </div>
         </div>
 
-        <!-- Food Database Card (Read-only list of all foods) -->
-        <div class="card food-database-card" style="margin-top:24px;">
-            <div class="section-header" style="margin-bottom:12px;">
-                <label class="card-label">FOOD DATABASE</label>
-                <span id="foodDatabaseCount" style="color:var(--textMuted);font-size:12px;margin-left:8px;">Loading...</span>
-            </div>
-            <div id="foodDatabaseList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);">
-                <div style="padding:20px;text-align:center;color:var(--textMuted);">
-                    <div class="loading-spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
-                    <p style="margin-top:8px;">Loading foods...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Supplement Database Card (Read-only list of all supplements) -->
-        <div class="card supplement-database-card" style="margin-top:24px;">
-            <div class="section-header" style="margin-bottom:12px;">
-                <label class="card-label">SUPPLEMENT DATABASE</label>
-                <span id="supplementDatabaseCount" style="color:var(--textMuted);font-size:12px;margin-left:8px;">Loading...</span>
-            </div>
-            <div id="supplementDatabaseList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);">
-                <div style="padding:20px;text-align:center;color:var(--textMuted);">
-                    <div class="loading-spinner" style="display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div>
-                    <p style="margin-top:8px;">Loading supplements...</p>
-                </div>
-            </div>
-        </div>
 
     </div>
 </div>
@@ -881,67 +854,6 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    // Function to load all foods into the Food Database card
-    function loadFoodDatabase() {
-        const listEl = document.getElementById('foodDatabaseList');
-        const countEl = document.getElementById('foodDatabaseCount');
-        
-        fetch('/api/all_foods/')
-            .then(response => response.json())
-            .then(data => {
-                if (data.foods && data.foods.length > 0) {
-                    countEl.textContent = `(${data.count} items)`;
-                    listEl.innerHTML = data.foods.map(function(food) {
-                        return `<div class="food-db-item">
-                            <span class="food-db-name">${food.name}</span>
-                            <span class="food-db-macros">${food.calories} cal | P: ${food.protein || 0}g | C: ${food.carbs || 0}g | F: ${food.fats || 0}g</span>
-                        </div>`;
-                    }).join('');
-                } else {
-                    countEl.textContent = '(0 items)';
-                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No foods in database yet. Add foods using the Search tab!</div>';
-                }
-            })
-            .catch(function(err) {
-                console.error('Failed to load food database:', err);
-                countEl.textContent = '';
-                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load food database</div>';
-            });
-    }
-
-    // Load food database on page load
-    document.addEventListener('DOMContentLoaded', loadFoodDatabase);
-
-    // Function to load all supplements into the Supplement Database card
-    function loadSupplementDatabase() {
-        const listEl = document.getElementById('supplementDatabaseList');
-        const countEl = document.getElementById('supplementDatabaseCount');
-        
-        fetch('/api/supplements/')
-            .then(response => response.json())
-            .then(data => {
-                if (data.supplements && data.supplements.length > 0) {
-                    countEl.textContent = `(${data.supplements.length} items)`;
-                    listEl.innerHTML = data.supplements.map(function(supplement) {
-                        return `<div class="supplement-db-item">
-                            <span class="supplement-db-name">${supplement.name}</span>
-                            <span class="supplement-db-type">${supplement.supplement_type} | ${supplement.dosage}${supplement.unit}</span>
-                        </div>`;
-                    }).join('');
-                } else {
-                    countEl.textContent = '(0 items)';
-                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No supplements in database yet.</div>';
-                }
-            })
-            .catch(function(err) {
-                console.error('Failed to load supplement database:', err);
-                countEl.textContent = '';
-                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load supplement database</div>';
-            });
-    }
-
-    // Load supplement database on page load
-    document.addEventListener('DOMContentLoaded', loadSupplementDatabase);
 
     var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
@@ -1331,8 +1243,7 @@
                     modalSearchInput.dispatchEvent(new Event('input'));
                 }
                 
-                // Refresh the Food Database card
-                loadFoodDatabase();
+
             } else {
                 showStatus(data.error || 'Failed to save', true);
             }
