@@ -6,6 +6,8 @@ from . import exercise_api
 urlpatterns = [
     path('', views.splash, name='splash'),
     path('api/chat', views.api_chat, name='api_chat'),
+    path('api/chat/history/', views.api_chat_history, name='api_chat_history'),
+    path('api/chat/history/<int:conversation_id>/', views.api_chat_history_detail, name='api_chat_history_detail'),
     path('api/search_foods/', views.search_foods, name='search_foods'),
     path('api/save_food/', views.save_food_to_database, name='save_food_to_database'),
     path('api/all_foods/', views.get_all_foods, name='get_all_foods'),
