@@ -375,10 +375,6 @@ def _extract_ai_planner_action(reply, user):
     if not planner_action:
         return cleaned_reply, None
 
-    if '?' not in cleaned_reply:
-        follow_up = 'Would you like me to add this to your Train/Nutrition planners now?'
-        cleaned_reply = f'{cleaned_reply}\n\n{follow_up}' if cleaned_reply else follow_up
-
     return cleaned_reply, planner_action
 
 
@@ -641,8 +637,8 @@ def _build_ai_system_prompt(user):
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
-            '12. When you provide a workout plan and/or nutrition plan that can be added to the app, ask for confirmation first (for example: "Would you like me to add this plan?").\n'
-            '13. For addable plans, append a machine block at the end in this exact format:\n'
+            '12. When you provide a workout plan and/or nutrition plan that can be added to the app, ALWAYS append the planner_payload block at the end (do NOT ask for permission—the user will see an "Add" button in the app interface).\n'
+            '13. For addable plans, use this exact planner_payload format at the very end:\n'
             '<planner_payload>\n'
             '{"workout_plan":{"workout_name":"...", "goal":"...", "date":"YYYY-MM-DD", "exercises":[{"name":"...", "muscle_group":"arms|chest|back|shoulders|legs|core", "sets":3, "reps":10, "weight":0}]},'
             '"nutrition_plan":{"date":"YYYY-MM-DD", "meals":[{"name":"...", "items":[{"name":"...", "calories":300, "protein":20, "carbs":35, "fats":8}]}], "supplements":[{"name":"...", "supplement_type":"vitamin|mineral|herb|protein|amino_acid|other", "dosage":"5", "unit":"g"}]}}\n'

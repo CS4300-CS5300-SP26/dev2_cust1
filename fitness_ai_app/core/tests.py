@@ -1455,6 +1455,66 @@ class ApiChatPlannerApplyTests(TestCase):
         self.assertEqual(FoodItem.objects.filter(meal__user=self.user).count(), 1)
         self.assertEqual(SupplementEntry.objects.filter(user=self.user).count(), 1)
 
+    def test_apply_plan_multiple_food_items_created_separately(self):
+        """Verify that multiple food items in a meal are created as separate records."""
+        from core.models import FoodItem, Meal
+
+        payload = {
+            'planner_payload': {
+                'nutrition_plan': {
+                    'date': '2026-04-27',
+                    'meals': [
+                        {
+                            'name': 'Breakfast',
+                            'items': [
+                                {
+                                    'name': 'Eggs',
+                                    'calories': 150,
+                                    'protein': 12,
+                                    'carbs': 1,
+                                    'fats': 11,
+                                },
+                                {
+                                    'name': 'Toast',
+                                    'calories': 100,
+                                    'protein': 4,
+                                    'carbs': 20,
+                                    'fats': 1,
+                                },
+                                {
+                                    'name': 'Orange Juice',
+                                    'calories': 110,
+                                    'protein': 2,
+                                    'carbs': 26,
+                                    'fats': 0,
+                                },
+                            ],
+                        }
+                    ],
+                    'supplements': [],
+                },
+            }
+        }
+
+        r = self.client.post('/api/chat/apply_plan', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+
+        meal = Meal.objects.filter(user=self.user).first()
+        self.assertIsNotNone(meal)
+        self.assertEqual(meal.name, 'Breakfast')
+
+        food_items = FoodItem.objects.filter(meal=meal)
+        self.assertEqual(food_items.count(), 3)
+
+        item_names = sorted([item.name for item in food_items])
+        self.assertEqual(item_names, ['Eggs', 'Orange Juice', 'Toast'])
+
+        item_calories = {item.name: item.calories for item in food_items}
+        self.assertEqual(item_calories['Eggs'], 150)
+        self.assertEqual(item_calories['Toast'], 100)
+        self.assertEqual(item_calories['Orange Juice'], 110)
+
     def test_apply_plan_requires_valid_payload(self):
         r = self.client.post(
             '/api/chat/apply_plan',
