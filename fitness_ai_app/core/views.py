@@ -305,6 +305,71 @@ def _normalize_ai_nutrition_plan(raw_nutrition_plan):
     }
 
 
+def _build_planner_action_response_multi_day(normalized_workouts, normalized_nutrition):
+    """Return UI metadata for the AI planner action button, supporting multi-day plans."""
+    has_workouts = len(normalized_workouts) > 0
+    has_nutrition = len(normalized_nutrition) > 0
+    
+    if not has_workouts and not has_nutrition:
+        return None
+    
+    if has_workouts and has_nutrition:
+        button_label = 'Add both exercises and nutritions'
+        action_type = 'both'
+    elif has_workouts:
+        button_label = 'Add exercises'
+        action_type = 'exercises'
+    else:
+        button_label = 'Add nutritions'
+        action_type = 'nutritions'
+    
+    payload = {}
+    
+    # Include ALL workouts as array if multiple, or single object if one
+    if has_workouts:
+        if len(normalized_workouts) == 1:
+            payload['workout_plan'] = {
+                'workout_name': normalized_workouts[0]['workout_name'],
+                'goal': normalized_workouts[0]['goal'],
+                'date': normalized_workouts[0]['date'].isoformat(),
+                'exercises': normalized_workouts[0]['exercises'],
+            }
+        else:
+            payload['workout_plan'] = [
+                {
+                    'workout_name': wk['workout_name'],
+                    'goal': wk['goal'],
+                    'date': wk['date'].isoformat(),
+                    'exercises': wk['exercises'],
+                }
+                for wk in normalized_workouts
+            ]
+    
+    # Include ALL nutrition as array if multiple, or single object if one
+    if has_nutrition:
+        if len(normalized_nutrition) == 1:
+            payload['nutrition_plan'] = {
+                'date': normalized_nutrition[0]['date'].isoformat(),
+                'meals': normalized_nutrition[0]['meals'],
+                'supplements': normalized_nutrition[0]['supplements'],
+            }
+        else:
+            payload['nutrition_plan'] = [
+                {
+                    'date': nt['date'].isoformat(),
+                    'meals': nt['meals'],
+                    'supplements': nt['supplements'],
+                }
+                for nt in normalized_nutrition
+            ]
+    
+    return {
+        'type': action_type,
+        'button_label': button_label,
+        'payload': payload,
+    }
+
+
 def _build_planner_action_response(workout_plan, nutrition_plan):
     """Return UI metadata for the AI planner action button."""
     if workout_plan and nutrition_plan:
@@ -347,7 +412,7 @@ def _extract_ai_planner_action(reply, user):
         return '', None
 
     payload_match = re.search(
-        r'<planner_payload>\s*(\{.*?\})\s*</planner_payload>',
+        r'<planner_payload>\s*([\{\[].*?[\}\]])\s*</planner_payload>',
         reply,
         flags=re.IGNORECASE | re.DOTALL,
     )
@@ -355,7 +420,7 @@ def _extract_ai_planner_action(reply, user):
         return reply.strip(), None
 
     cleaned_reply = re.sub(
-        r'<planner_payload>\s*\{.*?\}\s*</planner_payload>',
+        r'<planner_payload>\s*[\{\[].*?[\}\]]\s*</planner_payload>',
         '',
         reply,
         flags=re.IGNORECASE | re.DOTALL,
@@ -370,7 +435,6 @@ def _extract_ai_planner_action(reply, user):
         return cleaned_reply, None
 
     # Handle both single-plan (dict) and multi-day (array) formats
-    # For extraction/validation, we just need to check if ANY valid plans exist
     workout_plans_raw = raw_payload.get('workout_plan')
     nutrition_plans_raw = raw_payload.get('nutrition_plan')
     
@@ -385,16 +449,21 @@ def _extract_ai_planner_action(reply, user):
     elif not isinstance(nutrition_plans_raw, list):
         nutrition_plans_raw = []
     
-    # Normalize at least one of each plan type if present (just for validation)
-    workout_plan = None
-    nutrition_plan = None
+    # Normalize ALL plans for button response (not just first one)
+    normalized_workouts = []
+    normalized_nutrition = []
     
-    if workout_plans_raw:
-        workout_plan = _normalize_ai_workout_plan(workout_plans_raw[0], user)
-    if nutrition_plans_raw:
-        nutrition_plan = _normalize_ai_nutrition_plan(nutrition_plans_raw[0])
+    for raw_wk in workout_plans_raw:
+        normalized = _normalize_ai_workout_plan(raw_wk, user)
+        if normalized:
+            normalized_workouts.append(normalized)
     
-    planner_action = _build_planner_action_response(workout_plan, nutrition_plan)
+    for raw_nt in nutrition_plans_raw:
+        normalized = _normalize_ai_nutrition_plan(raw_nt)
+        if normalized:
+            normalized_nutrition.append(normalized)
+    
+    planner_action = _build_planner_action_response_multi_day(normalized_workouts, normalized_nutrition)
     if not planner_action:
         return cleaned_reply, None
 
