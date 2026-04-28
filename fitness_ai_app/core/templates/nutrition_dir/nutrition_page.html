@@ -115,6 +115,32 @@
   .delete-confirmation-buttons .btn-delete:hover {
     background: #c0392b;
   }
+
+  /* Save buttons — base state */
+  .save-food-btn,
+  .save-supplement-btn,
+  .save-group-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px;
+    color: #888;
+  }
+  .save-food-btn[data-saved="true"],
+  .save-supplement-btn[data-saved="true"],
+  .save-group-btn[data-saved="true"] {
+    color: var(--accent);
+  }
+
+  /* Item count badge on meal/group headers */
+  .item-counter {
+    font-size: 11px;
+    white-space: nowrap;
+    color: #888;
+  }
+  .item-counter.at-limit {
+    color: #e53e3e;
+  }
 </style>
 {% endblock %}
 
@@ -188,20 +214,20 @@
                 </div>
                 <div style="margin-bottom:12px;">
                     <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
-                    <input type="number" id="editFoodCalories" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
+                    <input type="number" id="editFoodCalories" min="0" max="999" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
                     <div>
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
-                        <input type="number" id="editFoodProtein" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
+                        <input type="number" id="editFoodProtein" min="0" max="999" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
                     </div>
                     <div>
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Carbs (g)</label>
-                        <input type="number" id="editFoodCarbs" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
+                        <input type="number" id="editFoodCarbs" min="0" max="999" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
                     </div>
                     <div>
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
-                        <input type="number" id="editFoodFats" min="0" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
+                        <input type="number" id="editFoodFats" min="0" max="999" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:14px;box-sizing:border-box;">
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;">
@@ -287,20 +313,20 @@
                     </div>
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
-                        <input type="number" name="food_calories" id="foodCaloriesInput" placeholder="Calories" required min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        <input type="number" name="food_calories" id="foodCaloriesInput" placeholder="Calories" required min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
-                            <input type="number" name="protein" id="foodProteinInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="protein" id="foodProteinInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Carbs (g)</label>
-                            <input type="number" name="carbs" id="foodCarbsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="carbs" id="foodCarbsInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
-                            <input type="number" name="fats" id="foodFatsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="fats" id="foodFatsInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                     </div>
                     <button type="submit" id="addFoodItemBtn" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
@@ -345,7 +371,7 @@
                     </div>
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Dosage</label>
-                        <input type="text" name="dosage" id="supplementDosageInput" placeholder="e.g., 1000" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        <input type="number" name="dosage" id="supplementDosageInput" placeholder="e.g., 1000" value="1" min="1" max="5000" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                     </div>
                     <div style="margin-bottom:16px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
@@ -390,12 +416,12 @@
                         </div>
                         <div style="margin-bottom:8px;">
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
-                            <input type="number" id="mealFoodCaloriesInput" placeholder="Calories" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodCaloriesInput" placeholder="Calories" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div class="meal-macro-grid" style="margin-bottom:12px;">
-                            <input type="number" id="mealFoodProteinInput" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <input type="number" id="mealFoodCarbsInput" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodProteinInput" placeholder="Protein (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodCarbsInput" placeholder="Carbs (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div class="meal-action-row">
                             <button type="button" id="mealAddItemBtn" style="flex:1;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
@@ -497,17 +523,28 @@
             <div class="meals-list">
                 {% if meals %}
                     {% for meal in meals %}
+                    {% with item_count=meal.items.all|length %}
                     <div class="meal-card">
                         <div class="meal-header">
                             <span class="meal-name">{{ meal.name }}</span>
                             <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
                             <div class="meal-actions">
+                                <span class="item-counter {% if item_count >= 30 %}at-limit{% endif %}">{{ item_count }}/30</span>
+                                {% if item_count < 30 %}
                                 <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}', '{{ meal.name|escapejs }}')" title="Add food or supplement">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
                                 </button>
+                                {% else %}
+                                <button class="meal-edit-btn" type="button" disabled title="Item limit reached (30 max)" style="opacity:0.35;cursor:not-allowed;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                                {% endif %}
                                 <form method="POST" action="{% url 'delete_meal' %}" style="display:inline;">
                                     {% csrf_token %}
                                     <input type="hidden" name="meal_id" value="{{ meal.id }}">
@@ -543,8 +580,7 @@
                                         data-fats="{{ item.fats }}"
                                         data-serving-size="{{ item.serving_size }}"
                                         data-serving-unit="{{ item.serving_unit|escapejs }}"
-                                        data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}"
-                                        style="border:none;background:none;cursor:pointer;padding:2px;color:{% if item.name in saved_food_names %}var(--accent){% else %}#888{% endif %};">
+                                        data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if item.name in saved_food_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                                     </button>
                                     <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
@@ -570,21 +606,31 @@
 
                             {% for group in meal.food_groups.all %}
                             <div class="food-group-section" style="margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+                                {% with group_count=group.grouped_items.all|length %}
                                 <div class="food-group-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.06);">
                                     <span style="font-weight:600;font-size:13px;color:var(--accent);">🍴 {{ group.name }}</span>
                                     <div style="display:flex;gap:6px;align-items:center;">
+                                        <span class="item-counter {% if group_count >= 30 %}at-limit{% endif %}">{{ group_count }}/30</span>
                                         <button type="button" class="save-group-btn" title="{% if group.name in saved_meal_names %}Saved{% else %}Save group as template{% endif %}"
                                             data-group-id="{{ group.id }}"
-                                            data-saved="{% if group.name in saved_meal_names %}true{% else %}false{% endif %}"
-                                            style="border:none;background:none;cursor:pointer;padding:4px;color:{% if group.name in saved_meal_names %}var(--accent){% else %}#888{% endif %};">
+                                            data-saved="{% if group.name in saved_meal_names %}true{% else %}false{% endif %}">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="{% if group.name in saved_meal_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                                         </button>
+                                        {% if group_count < 30 %}
                                         <button type="button" class="meal-edit-btn" onclick="openAddItemModalInGroup('{{ meal.id }}', '{{ meal.name|escapejs }}', '{{ group.id }}', '{{ group.name|escapejs }}')" title="Add item to group" style="width:24px;height:24px;">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                                             </svg>
                                         </button>
+                                        {% else %}
+                                        <button type="button" class="meal-edit-btn" disabled title="Item limit reached (30 max)" style="width:24px;height:24px;opacity:0.35;cursor:not-allowed;">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                        {% endif %}
                                         <form method="POST" action="{% url 'delete_food_group' %}" style="display:flex;align-items:center;">
                                             {% csrf_token %}
                                             <input type="hidden" name="group_id" value="{{ group.id }}">
@@ -598,6 +644,7 @@
                                         </form>
                                     </div>
                                 </div>
+                                {% endwith %}
                                 {% for item in group.grouped_items.all %}
                                 <div class="food-item {% if item.completed %}completed{% endif %}" style="padding-left:20px;">
                                     <form method="POST" action="{% url 'toggle_food_item' %}" style="display:flex;align-items:center;">
@@ -619,8 +666,7 @@
                                             data-fats="{{ item.fats }}"
                                             data-serving-size="{{ item.serving_size }}"
                                             data-serving-unit="{{ item.serving_unit|escapejs }}"
-                                            data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}"
-                                            style="border:none;background:none;cursor:pointer;padding:2px;color:{% if item.name in saved_food_names %}var(--accent){% else %}#888{% endif %};">
+                                            data-saved="{% if item.name in saved_food_names %}true{% else %}false{% endif %}">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if item.name in saved_food_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                                         </button>
                                         <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
@@ -668,8 +714,7 @@
                                         data-supplement-type="{{ supplement.supplement_type }}"
                                         data-dosage="{{ supplement.dosage }}"
                                         data-unit="{{ supplement.unit }}"
-                                        data-saved="{% if supplement.name in saved_supplement_names %}true{% else %}false{% endif %}"
-                                        style="border:none;background:none;cursor:pointer;padding:2px;color:{% if supplement.name in saved_supplement_names %}var(--accent){% else %}#888{% endif %};">
+                                        data-saved="{% if supplement.name in saved_supplement_names %}true{% else %}false{% endif %}">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if supplement.name in saved_supplement_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                                     </button>
                                     <button type="button" class="edit-supplement-btn" title="Edit supplement" onclick="editSupplement('{{ supplement.id }}', '{{ meal.id }}', '{{ supplement.name|escapejs }}', '{{ supplement.supplement_type }}', '{{ supplement.dosage }}', '{{ supplement.unit }}')">
@@ -694,6 +739,11 @@
                             {% endfor %}
                         </div>
                         <div class="add-food-form" style="display:none;">
+                            {% if item_count >= 30 %}
+                            <div style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);text-align:center;font-size:12px;color:#e53e3e;">
+                                Item limit reached (30/30). Remove an item to add more.
+                            </div>
+                            {% else %}
                             <form method="POST" action="{% url 'add_food_item' %}" class="food-form" style="padding:12px 16px;background-color:rgba(0,0,0,0.2);border-top:1px solid var(--border);">
                                 {% csrf_token %}
                                 <input type="hidden" name="meal_id" value="{{ meal.id }}">
@@ -707,16 +757,18 @@
                                     </svg>
                                     <div class="food-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background-color:#1a1a1a;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px;"></div>
                                 </div>
-                                <input type="number" name="food_calories" class="food-calories-input" placeholder="Calories" required min="0" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                <input type="number" name="food_calories" class="food-calories-input" placeholder="Calories" required min="0" max="999" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-                                    <input type="number" name="protein" class="food-protein-input" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <input type="number" name="carbs" class="food-carbs-input" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                                    <input type="number" name="fats" class="food-fats-input" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                    <input type="number" name="protein" class="food-protein-input" placeholder="Protein (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                    <input type="number" name="carbs" class="food-carbs-input" placeholder="Carbs (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                    <input type="number" name="fats" class="food-fats-input" placeholder="Fats (g)" min="0" max="999" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                 </div>
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
                             </form>
+                            {% endif %}
                         </div>
                     </div>
+                    {% endwith %}
                     {% endfor %}
                 {% else %}
                     <div style="text-align:center;padding:40px 20px;color:var(--textMuted);">
@@ -759,8 +811,7 @@
                                     data-supplement-type="{{ entry.supplement_type }}"
                                     data-dosage="{{ entry.dosage }}"
                                     data-unit="{{ entry.unit }}"
-                                    data-saved="{% if entry.name in saved_supplement_names %}true{% else %}false{% endif %}"
-                                    style="border:none;background:none;cursor:pointer;padding:4px;color:{% if entry.name in saved_supplement_names %}var(--accent){% else %}#888{% endif %};">
+                                    data-saved="{% if entry.name in saved_supplement_names %}true{% else %}false{% endif %}">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if entry.name in saved_supplement_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                                 </button>
                                 <button class="delete-supplement-btn" data-entry-id="{{ entry.id }}" style="border:none;background:none;color:#888;cursor:pointer;padding:4px;">
@@ -805,7 +856,7 @@
                     <!-- Dosage Input -->
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Dosage</label>
-                        <input type="text" id="supplementDosage" placeholder="e.g., 1000" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        <input type="number" id="supplementDosage" placeholder="e.g., 1000" min="1" max="5000" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                     </div>
                     
                     <!-- Unit Input -->

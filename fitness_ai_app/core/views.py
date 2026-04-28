@@ -955,6 +955,9 @@ def add_food_item(request):
         except FoodItem.DoesNotExist:
             messages.error(request, 'Food item not found.')
     else:
+        if meal.items.count() >= 30:
+            messages.error(request, 'Item limit reached (30 max per meal).')
+            return redirect(f"{reverse('nutrition_page')}?date={date_param}")
         FoodItem.objects.create(
             meal=meal,
             name=food_name,
@@ -993,6 +996,9 @@ def add_food_item_ajax(request):
         fats = int(request.POST.get('fats') or 0)
     except ValueError:
         protein = carbs = fats = 0
+
+    if meal.items.count() >= 30:
+        return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
 
     group_id = request.POST.get('group_id')
     group = None
