@@ -4,7 +4,7 @@ import time
 import random
 import re
 
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -369,8 +369,31 @@ def _extract_ai_planner_action(reply, user):
     if not isinstance(raw_payload, dict):
         return cleaned_reply, None
 
-    workout_plan = _normalize_ai_workout_plan(raw_payload.get('workout_plan'), user)
-    nutrition_plan = _normalize_ai_nutrition_plan(raw_payload.get('nutrition_plan'))
+    # Handle both single-plan (dict) and multi-day (array) formats
+    # For extraction/validation, we just need to check if ANY valid plans exist
+    workout_plans_raw = raw_payload.get('workout_plan')
+    nutrition_plans_raw = raw_payload.get('nutrition_plan')
+    
+    # Convert to arrays for uniform processing
+    if isinstance(workout_plans_raw, dict):
+        workout_plans_raw = [workout_plans_raw]
+    elif not isinstance(workout_plans_raw, list):
+        workout_plans_raw = []
+    
+    if isinstance(nutrition_plans_raw, dict):
+        nutrition_plans_raw = [nutrition_plans_raw]
+    elif not isinstance(nutrition_plans_raw, list):
+        nutrition_plans_raw = []
+    
+    # Normalize at least one of each plan type if present (just for validation)
+    workout_plan = None
+    nutrition_plan = None
+    
+    if workout_plans_raw:
+        workout_plan = _normalize_ai_workout_plan(workout_plans_raw[0], user)
+    if nutrition_plans_raw:
+        nutrition_plan = _normalize_ai_nutrition_plan(nutrition_plans_raw[0])
+    
     planner_action = _build_planner_action_response(workout_plan, nutrition_plan)
     if not planner_action:
         return cleaned_reply, None
@@ -637,17 +660,18 @@ def _build_ai_system_prompt(user):
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
-            '12. When you provide a workout plan and/or nutrition plan that can be added to the app, ALWAYS append the planner_payload block at the end (do NOT ask for permission—the user will see an "Add" button in the app interface).\n'
-            '13. For addable plans, use this exact planner_payload format at the very end. ONLY include the sections you are creating (e.g., if only exercises, omit nutrition_plan; if only meals, omit workout_plan). IMPORTANT: Each food/drink component MUST be a separate item in the "items" array (e.g., Breakfast meal has: Oatmeal item, Milk item, Banana item, etc.—NOT combined as one item). CRITICAL: If creating a multi-day plan (7-day, monthly, etc.), include ALL days as an array—do NOT describe future days that are not in the payload. The response message must match what is actually in the payload.\n'
-            'Single-day plan example:\n'
+            '12. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
+            '13. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
+            'Use this exact planner_payload format. ONLY include sections you are creating (omit null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
+            'Single-day example:\n'
             '<planner_payload>\n'
-            '{"workout_plan":{"workout_name":"...", "goal":"...", "date":"YYYY-MM-DD", "exercises":[{"name":"...", "muscle_group":"arms|chest|back|shoulders|legs|core", "sets":3, "reps":10, "weight":0}]}, "nutrition_plan":{"date":"YYYY-MM-DD", "meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}], "supplements":[]}}\n'
+            '{"workout_plan":{"workout_name":"Upper Body","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}],"supplements":[]}}\n'
             '</planner_payload>\n'
-            'Multi-day plan example (use arrays for both workout_plan and nutrition_plan if doing multi-day):\n'
+            'MULTI-DAY RULE (MANDATORY): When user asks for "7-day" OR "weekly" OR "multiple days" plan, you MUST generate plan_payload with workout_plan and nutrition_plan as ARRAYS containing ALL requested days. See multi-day example below:\n'
             '<planner_payload>\n'
-            '{"workout_plan":[{"workout_name":"Day 1","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0}]}]}\n'
+            '{"workout_plan":[{"workout_name":"Day 1 Upper","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Dumbbell Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2 Lower","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0},{"name":"Deadlifts","muscle_group":"back","sets":3,"reps":8,"weight":0}]},{"workout_name":"Day 3 Full Body","goal":"muscle_gain","date":"2026-05-01","exercises":[{"name":"Bench Press","muscle_group":"chest","sets":3,"reps":8,"weight":0},{"name":"Pull-ups","muscle_group":"back","sets":3,"reps":5,"weight":0}]}],"nutrition_plan":[{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]},{"name":"Lunch","items":[{"name":"Chicken","calories":350,"protein":50,"carbs":0,"fats":15},{"name":"Rice","calories":250,"protein":5,"carbs":55,"fats":1}]}],"supplements":[]},{"date":"2026-04-30","meals":[{"name":"Breakfast","items":[{"name":"Eggs","calories":155,"protein":13,"carbs":1,"fats":11},{"name":"Toast","calories":80,"protein":3,"carbs":14,"fats":1}]},{"name":"Lunch","items":[{"name":"Salmon","calories":300,"protein":35,"carbs":0,"fats":18},{"name":"Quinoa","calories":220,"protein":8,"carbs":39,"fats":3}]}],"supplements":[]},{"date":"2026-05-01","meals":[{"name":"Breakfast","items":[{"name":"Greek Yogurt","calories":150,"protein":20,"carbs":8,"fats":2},{"name":"Berries","calories":80,"protein":1,"carbs":18,"fats":0}]},{"name":"Lunch","items":[{"name":"Turkey","calories":280,"protein":50,"carbs":0,"fats":6},{"name":"Sweet Potato","calories":200,"protein":4,"carbs":45,"fats":0}]}],"supplements":[]}]}\n'
             '</planner_payload>\n'
-            '14. Only include <planner_payload> when a concrete addable plan is present. Never include markdown code fences around it. Omit null/empty sections from the JSON. CRITICAL: Break down meals into individual items—do NOT combine multiple foods into a single item name (e.g., "Oatmeal, milk, banana" should be 3 separate items, not 1). For multi-day plans, MUST include ALL days in the array.\n'
+            '14. Only include <planner_payload> when responding to user request for a concrete plan. Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", "plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from the payload. Response description must match payload exactly.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
@@ -713,6 +737,89 @@ def api_chat(request):
         return JsonResponse(response_payload)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_chat_stream(request):
+    """Stream chat responses token-by-token using Server-Sent Events."""
+    try:
+        body = json.loads(request.body)
+        incoming_messages = body.get('messages', [])
+        conversation_id = body.get('conversation_id')
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+
+    messages_for_model = _normalize_chat_messages(incoming_messages, max_messages=30)
+    if not messages_for_model:
+        return JsonResponse({"error": "messages list is required."}, status=400)
+    messages_for_storage = _normalize_chat_messages(incoming_messages, max_messages=None)
+
+    conversation = _get_user_chat_conversation(
+        request.user,
+        conversation_id,
+        messages_for_storage,
+    )
+    if conversation is False:
+        return JsonResponse({"error": "conversation_id must be an integer."}, status=400)
+    if conversation_id is not None and request.user.is_authenticated and conversation is None:
+        return JsonResponse({"error": "Conversation not found."}, status=404)
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return JsonResponse({"error": "OPENAI_API_KEY not configured."}, status=500)
+
+    model_name = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5-mini')
+    client = OpenAI(api_key=api_key)
+    ai_messages = [_build_ai_system_prompt(request.user), *messages_for_model]
+
+    def event_stream():
+        """Generator that yields SSE formatted chunks."""
+        try:
+            full_reply = ""
+            stream = client.chat.completions.create(
+                model=model_name,
+                messages=ai_messages,
+                stream=True,
+            )
+            
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    token = chunk.choices[0].delta.content
+                    full_reply += token
+                    # Send token as SSE event
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+            
+            # After streaming completes, extract planner action and save conversation
+            cleaned_reply, planner_action = _extract_ai_planner_action(full_reply, request.user)
+            _save_chat_conversation_state(conversation, messages_for_storage, cleaned_reply)
+            
+            # If we cleaned the reply (removed payload), send the cleaned version to frontend
+            if cleaned_reply != full_reply:
+                yield f"data: {json.dumps({'type': 'replace_text', 'text': cleaned_reply})}\n\n"
+            
+            # Send metadata at end
+            metadata = {
+                "type": "done",
+                "conversation_id": conversation.id if conversation else None,
+            }
+            if planner_action:
+                metadata['planner_action'] = planner_action
+            
+            yield f"data: {json.dumps(metadata)}\n\n"
+            
+        except Exception as e:
+            error_data = {"type": "error", "error": str(e)}
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    response = StreamingHttpResponse(
+        event_stream(),
+        content_type="text/event-stream"
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @login_required
