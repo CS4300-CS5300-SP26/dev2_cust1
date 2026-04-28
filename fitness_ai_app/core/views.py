@@ -1732,6 +1732,41 @@ def save_meal_template(request):
 
 
 @login_required
+def save_food_group_template(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+    data = json.loads(request.body)
+    group_id = data.get('group_id')
+    try:
+        group = FoodGroup.objects.get(id=group_id, meal__user=request.user)
+    except FoodGroup.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Group not found'}, status=404)
+
+    if SavedMeal.objects.filter(user=request.user, name=group.name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+
+    items = []
+    for item in group.grouped_items.all():
+        items.append({
+            'type': 'food',
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': str(item.serving_size),
+            'serving_unit': item.serving_unit,
+        })
+
+    saved = SavedMeal.objects.create(
+        user=request.user,
+        name=group.name,
+        items=items,
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
 def get_saved_items(request):
     foods = list(SavedFood.objects.filter(user=request.user).values(
         'id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_size', 'serving_unit', 'created_at'

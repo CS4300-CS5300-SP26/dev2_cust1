@@ -59,6 +59,7 @@ urlpatterns = [
     path('nutrition/save_food_item/', views.save_food_item, name='save_food_item'),
     path('nutrition/save_supplement_item/', views.save_supplement_item, name='save_supplement_item'),
     path('nutrition/save_meal_template/', views.save_meal_template, name='save_meal_template'),
+    path('nutrition/save_food_group_template/', views.save_food_group_template, name='save_food_group_template'),
     path('nutrition/saved_items/', views.get_saved_items, name='get_saved_items'),
     path('nutrition/delete_saved_item/', views.delete_saved_item, name='delete_saved_item'),
     path('nutrition/add_saved_meal_to_date/', views.add_saved_meal_to_date, name='add_saved_meal_to_date'),

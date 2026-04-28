@@ -441,7 +441,7 @@
         <div class="card calories-card" title="Total calories for the day">
             <label class="card-label">CALORIES — TODAY</label>
             <div class="calories-display">
-                <span class="calories-consumed">{{ total_calories }}</span>
+                <span class="calories-consumed"{% if total_calories > calorie_goal %} style="color:#e53e3e;"{% endif %}>{{ total_calories }}</span>
                 <span class="calories-separator">/</span>
                 <span class="calories-goal">{{ calorie_goal }}</span>
                 <span class="calories-unit">kcal</span>
@@ -502,12 +502,6 @@
                             <span class="meal-name">{{ meal.name }}</span>
                             <span class="meal-calories meal-cal-total">{{ meal.meal_total|default:"0" }} kcal</span>
                             <div class="meal-actions">
-                                <button type="button" class="save-meal-btn" title="{% if meal.name in saved_meal_names %}Saved{% else %}Save meal as template{% endif %}"
-                                    data-meal-id="{{ meal.id }}"
-                                    data-saved="{% if meal.name in saved_meal_names %}true{% else %}false{% endif %}"
-                                    style="border:none;background:none;cursor:pointer;padding:4px;color:{% if meal.name in saved_meal_names %}var(--accent){% else %}#888{% endif %};">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if meal.name in saved_meal_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                                </button>
                                 <button class="meal-edit-btn" type="button" onclick="openAddItemModal('{{ meal.id }}', '{{ meal.name|escapejs }}')" title="Add food or supplement">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -579,6 +573,12 @@
                                 <div class="food-group-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.06);">
                                     <span style="font-weight:600;font-size:13px;color:var(--accent);">🍴 {{ group.name }}</span>
                                     <div style="display:flex;gap:6px;align-items:center;">
+                                        <button type="button" class="save-group-btn" title="{% if group.name in saved_meal_names %}Saved{% else %}Save group as template{% endif %}"
+                                            data-group-id="{{ group.id }}"
+                                            data-saved="{% if group.name in saved_meal_names %}true{% else %}false{% endif %}"
+                                            style="border:none;background:none;cursor:pointer;padding:4px;color:{% if group.name in saved_meal_names %}var(--accent){% else %}#888{% endif %};">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="{% if group.name in saved_meal_names %}var(--accent){% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                        </button>
                                         <button type="button" class="meal-edit-btn" onclick="openAddItemModalInGroup('{{ meal.id }}', '{{ meal.name|escapejs }}', '{{ group.id }}', '{{ group.name|escapejs }}')" title="Add item to group" style="width:24px;height:24px;">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -2152,14 +2152,14 @@
         .then(data => { if (data.success) markSaveBtnSaved(btn); });
     });
 
-    // Wire save buttons for meals
+    // Wire save buttons for food groups
     document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.save-meal-btn');
+        const btn = e.target.closest('.save-group-btn');
         if (!btn || btn.dataset.saved === 'true') return;
-        fetch('/nutrition/save_meal_template/', {
+        fetch('/nutrition/save_food_group_template/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
-            body: JSON.stringify({meal_id: btn.dataset.mealId}),
+            body: JSON.stringify({group_id: btn.dataset.groupId}),
         })
         .then(r => r.json())
         .then(data => { if (data.success) markSaveBtnSaved(btn); });
