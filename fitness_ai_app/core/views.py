@@ -638,12 +638,16 @@ def _build_ai_system_prompt(user):
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
             '12. When you provide a workout plan and/or nutrition plan that can be added to the app, ALWAYS append the planner_payload block at the end (do NOT ask for permission—the user will see an "Add" button in the app interface).\n'
-            '13. For addable plans, use this exact planner_payload format at the very end. ONLY include the sections you are creating (e.g., if only exercises, omit nutrition_plan; if only meals, omit workout_plan). IMPORTANT: Each food/drink component MUST be a separate item in the "items" array (e.g., Breakfast meal has: Oatmeal item, Milk item, Banana item, etc.—NOT combined as one item):\n'
+            '13. For addable plans, use this exact planner_payload format at the very end. ONLY include the sections you are creating (e.g., if only exercises, omit nutrition_plan; if only meals, omit workout_plan). IMPORTANT: Each food/drink component MUST be a separate item in the "items" array (e.g., Breakfast meal has: Oatmeal item, Milk item, Banana item, etc.—NOT combined as one item). CRITICAL: If creating a multi-day plan (7-day, monthly, etc.), include ALL days as an array—do NOT describe future days that are not in the payload. The response message must match what is actually in the payload.\n'
+            'Single-day plan example:\n'
             '<planner_payload>\n'
-            '{"workout_plan":{"workout_name":"...", "goal":"...", "date":"YYYY-MM-DD", "exercises":[{"name":"...", "muscle_group":"arms|chest|back|shoulders|legs|core", "sets":3, "reps":10, "weight":0}]},'
-            '"nutrition_plan":{"date":"YYYY-MM-DD", "meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]}], "supplements":[{"name":"...", "supplement_type":"vitamin|mineral|herb|protein|amino_acid|other", "dosage":"5", "unit":"g"}]}}\n'
+            '{"workout_plan":{"workout_name":"...", "goal":"...", "date":"YYYY-MM-DD", "exercises":[{"name":"...", "muscle_group":"arms|chest|back|shoulders|legs|core", "sets":3, "reps":10, "weight":0}]}, "nutrition_plan":{"date":"YYYY-MM-DD", "meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}], "supplements":[]}}\n'
             '</planner_payload>\n'
-            '14. Only include <planner_payload> when a concrete addable plan is present. Never include markdown code fences around it. Omit null/empty sections from the JSON. CRITICAL: Break down meals into individual items—do NOT combine multiple foods into a single item name (e.g., "Oatmeal, milk, banana" should be 3 separate items, not 1).\n'
+            'Multi-day plan example (use arrays for both workout_plan and nutrition_plan if doing multi-day):\n'
+            '<planner_payload>\n'
+            '{"workout_plan":[{"workout_name":"Day 1","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0}]}]}\n'
+            '</planner_payload>\n'
+            '14. Only include <planner_payload> when a concrete addable plan is present. Never include markdown code fences around it. Omit null/empty sections from the JSON. CRITICAL: Break down meals into individual items—do NOT combine multiple foods into a single item name (e.g., "Oatmeal, milk, banana" should be 3 separate items, not 1). For multi-day plans, MUST include ALL days in the array.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
@@ -725,9 +729,22 @@ def api_chat_apply_plan(request):
     if not isinstance(raw_payload, dict):
         return JsonResponse({'error': 'planner_payload object is required.'}, status=400)
 
-    workout_plan = _normalize_ai_workout_plan(raw_payload.get('workout_plan'), request.user)
-    nutrition_plan = _normalize_ai_nutrition_plan(raw_payload.get('nutrition_plan'))
-    if not workout_plan and not nutrition_plan:
+    # Support both single plans and multiple plans (arrays for multi-day)
+    raw_workout_plans = raw_payload.get('workout_plan')
+    raw_nutrition_plans = raw_payload.get('nutrition_plan')
+    
+    # Convert single plans to arrays for uniform processing
+    if isinstance(raw_workout_plans, dict):
+        raw_workout_plans = [raw_workout_plans]
+    elif not isinstance(raw_workout_plans, list):
+        raw_workout_plans = []
+    
+    if isinstance(raw_nutrition_plans, dict):
+        raw_nutrition_plans = [raw_nutrition_plans]
+    elif not isinstance(raw_nutrition_plans, list):
+        raw_nutrition_plans = []
+    
+    if not raw_workout_plans and not raw_nutrition_plans:
         return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
 
     workouts_created = 0
@@ -737,7 +754,12 @@ def api_chat_apply_plan(request):
     supplements_created = 0
 
     with transaction.atomic():
-        if workout_plan:
+        # Process all workout plans
+        for raw_workout in raw_workout_plans:
+            workout_plan = _normalize_ai_workout_plan(raw_workout, request.user)
+            if not workout_plan:
+                continue
+                
             workout = Workout.objects.create(
                 user=request.user,
                 name=workout_plan['workout_name'],
@@ -759,7 +781,12 @@ def api_chat_apply_plan(request):
                 )
                 exercises_created += 1
 
-        if nutrition_plan:
+        # Process all nutrition plans
+        for raw_nutrition in raw_nutrition_plans:
+            nutrition_plan = _normalize_ai_nutrition_plan(raw_nutrition)
+            if not nutrition_plan:
+                continue
+                
             nutrition_date = nutrition_plan['date']
             for meal_data in nutrition_plan['meals']:
                 meal = Meal.objects.create(
@@ -795,6 +822,10 @@ def api_chat_apply_plan(request):
                     taken=False,
                 )
                 supplements_created += 1
+
+    # Validate that at least something was created
+    if not (workouts_created or meals_created or supplements_created):
+        return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
 
     return JsonResponse({
         'success': True,

@@ -1651,6 +1651,96 @@ class ApiChatPlannerApplyTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn('error', r.json())
 
+    def test_apply_plan_supports_multi_day_workout_plans(self):
+        """Verify that multiple workout plans (e.g., 7-day) are all created."""
+        payload = {
+            'planner_payload': {
+                'workout_plan': [
+                    {
+                        'workout_name': 'Day 1 Workout',
+                        'goal': 'muscle_gain',
+                        'date': str(date.today()),
+                        'exercises': [
+                            {'name': 'Push-ups', 'muscle_group': 'chest', 'sets': 3, 'reps': 10, 'weight': 0},
+                        ],
+                    },
+                    {
+                        'workout_name': 'Day 2 Workout',
+                        'goal': 'muscle_gain',
+                        'date': str(date.today()),
+                        'exercises': [
+                            {'name': 'Squats', 'muscle_group': 'legs', 'sets': 3, 'reps': 10, 'weight': 0},
+                        ],
+                    },
+                ],
+            }
+        }
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['summary']['workouts_created'], 2)
+        self.assertEqual(data['summary']['exercises_created'], 2)
+
+        # Verify both workouts exist
+        workouts = Workout.objects.filter(user=self.user).order_by('name')
+        self.assertEqual(workouts.count(), 2)
+        self.assertEqual(workouts[0].name, 'Day 1 Workout')
+        self.assertEqual(workouts[1].name, 'Day 2 Workout')
+
+    def test_apply_plan_supports_multi_day_nutrition_plans(self):
+        """Verify that multiple nutrition plans (e.g., 7-day) are all created."""
+        payload = {
+            'planner_payload': {
+                'nutrition_plan': [
+                    {
+                        'date': str(date.today()),
+                        'meals': [
+                            {
+                                'name': 'Breakfast',
+                                'items': [
+                                    {'name': 'Oatmeal', 'calories': 150, 'protein': 5, 'carbs': 27, 'fats': 3},
+                                ],
+                            },
+                        ],
+                        'supplements': [],
+                    },
+                    {
+                        'date': str(date.today()),
+                        'meals': [
+                            {
+                                'name': 'Lunch',
+                                'items': [
+                                    {'name': 'Chicken', 'calories': 350, 'protein': 50, 'carbs': 0, 'fats': 15},
+                                ],
+                            },
+                        ],
+                        'supplements': [],
+                    },
+                ],
+            }
+        }
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['summary']['meals_created'], 2)
+        self.assertEqual(data['summary']['food_items_created'], 2)
+
+        # Verify both meals exist
+        meals = Meal.objects.filter(user=self.user).order_by('name')
+        self.assertEqual(meals.count(), 2)
+        self.assertEqual(meals[0].name, 'Breakfast')
+        self.assertEqual(meals[1].name, 'Lunch')
+
 
 # ---------------------------------------------------------------------------
 #  Food Database Views – Coverage Tests
