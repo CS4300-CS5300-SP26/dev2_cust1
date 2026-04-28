@@ -2,6 +2,7 @@ import json
 import os
 import time
 import random
+import re
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -120,6 +121,265 @@ def _build_profile_option_catalog():
         '  - Age input range: 13-120 years\n'
         '  - Daily Calorie Goal input range: 1000-5000 kcal (blank uses default 2400)'
     )
+
+
+def _clean_ai_text(value, max_length):
+    """Normalize arbitrary AI payload strings to bounded plain text."""
+    if not isinstance(value, str):
+        return ''
+    normalized = ' '.join(value.split())
+    if len(normalized) > max_length:
+        return normalized[:max_length].rstrip()
+    return normalized
+
+
+def _coerce_non_negative_int(value):
+    """Parse non-negative integers used by generated planner payloads."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _normalize_planner_date(raw_date):
+    """Convert planner payload dates to a safe date value."""
+    if isinstance(raw_date, str):
+        try:
+            return datetime.strptime(raw_date.strip(), '%Y-%m-%d').date()
+        except ValueError:
+            return date.today()
+    return date.today()
+
+
+def _infer_muscle_group_from_name(exercise_name):
+    """Best-effort mapping from free-text exercise names to allowed groups."""
+    lowered_name = (exercise_name or '').lower()
+    keyword_map = {
+        'arms': ('curl', 'tricep', 'bicep', 'forearm', 'hammer curl', 'skull crusher'),
+        'chest': ('bench', 'chest', 'push-up', 'pushup', 'pec', 'fly', 'dip'),
+        'back': ('row', 'lat', 'pull-up', 'pullup', 'deadlift', 'back', 'pulldown'),
+        'shoulders': ('shoulder', 'press', 'lateral raise', 'rear delt', 'overhead'),
+        'legs': ('squat', 'lunge', 'leg', 'hamstring', 'glute', 'calf', 'hip thrust'),
+        'core': ('plank', 'core', 'ab', 'crunch', 'sit-up', 'russian twist'),
+    }
+    for muscle_group, keywords in keyword_map.items():
+        if any(keyword in lowered_name for keyword in keywords):
+            return muscle_group
+    return 'core'
+
+
+def _normalize_ai_workout_plan(raw_workout_plan, user):
+    """Validate and normalize AI-generated workout plans for persistence."""
+    if not isinstance(raw_workout_plan, dict):
+        return None
+
+    raw_exercises = raw_workout_plan.get('exercises')
+    if not isinstance(raw_exercises, list):
+        return None
+
+    valid_muscle_groups = {value for value, _ in Exercise.MUSCLE_GROUP_CHOICES}
+    normalized_exercises = []
+    for raw_exercise in raw_exercises:
+        if not isinstance(raw_exercise, dict):
+            continue
+
+        name = _clean_ai_text(raw_exercise.get('name'), 200)
+        if not name:
+            continue
+
+        raw_muscle_group = _clean_ai_text(raw_exercise.get('muscle_group'), 20).lower()
+        muscle_group = (
+            raw_muscle_group if raw_muscle_group in valid_muscle_groups
+            else _infer_muscle_group_from_name(name)
+        )
+
+        sets = _coerce_non_negative_int(raw_exercise.get('sets'))
+        reps = _coerce_non_negative_int(raw_exercise.get('reps'))
+        weight = _coerce_non_negative_int(raw_exercise.get('weight'))
+
+        normalized_exercises.append({
+            'name': name,
+            'muscle_group': muscle_group,
+            'sets': sets,
+            'reps': reps,
+            'weight': weight,
+        })
+
+    if not normalized_exercises:
+        return None
+
+    valid_goals = {value for value, _ in Workout.GOAL_CHOICES}
+    goal_candidate = _clean_ai_text(raw_workout_plan.get('goal'), 30).lower()
+    default_goal = get_default_workout_goal(user) or 'general_health'
+    workout_goal = goal_candidate if goal_candidate in valid_goals else default_goal
+
+    workout_name = _clean_ai_text(raw_workout_plan.get('workout_name'), 100) or 'AI Workout Plan'
+    workout_date = _normalize_planner_date(raw_workout_plan.get('date'))
+
+    return {
+        'workout_name': workout_name,
+        'goal': workout_goal,
+        'date': workout_date,
+        'exercises': normalized_exercises,
+    }
+
+
+def _normalize_ai_nutrition_plan(raw_nutrition_plan):
+    """Validate and normalize AI-generated nutrition/supplement plans."""
+    if not isinstance(raw_nutrition_plan, dict):
+        return None
+
+    raw_meals = raw_nutrition_plan.get('meals')
+    meals = []
+    if isinstance(raw_meals, list):
+        for meal_index, raw_meal in enumerate(raw_meals, start=1):
+            if not isinstance(raw_meal, dict):
+                continue
+
+            meal_name = _clean_ai_text(raw_meal.get('name'), 100) or f'Meal {meal_index}'
+            raw_items = raw_meal.get('items')
+            if not isinstance(raw_items, list):
+                continue
+
+            items = []
+            for raw_item in raw_items:
+                if not isinstance(raw_item, dict):
+                    continue
+
+                item_name = _clean_ai_text(raw_item.get('name'), 200)
+                if not item_name:
+                    continue
+
+                calories = _coerce_non_negative_int(raw_item.get('calories'))
+                if calories is None:
+                    calories = 0
+
+                protein = _coerce_non_negative_int(raw_item.get('protein'))
+                carbs = _coerce_non_negative_int(raw_item.get('carbs'))
+                fats = _coerce_non_negative_int(raw_item.get('fats'))
+
+                items.append({
+                    'name': item_name,
+                    'calories': calories,
+                    'protein': protein if protein is not None else 0,
+                    'carbs': carbs if carbs is not None else 0,
+                    'fats': fats if fats is not None else 0,
+                })
+
+            if items:
+                meals.append({'name': meal_name, 'items': items})
+
+    valid_supplement_types = {value for value, _ in SupplementDatabase.TYPE_CHOICES}
+    raw_supplements = raw_nutrition_plan.get('supplements')
+    supplements = []
+    if isinstance(raw_supplements, list):
+        for raw_supplement in raw_supplements:
+            if not isinstance(raw_supplement, dict):
+                continue
+
+            supplement_name = _clean_ai_text(raw_supplement.get('name'), 200)
+            if not supplement_name:
+                continue
+
+            supplement_type = _clean_ai_text(raw_supplement.get('supplement_type'), 20).lower()
+            if supplement_type not in valid_supplement_types:
+                supplement_type = 'other'
+
+            dosage = _clean_ai_text(raw_supplement.get('dosage'), 100) or '1'
+            unit = _clean_ai_text(raw_supplement.get('unit'), 50) or 'serving'
+            supplements.append({
+                'name': supplement_name,
+                'supplement_type': supplement_type,
+                'dosage': dosage,
+                'unit': unit,
+            })
+
+    if not meals and not supplements:
+        return None
+
+    return {
+        'date': _normalize_planner_date(raw_nutrition_plan.get('date')),
+        'meals': meals,
+        'supplements': supplements,
+    }
+
+
+def _build_planner_action_response(workout_plan, nutrition_plan):
+    """Return UI metadata for the AI planner action button."""
+    if workout_plan and nutrition_plan:
+        button_label = 'Add both exercises and nutritions'
+        action_type = 'both'
+    elif workout_plan:
+        button_label = 'Add exercises'
+        action_type = 'exercises'
+    elif nutrition_plan:
+        button_label = 'Add nutritions'
+        action_type = 'nutritions'
+    else:
+        return None
+
+    payload = {}
+    if workout_plan:
+        payload['workout_plan'] = {
+            'workout_name': workout_plan['workout_name'],
+            'goal': workout_plan['goal'],
+            'date': workout_plan['date'].isoformat(),
+            'exercises': workout_plan['exercises'],
+        }
+    if nutrition_plan:
+        payload['nutrition_plan'] = {
+            'date': nutrition_plan['date'].isoformat(),
+            'meals': nutrition_plan['meals'],
+            'supplements': nutrition_plan['supplements'],
+        }
+
+    return {
+        'type': action_type,
+        'button_label': button_label,
+        'payload': payload,
+    }
+
+
+def _extract_ai_planner_action(reply, user):
+    """Extract optional planner payload tag from AI text and normalize it."""
+    if not isinstance(reply, str):
+        return '', None
+
+    payload_match = re.search(
+        r'<planner_payload>\s*(\{.*?\})\s*</planner_payload>',
+        reply,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not payload_match:
+        return reply.strip(), None
+
+    cleaned_reply = re.sub(
+        r'<planner_payload>\s*\{.*?\}\s*</planner_payload>',
+        '',
+        reply,
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+
+    try:
+        raw_payload = json.loads(payload_match.group(1))
+    except json.JSONDecodeError:
+        return cleaned_reply, None
+
+    if not isinstance(raw_payload, dict):
+        return cleaned_reply, None
+
+    workout_plan = _normalize_ai_workout_plan(raw_payload.get('workout_plan'), user)
+    nutrition_plan = _normalize_ai_nutrition_plan(raw_payload.get('nutrition_plan'))
+    planner_action = _build_planner_action_response(workout_plan, nutrition_plan)
+    if not planner_action:
+        return cleaned_reply, None
+
+    if '?' not in cleaned_reply:
+        follow_up = 'Would you like me to add this to your Train/Nutrition planners now?'
+        cleaned_reply = f'{cleaned_reply}\n\n{follow_up}' if cleaned_reply else follow_up
+
+    return cleaned_reply, planner_action
 
 
 def _infer_muscle_group_from_training_exercise(training_exercise):
@@ -381,6 +641,13 @@ def _build_ai_system_prompt(user):
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
+            '12. When you provide a workout plan and/or nutrition plan that can be added to the app, ask for confirmation first (for example: "Would you like me to add this plan?").\n'
+            '13. For addable plans, append a machine block at the end in this exact format:\n'
+            '<planner_payload>\n'
+            '{"workout_plan":{"workout_name":"...", "goal":"...", "date":"YYYY-MM-DD", "exercises":[{"name":"...", "muscle_group":"arms|chest|back|shoulders|legs|core", "sets":3, "reps":10, "weight":0}]},'
+            '"nutrition_plan":{"date":"YYYY-MM-DD", "meals":[{"name":"...", "items":[{"name":"...", "calories":300, "protein":20, "carbs":35, "fats":8}]}], "supplements":[{"name":"...", "supplement_type":"vitamin|mineral|herb|protein|amino_acid|other", "dosage":"5", "unit":"g"}]}}\n'
+            '</planner_payload>\n'
+            '14. Only include <planner_payload> when a concrete addable plan is present. Never include markdown code fences around it.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
@@ -433,14 +700,120 @@ def api_chat(request):
             model=model_name,
             messages=ai_messages,
         )
-        reply = response.choices[0].message.content
-        _save_chat_conversation_state(conversation, messages_for_storage, reply)
-        return JsonResponse({
+        reply = response.choices[0].message.content or ''
+        cleaned_reply, planner_action = _extract_ai_planner_action(reply, request.user)
+        _save_chat_conversation_state(conversation, messages_for_storage, cleaned_reply)
+        response_payload = {
             "reply": reply,
             "conversation_id": conversation.id if conversation else None,
-        })
+        }
+        response_payload['reply'] = cleaned_reply
+        if planner_action:
+            response_payload['planner_action'] = planner_action
+        return JsonResponse(response_payload)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_chat_apply_plan(request):
+    """Apply a planner payload from AI chat into train/nutrition records."""
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    raw_payload = body.get('planner_payload')
+    if not isinstance(raw_payload, dict):
+        return JsonResponse({'error': 'planner_payload object is required.'}, status=400)
+
+    workout_plan = _normalize_ai_workout_plan(raw_payload.get('workout_plan'), request.user)
+    nutrition_plan = _normalize_ai_nutrition_plan(raw_payload.get('nutrition_plan'))
+    if not workout_plan and not nutrition_plan:
+        return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
+
+    workouts_created = 0
+    exercises_created = 0
+    meals_created = 0
+    food_items_created = 0
+    supplements_created = 0
+
+    with transaction.atomic():
+        if workout_plan:
+            workout = Workout.objects.create(
+                user=request.user,
+                name=workout_plan['workout_name'],
+                goal=workout_plan['goal'],
+                status='planned',
+                date=workout_plan['date'],
+            )
+            workouts_created += 1
+
+            for exercise_data in workout_plan['exercises']:
+                Exercise.objects.create(
+                    workout=workout,
+                    name=exercise_data['name'],
+                    muscle_group=exercise_data['muscle_group'],
+                    sets=exercise_data['sets'],
+                    reps=exercise_data['reps'],
+                    weight=exercise_data['weight'],
+                    completed=False,
+                )
+                exercises_created += 1
+
+        if nutrition_plan:
+            nutrition_date = nutrition_plan['date']
+            for meal_data in nutrition_plan['meals']:
+                meal = Meal.objects.create(
+                    user=request.user,
+                    name=meal_data['name'],
+                    date=nutrition_date,
+                )
+                meals_created += 1
+
+                for item_data in meal_data['items']:
+                    FoodItem.objects.create(
+                        meal=meal,
+                        name=item_data['name'],
+                        calories=item_data['calories'],
+                        protein=item_data['protein'],
+                        carbs=item_data['carbs'],
+                        fats=item_data['fats'],
+                    )
+                    food_items_created += 1
+
+            for supplement_data in nutrition_plan['supplements']:
+                supplement_obj = SupplementDatabase.objects.filter(
+                    name__iexact=supplement_data['name'],
+                ).first()
+                SupplementEntry.objects.create(
+                    user=request.user,
+                    supplement=supplement_obj,
+                    name=supplement_data['name'],
+                    supplement_type=supplement_data['supplement_type'],
+                    dosage=supplement_data['dosage'],
+                    unit=supplement_data['unit'],
+                    date=nutrition_date,
+                    taken=False,
+                )
+                supplements_created += 1
+
+    return JsonResponse({
+        'success': True,
+        'message': (
+            f'Added {exercises_created} exercises, {food_items_created} food items, '
+            f'and {supplements_created} supplements to your planners.'
+        ),
+        'summary': {
+            'workouts_created': workouts_created,
+            'exercises_created': exercises_created,
+            'meals_created': meals_created,
+            'food_items_created': food_items_created,
+            'supplements_created': supplements_created,
+        },
+    })
 
 
 @login_required

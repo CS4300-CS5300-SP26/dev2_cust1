@@ -205,6 +205,33 @@
       border-bottom-left-radius: 4px;
     }
 
+    .planner-action-wrap {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .planner-action-btn {
+      border: none;
+      border-radius: 10px;
+      background: var(--harvest-orange);
+      color: #fff;
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .planner-action-btn:hover {
+      opacity: 0.9;
+    }
+
+    .planner-action-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     .msg.error {
       align-self: center;
       background: #2a0a0a;
@@ -604,10 +631,66 @@
         historyBackdrop.classList.remove('open');
     }
 
-    function addBubble(role, text) {
+    async function applyPlannerAction(button, plannerPayload) {
+        if (!plannerPayload) return;
+
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Adding...';
+
+        try {
+            const response = await fetch('/api/chat/apply_plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planner_payload: plannerPayload,
+                    conversation_id: currentConversationId,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+                addBubble('error', data.error || 'Could not add plan to your planners.');
+                return;
+            }
+
+            button.textContent = 'Added';
+            const appliedMessage = data.message || 'Added your plan to the planners.';
+            history.push({ role: 'assistant', content: appliedMessage });
+            addBubble('assistant', appliedMessage);
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = originalLabel;
+            addBubble('error', 'Network error – could not add plan to planners.');
+        }
+    }
+
+    function addBubble(role, text, options = {}) {
         const div = document.createElement('div');
         div.className = 'msg ' + role;
         div.textContent = text;
+
+        const plannerAction = options.plannerAction;
+        if (
+            role === 'assistant'
+            && plannerAction
+            && plannerAction.payload
+            && plannerAction.button_label
+        ) {
+            const actionWrap = document.createElement('div');
+            actionWrap.className = 'planner-action-wrap';
+            const actionButton = document.createElement('button');
+            actionButton.type = 'button';
+            actionButton.className = 'planner-action-btn';
+            actionButton.textContent = plannerAction.button_label;
+            actionButton.addEventListener('click', () => {
+                applyPlannerAction(actionButton, plannerAction.payload);
+            });
+            actionWrap.appendChild(actionButton);
+            div.appendChild(actionWrap);
+        }
+
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
         return div;
@@ -619,7 +702,11 @@
             addBubble('assistant', 'Hey! I am your Spotter.ai coach. Ask me anything about workouts, nutrition, or supplements.');
             return;
         }
-        history.forEach((message) => addBubble(message.role, message.content));
+        history.forEach((message) => {
+            addBubble(message.role, message.content, {
+                plannerAction: message.planner_action || null,
+            });
+        });
     }
 
     function toLocalDateTimeText(isoDate) {
@@ -743,8 +830,14 @@
             if (data.error) {
                 addBubble('error', data.error);
             } else {
-                history.push({ role: 'assistant', content: data.reply });
-                addBubble('assistant', data.reply);
+                const assistantMessage = { role: 'assistant', content: data.reply };
+                if (data.planner_action) {
+                    assistantMessage.planner_action = data.planner_action;
+                }
+                history.push(assistantMessage);
+                addBubble('assistant', data.reply, {
+                    plannerAction: data.planner_action || null,
+                });
                 if (normalizeNumber(data.conversation_id)) {
                     setCurrentConversationId(data.conversation_id);
                 }

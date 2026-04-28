@@ -1004,6 +1004,51 @@ class ApiChatViewTests(TestCase):
         self.assertIn('menu item "Profile"', create_kwargs['messages'][0]['content'])
         self.assertIn('section "Additional Information"', create_kwargs['messages'][0]['content'])
         self.assertIn('field label "About You"', create_kwargs['messages'][0]['content'])
+        self.assertIn('<planner_payload>', create_kwargs['messages'][0]['content'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_planner_action_when_payload_is_present(self, mock_openai_cls):
+        from core.models import AIChatConversation
+
+        user = User.objects.create_user(
+            username='plannerchat@example.com',
+            email='plannerchat@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='plannerchat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'I built a workout and nutrition plan. Does this look good to add?\n'
+            '<planner_payload>'
+            '{"workout_plan":{"workout_name":"Push Day","goal":"strength","date":"2026-04-27",'
+            '"exercises":[{"name":"Bench Press","muscle_group":"chest","sets":4,"reps":8,"weight":135}]},'
+            '"nutrition_plan":{"date":"2026-04-27","meals":[{"name":"Lunch","items":[{"name":"Chicken Rice","calories":650,"protein":45,"carbs":70,"fats":18}]}],'
+            '"supplements":[{"name":"Creatine Monohydrate","supplement_type":"amino_acid","dosage":"5","unit":"g"}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'make me a full plan'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add both exercises and nutritions')
+        self.assertIn('workout_plan', payload['planner_action']['payload'])
+        self.assertIn('nutrition_plan', payload['planner_action']['payload'])
+        self.assertNotIn('<planner_payload>', payload['reply'])
+        self.assertIn('Does this look good to add?', payload['reply'])
+
+        conversation_id = payload.get('conversation_id')
+        conversation = AIChatConversation.objects.get(id=conversation_id, user=user)
+        latest_assistant_message = conversation.messages.filter(role='assistant').latest('id')
+        self.assertNotIn('<planner_payload>', latest_assistant_message.content)
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
@@ -1344,6 +1389,79 @@ class ApiChatViewTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(r.status_code, 502)
+        self.assertIn('error', r.json())
+
+
+class ApiChatPlannerApplyTests(TestCase):
+    """Tests for applying AI planner payloads to workout/nutrition data."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='applyplanner@example.com',
+            email='applyplanner@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='applyplanner@example.com', password='TestPass123!')
+
+    def test_apply_plan_creates_workout_nutrition_and_supplements(self):
+        from core.models import Exercise, FoodItem, Meal, SupplementEntry, Workout
+
+        payload = {
+            'planner_payload': {
+                'workout_plan': {
+                    'workout_name': 'AI Strength Session',
+                    'goal': 'strength',
+                    'date': '2026-04-27',
+                    'exercises': [
+                        {'name': 'Bench Press', 'muscle_group': 'chest', 'sets': 4, 'reps': 8, 'weight': 135},
+                        {'name': 'Dumbbell Row', 'muscle_group': 'back', 'sets': 3, 'reps': 10, 'weight': 60},
+                    ],
+                },
+                'nutrition_plan': {
+                    'date': '2026-04-27',
+                    'meals': [
+                        {
+                            'name': 'Lunch',
+                            'items': [
+                                {
+                                    'name': 'Chicken Bowl',
+                                    'calories': 700,
+                                    'protein': 50,
+                                    'carbs': 60,
+                                    'fats': 20,
+                                }
+                            ],
+                        }
+                    ],
+                    'supplements': [
+                        {
+                            'name': 'Creatine',
+                            'supplement_type': 'amino_acid',
+                            'dosage': '5',
+                            'unit': 'g',
+                        }
+                    ],
+                },
+            }
+        }
+
+        r = self.client.post('/api/chat/apply_plan', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+
+        self.assertEqual(Workout.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Exercise.objects.filter(workout__user=self.user).count(), 2)
+        self.assertEqual(Meal.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(FoodItem.objects.filter(meal__user=self.user).count(), 1)
+        self.assertEqual(SupplementEntry.objects.filter(user=self.user).count(), 1)
+
+    def test_apply_plan_requires_valid_payload(self):
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps({'planner_payload': {'workout_plan': {'exercises': []}}}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 400)
         self.assertIn('error', r.json())
 
 
