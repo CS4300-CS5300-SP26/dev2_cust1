@@ -1052,6 +1052,76 @@ class ApiChatViewTests(TestCase):
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_exercises_only_button_label(self, mock_openai_cls):
+        """Verify button shows 'Add exercises' when only workout_plan is in payload."""
+        user = User.objects.create_user(
+            username='exerciseonly@example.com',
+            email='exerciseonly@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='exerciseonly@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'Here is your home-friendly full-body session for tomorrow.\n'
+            '<planner_payload>'
+            '{"workout_plan":{"workout_name":"Full Body","goal":"general_health","date":"2026-04-29",'
+            '"exercises":[{"name":"Pull-up negatives","muscle_group":"back","sets":3,"reps":6,"weight":0},'
+            '{"name":"Incline push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},'
+            '{"name":"Bodyweight squats","muscle_group":"legs","sets":3,"reps":12,"weight":0}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create only exercises'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add exercises')
+        self.assertIn('workout_plan', payload['planner_action']['payload'])
+        self.assertNotIn('nutrition_plan', payload['planner_action']['payload'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_nutrition_only_button_label(self, mock_openai_cls):
+        """Verify button shows 'Add nutritions' when only nutrition_plan is in payload."""
+        user = User.objects.create_user(
+            username='nutritiononly@example.com',
+            email='nutritiononly@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='nutritiononly@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'Here is a meal plan for your muscle gain.\n'
+            '<planner_payload>'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":300,"protein":10,"carbs":50,"fats":5}]}],'
+            '"supplements":[{"name":"Whey Protein","supplement_type":"protein","dosage":"30","unit":"g"}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create only meals'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add nutritions')
+        self.assertNotIn('workout_plan', payload['planner_action']['payload'])
+        self.assertIn('nutrition_plan', payload['planner_action']['payload'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_successful_chat_persists_conversation_for_authenticated_user(self, mock_openai_cls):
         from core.models import AIChatConversation
 
