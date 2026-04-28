@@ -593,59 +593,82 @@ def _save_chat_conversation_state(conversation, normalized_messages, reply):
     conversation.save()
 
 
-def _get_today_train_context(user):
-    """Build context showing today's planned workouts and exercises."""
+def _get_week_train_context(user, days_ahead=7):
+    """Build context showing workouts and exercises for the next N days (default 7)."""
     today = date.today()
-    workouts = Workout.objects.filter(user=user, date=today).prefetch_related('exercises').order_by('created_at')
+    end_date = today + timedelta(days=days_ahead - 1)
+    workouts = Workout.objects.filter(
+        user=user, 
+        date__gte=today, 
+        date__lte=end_date
+    ).prefetch_related('exercises').order_by('date', 'created_at')
     
     if not workouts:
-        return 'Today\'s Train Plan: None planned yet'
+        return 'Train Plan (Next 7 days): None planned'
     
-    lines = ['Today\'s Train Plan:']
+    lines = ['Train Plan (Next 7 days):']
+    current_date = None
+    
     for workout in workouts:
+        if workout.date != current_date:
+            current_date = workout.date
+            lines.append(f'  {current_date.strftime("%a, %b %d")}:')
+        
         exercises = workout.exercises.all()
         if not exercises:
-            lines.append(f'  - {workout.name}: (no exercises)')
+            lines.append(f'    - {workout.name}: (no exercises)')
         else:
-            exercise_strs = []
+            lines.append(f'    - {workout.name} ({workout.get_goal_display()}):')
             for ex in exercises:
                 status = '✓' if ex.completed else '○'
-                exercise_strs.append(f'{ex.name} ({ex.sets}x{ex.reps}{f" @ {ex.weight}lb" if ex.weight else ""}){status}')
-            lines.append(f'  - {workout.name} ({workout.get_goal_display()}):')
-            for ex_str in exercise_strs:
-                lines.append(f'    • {ex_str}')
+                weight_str = f' @ {ex.weight}lb' if ex.weight else ''
+                lines.append(f'      • {ex.name} ({ex.sets}x{ex.reps}{weight_str}){status}')
     
     return '\n'.join(lines)
 
 
-def _get_today_nutrition_context(user):
-    """Build context showing today's planned meals and food items."""
+def _get_week_nutrition_context(user, days_ahead=7):
+    """Build context showing meals and food items for the next N days (default 7)."""
     today = date.today()
-    meals = Meal.objects.filter(user=user, date=today).prefetch_related('items').order_by('created_at')
+    end_date = today + timedelta(days=days_ahead - 1)
+    meals = Meal.objects.filter(
+        user=user, 
+        date__gte=today, 
+        date__lte=end_date
+    ).prefetch_related('items').order_by('date', 'created_at')
     
     if not meals:
-        return 'Today\'s Nutrition Plan: None planned yet'
+        return 'Nutrition Plan (Next 7 days): None planned'
     
-    lines = ['Today\'s Nutrition Plan:']
-    total_cals = 0
-    total_protein = 0
-    total_carbs = 0
-    total_fats = 0
+    lines = ['Nutrition Plan (Next 7 days):']
+    current_date = None
+    day_totals = {}
     
     for meal in meals:
+        if meal.date != current_date:
+            if current_date is not None and current_date in day_totals:
+                totals = day_totals[current_date]
+                lines.append(
+                    f'    DAY TOTAL: {totals["cals"]} cal, {totals["protein"]}g P, '
+                    f'{totals["carbs"]}g C, {totals["fats"]}g F'
+                )
+            current_date = meal.date
+            lines.append(f'  {current_date.strftime("%a, %b %d")}:')
+            day_totals[current_date] = {'cals': 0, 'protein': 0, 'carbs': 0, 'fats': 0}
+        
         items = meal.items.all()
         if not items:
-            lines.append(f'  - {meal.name}: (no items)')
+            lines.append(f'    - {meal.name}: (no items)')
         else:
             meal_cals = 0
             meal_protein = 0
             meal_carbs = 0
             meal_fats = 0
-            item_strs = []
+            
             for item in items:
                 status = '✓' if item.completed else '○'
-                item_strs.append(
-                    f'{item.name} ({item.calories} cal, {item.protein}g P, '
+                lines.append(
+                    f'    - {meal.name}: {item.name} ({item.calories} cal, {item.protein}g P, '
                     f'{item.carbs}g C, {item.fats}g F){status}'
                 )
                 meal_cals += item.calories
@@ -653,18 +676,19 @@ def _get_today_nutrition_context(user):
                 meal_carbs += item.carbs
                 meal_fats += item.fats
             
-            lines.append(
-                f'  - {meal.name} ({meal_cals} cal, {meal_protein}g P, {meal_carbs}g C, {meal_fats}g F):'
-            )
-            for item_str in item_strs:
-                lines.append(f'    • {item_str}')
-            
-            total_cals += meal_cals
-            total_protein += meal_protein
-            total_carbs += meal_carbs
-            total_fats += meal_fats
+            day_totals[current_date]['cals'] += meal_cals
+            day_totals[current_date]['protein'] += meal_protein
+            day_totals[current_date]['carbs'] += meal_carbs
+            day_totals[current_date]['fats'] += meal_fats
     
-    lines.append(f'  DAILY TOTAL: {total_cals} cal, {total_protein}g P, {total_carbs}g C, {total_fats}g F')
+    # Add final day total
+    if current_date is not None and current_date in day_totals:
+        totals = day_totals[current_date]
+        lines.append(
+            f'    DAY TOTAL: {totals["cals"]} cal, {totals["protein"]}g P, '
+            f'{totals["carbs"]}g C, {totals["fats"]}g F'
+        )
+    
     return '\n'.join(lines)
 
 
@@ -816,8 +840,8 @@ def _build_ai_user_context(user):
         f'- Workouts planned today: {workouts_today}\n'
         f'- Exercises completed today: {completed_exercises}\n'
         f'- Supplements taken today: {supplements_taken}/{supplements_total}\n\n'
-        f'{_get_today_train_context(user)}\n\n'
-        f'{_get_today_nutrition_context(user)}\n\n'
+        f'{_get_week_train_context(user)}\n\n'
+        f'{_get_week_nutrition_context(user)}\n\n'
         f'{profile_options_context}'
     )
 
@@ -844,7 +868,7 @@ def _build_ai_system_prompt(user):
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
-            '12. Use the provided "Today\'s Train Plan" and "Today\'s Nutrition Plan" context sections to understand what the user has already scheduled for today. When user asks about their plan (e.g., "what\'s my plan today?", "what exercises do I have?"), refer to these sections. If a day is already heavily planned, mention it; if empty, suggest adding workouts/meals. When suggesting new plans, check if today already has content and integrate thoughtfully (don\'t duplicate if similar workouts/meals exist).\n'
+            '12. Use the provided "Train Plan (Next 7 days)" and "Nutrition Plan (Next 7 days)" context sections to understand what the user has scheduled. When user asks about their plan (e.g., "what\'s my plan today?", "what exercises do I have tomorrow?", "show me next week"), refer to these sections. Plans are organized by date with headers (e.g., "Mon, Apr 28"). If a day is already heavily planned, mention it; if empty, suggest adding workouts/meals. When suggesting new plans, check for existing content and integrate thoughtfully (don\'t duplicate if similar workouts/meals exist for that date).\n'
             '13. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
             '14. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
             'Use this exact planner_payload format. ONLY include sections you are creating (omit null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
