@@ -593,6 +593,119 @@ def _save_chat_conversation_state(conversation, normalized_messages, reply):
     conversation.save()
 
 
+def _get_today_train_context(user):
+    """Build context showing today's planned workouts and exercises."""
+    today = date.today()
+    workouts = Workout.objects.filter(user=user, date=today).prefetch_related('exercises').order_by('created_at')
+    
+    if not workouts:
+        return 'Today\'s Train Plan: None planned yet'
+    
+    lines = ['Today\'s Train Plan:']
+    for workout in workouts:
+        exercises = workout.exercises.all()
+        if not exercises:
+            lines.append(f'  - {workout.name}: (no exercises)')
+        else:
+            exercise_strs = []
+            for ex in exercises:
+                status = '✓' if ex.completed else '○'
+                exercise_strs.append(f'{ex.name} ({ex.sets}x{ex.reps}{f" @ {ex.weight}lb" if ex.weight else ""}){status}')
+            lines.append(f'  - {workout.name} ({workout.get_goal_display()}):')
+            for ex_str in exercise_strs:
+                lines.append(f'    • {ex_str}')
+    
+    return '\n'.join(lines)
+
+
+def _get_today_nutrition_context(user):
+    """Build context showing today's planned meals and food items."""
+    today = date.today()
+    meals = Meal.objects.filter(user=user, date=today).prefetch_related('items').order_by('created_at')
+    
+    if not meals:
+        return 'Today\'s Nutrition Plan: None planned yet'
+    
+    lines = ['Today\'s Nutrition Plan:']
+    total_cals = 0
+    total_protein = 0
+    total_carbs = 0
+    total_fats = 0
+    
+    for meal in meals:
+        items = meal.items.all()
+        if not items:
+            lines.append(f'  - {meal.name}: (no items)')
+        else:
+            meal_cals = 0
+            meal_protein = 0
+            meal_carbs = 0
+            meal_fats = 0
+            item_strs = []
+            for item in items:
+                status = '✓' if item.completed else '○'
+                item_strs.append(
+                    f'{item.name} ({item.calories} cal, {item.protein}g P, '
+                    f'{item.carbs}g C, {item.fats}g F){status}'
+                )
+                meal_cals += item.calories
+                meal_protein += item.protein
+                meal_carbs += item.carbs
+                meal_fats += item.fats
+            
+            lines.append(
+                f'  - {meal.name} ({meal_cals} cal, {meal_protein}g P, {meal_carbs}g C, {meal_fats}g F):'
+            )
+            for item_str in item_strs:
+                lines.append(f'    • {item_str}')
+            
+            total_cals += meal_cals
+            total_protein += meal_protein
+            total_carbs += meal_carbs
+            total_fats += meal_fats
+    
+    lines.append(f'  DAILY TOTAL: {total_cals} cal, {total_protein}g P, {total_carbs}g C, {total_fats}g F')
+    return '\n'.join(lines)
+
+
+
+    if not user or not user.is_authenticated:
+        return None
+
+    if conversation_id is None:
+        return AIChatConversation.objects.create(
+            user=user,
+            title=_build_chat_conversation_title(normalized_messages),
+        )
+
+    try:
+        conversation_id = int(conversation_id)
+    except (TypeError, ValueError):
+        return False
+
+    return AIChatConversation.objects.filter(id=conversation_id, user=user).first()
+
+
+def _save_chat_conversation_state(conversation, normalized_messages, reply):
+    if not conversation:
+        return
+
+    all_messages = [*normalized_messages, {'role': 'assistant', 'content': reply}]
+    conversation.messages.all().delete()
+    AIChatMessage.objects.bulk_create(
+        [
+            AIChatMessage(
+                conversation=conversation,
+                role=message['role'],
+                content=message['content'],
+            )
+            for message in all_messages
+        ]
+    )
+    conversation.title = _build_chat_conversation_title(all_messages)
+    conversation.save()
+
+
 def _build_ai_user_context(user):
     """Build a compact user context snapshot for personalized coaching."""
     profile_options_context = _build_profile_option_catalog()
@@ -702,7 +815,9 @@ def _build_ai_user_context(user):
         f'{total_carbs}g carbs, {total_fats}g fats\n'
         f'- Workouts planned today: {workouts_today}\n'
         f'- Exercises completed today: {completed_exercises}\n'
-        f'- Supplements taken today: {supplements_taken}/{supplements_total}\n'
+        f'- Supplements taken today: {supplements_taken}/{supplements_total}\n\n'
+        f'{_get_today_train_context(user)}\n\n'
+        f'{_get_today_nutrition_context(user)}\n\n'
         f'{profile_options_context}'
     )
 
@@ -729,8 +844,9 @@ def _build_ai_system_prompt(user):
             '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
             '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
             '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
-            '12. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
-            '13. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
+            '12. Use the provided "Today\'s Train Plan" and "Today\'s Nutrition Plan" context sections to understand what the user has already scheduled for today. When user asks about their plan (e.g., "what\'s my plan today?", "what exercises do I have?"), refer to these sections. If a day is already heavily planned, mention it; if empty, suggest adding workouts/meals. When suggesting new plans, check if today already has content and integrate thoughtfully (don\'t duplicate if similar workouts/meals exist).\n'
+            '13. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
+            '14. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
             'Use this exact planner_payload format. ONLY include sections you are creating (omit null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
             'Single-day example:\n'
             '<planner_payload>\n'
@@ -740,7 +856,7 @@ def _build_ai_system_prompt(user):
             '<planner_payload>\n'
             '{"workout_plan":[{"workout_name":"Day 1 Upper","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Dumbbell Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2 Lower","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0},{"name":"Deadlifts","muscle_group":"back","sets":3,"reps":8,"weight":0}]},{"workout_name":"Day 3 Full Body","goal":"muscle_gain","date":"2026-05-01","exercises":[{"name":"Bench Press","muscle_group":"chest","sets":3,"reps":8,"weight":0},{"name":"Pull-ups","muscle_group":"back","sets":3,"reps":5,"weight":0}]}],"nutrition_plan":[{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]},{"name":"Lunch","items":[{"name":"Chicken","calories":350,"protein":50,"carbs":0,"fats":15},{"name":"Rice","calories":250,"protein":5,"carbs":55,"fats":1}]}],"supplements":[]},{"date":"2026-04-30","meals":[{"name":"Breakfast","items":[{"name":"Eggs","calories":155,"protein":13,"carbs":1,"fats":11},{"name":"Toast","calories":80,"protein":3,"carbs":14,"fats":1}]},{"name":"Lunch","items":[{"name":"Salmon","calories":300,"protein":35,"carbs":0,"fats":18},{"name":"Quinoa","calories":220,"protein":8,"carbs":39,"fats":3}]}],"supplements":[]},{"date":"2026-05-01","meals":[{"name":"Breakfast","items":[{"name":"Greek Yogurt","calories":150,"protein":20,"carbs":8,"fats":2},{"name":"Berries","calories":80,"protein":1,"carbs":18,"fats":0}]},{"name":"Lunch","items":[{"name":"Turkey","calories":280,"protein":50,"carbs":0,"fats":6},{"name":"Sweet Potato","calories":200,"protein":4,"carbs":45,"fats":0}]}],"supplements":[]}]}\n'
             '</planner_payload>\n'
-            '14. Only include <planner_payload> when responding to user request for a concrete plan. Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", "plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from the payload. Response description must match payload exactly.\n'
+            '15. Only include <planner_payload> when responding to user request for a concrete plan. Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", "plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from the payload. Response description must match payload exactly.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
