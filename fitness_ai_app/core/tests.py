@@ -1122,6 +1122,63 @@ class ApiChatViewTests(TestCase):
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_meal_items_are_separated_not_combined(self, mock_openai_cls):
+        """Verify that meal items are separate, not combined (e.g., Oatmeal, Milk, Banana as 3 items, not 1)."""
+        user = User.objects.create_user(
+            username='mealseparate@example.com',
+            email='mealseparate@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='mealseparate@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        # AI response with properly separated items (NOT combined)
+        mock_resp.choices[0].message.content = (
+            'Here is your breakfast plan with all components separated.\n'
+            '<planner_payload>'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0},{"name":"Peanut Butter","calories":190,"protein":8,"carbs":7,"fats":16},{"name":"Whey Protein","calories":120,"protein":25,"carbs":2,"fats":1}]}],'
+            '"supplements":[]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create breakfast with oatmeal, milk, banana, peanut butter, and whey'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        
+        # Verify payload has 5 separate items
+        nutrition_plan = payload['planner_action']['payload'].get('nutrition_plan')
+        self.assertIsNotNone(nutrition_plan)
+        meals = nutrition_plan.get('meals', [])
+        self.assertEqual(len(meals), 1)
+        
+        items = meals[0].get('items', [])
+        self.assertEqual(len(items), 5, f"Expected 5 items but got {len(items)}: {[item['name'] for item in items]}")
+        
+        # Verify each item has correct name and macro values
+        item_names = [item['name'] for item in items]
+        self.assertIn('Oatmeal', item_names)
+        self.assertIn('Milk', item_names)
+        self.assertIn('Banana', item_names)
+        self.assertIn('Peanut Butter', item_names)
+        self.assertIn('Whey Protein', item_names)
+        
+        # Verify individual calorie values (not combined)
+        item_dict = {item['name']: item for item in items}
+        self.assertEqual(item_dict['Oatmeal']['calories'], 200)
+        self.assertEqual(item_dict['Milk']['calories'], 100)
+        self.assertEqual(item_dict['Banana']['calories'], 90)
+        self.assertEqual(item_dict['Peanut Butter']['calories'], 190)
+        self.assertEqual(item_dict['Whey Protein']['calories'], 120)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_successful_chat_persists_conversation_for_authenticated_user(self, mock_openai_cls):
         from core.models import AIChatConversation
 
