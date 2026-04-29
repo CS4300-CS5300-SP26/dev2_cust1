@@ -102,6 +102,20 @@ def _weight_kg_to_lbs(weight_kg):
     return round(float(weight_kg) * 2.20462, 2)
 
 
+def _parse_serving_size(raw):
+    """Parse a serving size string (whole number, decimal, or fraction like '1/2') into a float clamped to (0, 1000]."""
+    raw = (raw or '1').strip()
+    try:
+        if '/' in raw:
+            num, den = raw.split('/', 1)
+            result = float(num) / float(den)
+        else:
+            result = float(raw)
+    except (ValueError, ZeroDivisionError):
+        result = 1.0
+    return max(0.01, min(result, 1000))
+
+
 def _choice_labels(choices):
     """Return a comma-separated list of display labels for model choices."""
     return ', '.join(label for _, label in choices)
