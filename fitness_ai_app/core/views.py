@@ -2,17 +2,14 @@ import json
 import os
 import time
 import random
+import logging
+from datetime import datetime, date, timedelta
 
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from openai import OpenAI
-import logging
-import smtplib
-from datetime import datetime, date, timedelta
-
-from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -337,15 +334,19 @@ def _build_ai_system_prompt(user):
             '5. For supplements, include concise caution about interactions/contraindications when relevant.\n'
             '6. Keep responses concise and coach-like: usually 3-6 sentences, optionally short bullets.\n'
             '7. If key info is missing, ask one focused follow-up question.\n'
-            '8. When giving app navigation help, use exact user-visible UI labels from this app; avoid generic or invented menus.\n'
-            '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
-            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
+            '8. When giving app navigation help, use exact user-visible UI labels from this app; '
+            'avoid generic or invented menus.\n'
+            '9. Do not tell users to paste text unless there is a real text input for that exact step; '
+            'for goal selection, instruct tap/select the listed option.\n'
+            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names '
+            'unless they actually exist in this app.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
             '- Home dashboard tracks daily progress toward calorie and workout goals.\n'
             '- Profile editing opens from the top-right profile bubble menu item "Profile".\n'
-            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" (tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
+            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" '
+            '(tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
             '- Calorie target changes use field "Daily Calorie Goal (kcal)" on the same page.\n\n'
             '- Bio is in section "Additional Information" with field label "About You" (textarea).\n'
             '- Profile form fields are directly editable on the page; there is no separate edit/pencil step.\n\n'
@@ -450,10 +451,12 @@ def api_chat_history_detail(request, conversation_id):
     }
     return JsonResponse(payload)
 
-from django.core.mail import send_mail
-from .models import EmailVerification
+
+from django.core.mail import send_mail  # noqa: E402
+from .models import EmailVerification  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
 
 def user_get_started(request):
     if request.user.is_authenticated:
@@ -475,16 +478,25 @@ def user_get_started(request):
                         verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
                         logger.info(f'Verify URL: {verify_url}')
 
-                        html_message = f"""
-                        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                            <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                            <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
-                            <div style="text-align:center;margin:32px 0;">
-                                <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
-                            </div>
-                            <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-                        </div>
-                        """
+                        html_message = (
+                            '<div style="font-family:Arial,sans-serif;max-width:480px;'
+                            'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
+                            '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
+                            '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
+                            'Welcome! Click the button below to verify your email and activate your account.'
+                            '</p>'
+                            '<div style="text-align:center;margin:32px 0;">'
+                            f'<a href="{verify_url}" style="display:inline-block;'
+                            'padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;'
+                            'font-weight:600;border-radius:12px;text-decoration:none;">'
+                            'Verify My Email</a>'
+                            '</div>'
+                            '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">'
+                            "This link expires in 24 hours. "
+                            "If you didn't create an account, you can ignore this email."
+                            '</p>'
+                            '</div>'
+                        )
 
                         logger.info(f'Sending verification email to {user.email} from {settings.DEFAULT_FROM_EMAIL}')
                         result = send_mail(
@@ -504,7 +516,7 @@ def user_get_started(request):
                         verification = EmailVerification.objects.create(user=user, verified=True)
                         logger.info(f'Email verification disabled - user auto-activated: {user.username}')
                         messages.success(request, 'Account created successfully! You can now log in.')
-            except Exception as e:
+            except Exception:
                 logger.exception(f'Failed during signup for {form.cleaned_data.get("email")}')
                 form.add_error(None, 'We could not create your account right now.')
                 return render(request, 'core/user_get_started.html', {'form': form})
@@ -524,7 +536,7 @@ def get_started_profile(request):
         user = request.user
         user.first_name = request.POST.get('name', user.first_name)
         user.save()
-        
+
         # Update or create user profile with fitness metrics
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=user)
@@ -532,7 +544,7 @@ def get_started_profile(request):
         max_height_cm = 272
         min_weight_kg = 36
         max_weight_kg = 635
-        
+
         # Save calorie goal
         calorie_goal = request.POST.get('calorie_goal', '').strip()
         if calorie_goal:
@@ -540,7 +552,7 @@ def get_started_profile(request):
                 profile.calorie_goal = int(calorie_goal)
             except (ValueError, TypeError):
                 pass
-        
+
         # Save height (supports unit selection)
         height_unit = request.POST.get('height_unit', 'imperial').strip().lower()
         if height_unit == 'metric':
@@ -574,7 +586,7 @@ def get_started_profile(request):
                             profile.height = parsed_height_cm
                     except (ValueError, TypeError):
                         pass
-        
+
         # Save weight (supports unit selection)
         weight_unit = request.POST.get('weight_unit', 'lbs').strip().lower()
         if weight_unit == 'kg':
@@ -605,7 +617,7 @@ def get_started_profile(request):
                             profile.weight = round(parsed_weight_kg, 2)
                     except (ValueError, TypeError):
                         pass
-        
+
         # Save age
         age = request.POST.get('age', '').strip()
         if age:
@@ -613,45 +625,45 @@ def get_started_profile(request):
                 profile.age = int(age)
             except (ValueError, TypeError):
                 pass
-        
+
         # Save primary goal
         primary_goal = request.POST.get('primary_goal', '').strip()
         if primary_goal:
             profile.primary_goal = primary_goal
-        
+
         # Save experience level
         experience_level = request.POST.get('experience_level', '').strip()
         if experience_level:
             profile.experience_level = experience_level
-        
+
         # Save dietary preference
         dietary_preference = request.POST.get('dietary_preference', '').strip()
         if dietary_preference:
             profile.dietary_preference = dietary_preference
-        
+
         # Save home gym status
         has_home_gym = request.POST.get('has_home_gym', '').strip()
         if has_home_gym:
             profile.has_home_gym = has_home_gym == 'yes'
-        
+
         # Save home equipment (multiple selections)
         home_equipment = request.POST.getlist('home_equipment')
         profile.home_equipment = [eq for eq in home_equipment if eq]
-        
+
         # Save bio
         bio = request.POST.get('bio', '').strip()
         if bio:
             profile.bio = bio
         else:
             profile.bio = None
-        
+
         # Mark onboarding as completed
         profile.onboarding_completed = True
         profile.save()
-        
+
         messages.success(request, 'Profile updated successfully!')
         return redirect('home_dash')
-    
+
     # Handle GET request with skip parameter
     if request.GET.get('skip') == 'true':
         from core.models import UserProfile
@@ -659,16 +671,16 @@ def get_started_profile(request):
         profile.onboarding_completed = True
         profile.save()
         return redirect('home_dash')
-    
+
     # GET request - pass profile data to template
     from core.models import UserProfile
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     height_feet, height_inches = _height_cm_to_us(profile.height)
     weight_lbs = _weight_kg_to_lbs(profile.weight)
-    
+
     # Show skip button on first-time onboarding (any user who hasn't completed it yet)
     is_first_time_onboarding = not profile.onboarding_completed
-    
+
     return render(request, 'profile_dir/get_started_profile.html', {
         'active_tab': 'profile',
         'profile': profile,
@@ -732,28 +744,37 @@ def forgot_password(request):
         if form.is_valid():
             email = form.cleaned_data['email']
             start_time = time.time()
-            
+
             # Case-insensitive lookup on both email and username fields
             user = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).first()
-            
+
             if user:
                 try:
                     # Create password reset token
                     reset = PasswordReset.objects.create(user=user)
                     reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
-                    
+
                     # Send reset email
-                    html_message = f"""
-                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
-                        <div style="text-align:center;margin:32px 0;">
-                            <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
-                        </div>
-                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
-                    </div>
-                    """
-                    
+                    html_message = (
+                        '<div style="font-family:Arial,sans-serif;max-width:480px;'
+                        'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
+                        '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
+                        '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
+                        'Click the button below to reset your password.'
+                        '</p>'
+                        '<div style="text-align:center;margin:32px 0;">'
+                        f'<a href="{reset_url}" style="display:inline-block;'
+                        'padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;'
+                        'font-weight:600;border-radius:12px;text-decoration:none;">'
+                        'Reset Password</a>'
+                        '</div>'
+                        '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">'
+                        "This link expires in 24 hours. "
+                        "If you didn't request a password reset, you can ignore this email."
+                        '</p>'
+                        '</div>'
+                    )
+
                     send_mail(
                         'Reset your Spotter.ai password',
                         f'Click this link to reset your password: {reset_url}',
@@ -764,13 +785,13 @@ def forgot_password(request):
                     )
                 except Exception as e:
                     logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
-            
+
             # Random delay between 0.5 and 3 seconds to prevent timing attacks
             elapsed = time.time() - start_time
             target_delay = random.uniform(0.5, 2.0)
             if elapsed < target_delay:
                 time.sleep(target_delay - elapsed)
-            
+
             messages.success(request, 'If an account exists with that email, you will receive a password reset link.')
             return redirect('user_login')
     else:
@@ -808,10 +829,10 @@ def reset_password(request, token):
             user = reset.user
             user.set_password(password)
             user.save()
-            
+
             reset.used = True
             reset.save()
-            
+
             messages.success(request, 'Your password has been reset. You can now log in.')
             return redirect('user_login')
     else:
@@ -833,23 +854,23 @@ def home_dash(request):
         profile = request.user.profile
         if profile.social_login_user and not profile.onboarding_completed:
             return redirect('get_started_profile')
-    except:
+    except Exception:
         pass
-    
+
     # Check for discard action from profile
     if request.GET.get('discard') == 'true':
         messages.info(request, 'Changes discarded. Nothing was saved.')
-    
+
     today = date.today()
     total_calories = FoodItem.objects.filter(
         meal__user=request.user,
         meal__date=today,
         completed=True
     ).aggregate(total=Sum('calories'))['total'] or 0
-    
+
     # Get calorie goal from user profile or use default
     calorie_goal = get_user_calorie_goal(request.user)
-    
+
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
     workout_goal = 5
     completed_exercises = Exercise.objects.filter(
@@ -928,7 +949,7 @@ def home_dash(request):
             streak_date -= timedelta(days=1)
             continue
         break
-    
+
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
@@ -1209,7 +1230,7 @@ def nutrition_page(request):
 
     # Get calorie goal from user profile or use default
     calorie_goal = get_user_calorie_goal(request.user)
-    
+
     calories_percentage = min(
         round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
         100,
@@ -1217,7 +1238,7 @@ def nutrition_page(request):
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
-    
+
     # Get supplements for the selected date
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
@@ -1244,17 +1265,17 @@ def nutrition_page(request):
 def add_meal(request):
     date_param = request.POST.get('date')
     meal_name = request.POST.get('meal_name', '').strip()
-    
+
     if not date_param:
         messages.error(request, 'Date is required.')
         return redirect(reverse('nutrition_page'))
-    
+
     try:
         meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
     except ValueError:
         messages.error(request, 'Invalid date format.')
         return redirect(reverse('nutrition_page'))
-    
+
     # If no meal name provided, auto-generate based on time of day
     if not meal_name:
         current_hour = datetime.now().hour
@@ -1264,12 +1285,12 @@ def add_meal(request):
             meal_name = 'Lunch'
         else:
             meal_name = 'Dinner'
-        
+
         # Check if this meal already exists for today, if so add a number
         existing_meals = Meal.objects.filter(user=request.user, date=meal_date, name=meal_name).count()
         if existing_meals > 0:
             meal_name = f'{meal_name} {existing_meals + 1}'
-    
+
     Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
     messages.success(request, f'Meal "{meal_name}" added successfully.')
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
@@ -1283,31 +1304,31 @@ def add_food_item(request):
     food_calories = request.POST.get('food_calories', '0')
     item_id = request.POST.get('item_id')  # For editing
     date_param = request.POST.get('date')
-    
+
     if not meal_id or not food_name or not food_calories:
         messages.error(request, 'All fields are required.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
-    
+
     try:
         calories = int(food_calories)
     except ValueError:
         messages.error(request, 'Calories must be a number.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}")
-    
+
     # Optional macro fields
     protein = request.POST.get('protein', '0')
     carbs = request.POST.get('carbs', '0')
     fats = request.POST.get('fats', '0')
-    
+
     try:
         protein = int(protein) if protein else 0
         carbs = int(carbs) if carbs else 0
         fats = int(fats) if fats else 0
     except ValueError:
         protein = carbs = fats = 0
-    
+
     # Check if this is an update or create
     if item_id:
         try:
@@ -1395,11 +1416,11 @@ def create_food_group_ajax(request):
 def toggle_food_item(request):
     item_id = request.POST.get('item_id')
     date_param = request.POST.get('date')
-    
+
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.completed = not food_item.completed
     food_item.save()
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -1427,7 +1448,7 @@ def delete_food_item(request):
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.delete()
     messages.success(request, 'Food item deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -1447,11 +1468,11 @@ def delete_food_group(request):
 def delete_meal(request):
     meal_id = request.POST.get('meal_id')
     date_param = request.POST.get('date')
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
     meal.delete()
     messages.success(request, 'Meal deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -1466,20 +1487,20 @@ def add_supplement_to_meal(request):
     supplement_id = request.POST.get('supplement_id')
     meal_supplement_id = request.POST.get('meal_supplement_id')  # For editing
     date_param = request.POST.get('date')
-    
+
     if not meal_id or not supplement_name:
         messages.error(request, 'Meal and supplement name are required.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
-    
+
     supplement_obj = None
     if supplement_id:
         try:
             supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
         except SupplementDatabase.DoesNotExist:
             pass
-    
+
     # Check if this is an update or create
     if meal_supplement_id:
         try:
@@ -1503,7 +1524,7 @@ def add_supplement_to_meal(request):
             unit=unit
         )
         messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
@@ -1512,11 +1533,11 @@ def add_supplement_to_meal(request):
 def toggle_meal_supplement(request):
     supplement_id = request.POST.get('supplement_id')
     date_param = request.POST.get('date')
-    
+
     supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
     supplement.taken = not supplement.taken
     supplement.save()
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -1525,11 +1546,11 @@ def toggle_meal_supplement(request):
 def delete_meal_supplement(request):
     supplement_id = request.POST.get('supplement_id')
     date_param = request.POST.get('date')
-    
+
     supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
     supplement.delete()
     messages.success(request, 'Supplement deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -1544,7 +1565,7 @@ def search_foods(request):
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
-    
+
     # Search for food items matching the query (case-insensitive)
     food_items = (
         FoodItem.objects
@@ -1552,7 +1573,7 @@ def search_foods(request):
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')[:20]
     )
-    
+
     # Deduplicate by name (keep entry with best macro data)
     seen_names = {}
     for item in food_items:
@@ -1565,7 +1586,7 @@ def search_foods(request):
             new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
             if new_score > existing_score:
                 seen_names[name_lower] = item
-    
+
     results = list(seen_names.values())
     return JsonResponse({'results': results})
 
@@ -1579,7 +1600,7 @@ def get_all_foods(request):
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')
     )
-    
+
     # Deduplicate by name (keep entry with best macro data)
     seen_names = {}
     for item in food_items:
@@ -1592,7 +1613,7 @@ def get_all_foods(request):
             new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
             if new_score > existing_score:
                 seen_names[name_lower] = item
-    
+
     # Sort by name alphabetically
     results = sorted(seen_names.values(), key=lambda x: x['name'].lower())
     return JsonResponse({'foods': results, 'count': len(results)})
@@ -1606,17 +1627,17 @@ def save_food_to_database(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    
+
     food_id = data.get('id')
     name = data.get('name', '').strip()
     calories = data.get('calories', 0)
     protein = data.get('protein', 0)
     carbs = data.get('carbs', 0)
     fats = data.get('fats', 0)
-    
+
     if not name:
         return JsonResponse({'error': 'Food name is required'}, status=400)
-    
+
     try:
         calories = int(calories) if calories else 0
         protein = int(protein) if protein else 0
@@ -1624,7 +1645,7 @@ def save_food_to_database(request):
         fats = int(fats) if fats else 0
     except ValueError:
         return JsonResponse({'error': 'Invalid numeric values'}, status=400)
-    
+
     # Get or create a system meal for storing database foods
     from django.contrib.auth.models import User
     system_user, _ = User.objects.get_or_create(
@@ -1636,7 +1657,7 @@ def save_food_to_database(request):
         name='Food Database',
         date=date(2000, 1, 1)
     )
-    
+
     if food_id:
         # Update existing food
         try:
@@ -1661,7 +1682,7 @@ def save_food_to_database(request):
             })
         except FoodItem.DoesNotExist:
             pass  # Fall through to create new
-    
+
     # Create new food item in database
     food_item = FoodItem.objects.create(
         meal=system_meal,
@@ -1672,7 +1693,7 @@ def save_food_to_database(request):
         fats=fats,
         completed=False
     )
-    
+
     return JsonResponse({
         'success': True,
         'message': f'Added "{name}" to database',
@@ -1697,7 +1718,7 @@ def get_all_supplements(request):
         .values('id', 'name', 'supplement_type', 'dosage', 'unit')
         .order_by('name')
     )
-    
+
     return JsonResponse({'supplements': list(supplements)})
 
 
@@ -1709,14 +1730,14 @@ def search_supplements(request):
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
-    
+
     supplements = (
         SupplementDatabase.objects
         .filter(name__icontains=query)
         .values('id', 'name', 'supplement_type', 'dosage', 'unit')
         .order_by('name')[:20]
     )
-    
+
     results = list(supplements)
     return JsonResponse({'results': results})
 
@@ -1735,42 +1756,42 @@ def supplement_entries(request):
                 entry_date = date.today()
         else:
             entry_date = date.today()
-        
+
         entries = SupplementEntry.objects.filter(
             user=request.user,
             date=entry_date
         ).values('id', 'name', 'supplement_type', 'dosage', 'unit', 'taken')
-        
+
         return JsonResponse({'entries': list(entries)})
-    
+
     elif request.method == 'POST':
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-        
+
         name = data.get('name', '').strip()
         supplement_type = data.get('supplement_type', 'other')
         dosage = data.get('dosage', '1')
         unit = data.get('unit', 'serving')
         entry_date = data.get('date', str(date.today()))
         supplement_id = data.get('supplement_id')
-        
+
         if not name:
             return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
-        
+
         try:
             entry_date = datetime.strptime(entry_date, '%Y-%m-%d').date()
         except ValueError:
             entry_date = date.today()
-        
+
         supplement_obj = None
         if supplement_id:
             try:
                 supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
             except SupplementDatabase.DoesNotExist:
                 pass
-        
+
         entry = SupplementEntry.objects.create(
             user=request.user,
             supplement=supplement_obj,
@@ -1781,7 +1802,7 @@ def supplement_entries(request):
             date=entry_date,
             taken=False
         )
-        
+
         return JsonResponse({
             'success': True,
             'entry': {
@@ -1804,20 +1825,20 @@ def complete_workout(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     workout_id = data.get('workout_id')
-    
+
     if not workout_id:
         return JsonResponse({'success': False, 'error': 'workout_id is required'}, status=400)
-    
+
     try:
         workout = Workout.objects.get(id=workout_id, user=request.user)
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-    
+
     workout.status = 'completed'
     workout.save()
-    
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
@@ -1834,16 +1855,16 @@ def toggle_supplement_taken(request, entry_id):
         entry = SupplementEntry.objects.get(id=entry_id, user=request.user)
     except SupplementEntry.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Entry not found'}, status=404)
-    
+
     try:
         data = json.loads(request.body)
         taken = data.get('taken', not entry.taken)
     except json.JSONDecodeError:
         taken = not entry.taken
-    
+
     entry.taken = taken
     entry.save()
-    
+
     return JsonResponse({
         'success': True,
         'taken': entry.taken,
@@ -1859,26 +1880,26 @@ def save_workout_time(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     workout_id = data.get('workout_id')
     total_seconds = data.get('total_seconds')
-    
+
     if not workout_id or total_seconds is None:
         return JsonResponse({'success': False, 'error': 'workout_id and total_seconds are required'}, status=400)
-    
+
     try:
         total_seconds = int(total_seconds)
     except (TypeError, ValueError):
         return JsonResponse({'success': False, 'error': 'total_seconds must be an integer'}, status=400)
-    
+
     try:
         workout = Workout.objects.get(id=workout_id, user=request.user)
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-    
+
     workout.total_duration_seconds = total_seconds
     workout.save()
-    
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
@@ -1895,12 +1916,12 @@ def complete_exercises_by_ids(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     exercise_ids = data.get('exercise_ids', [])
-    
+
     if not exercise_ids or not isinstance(exercise_ids, list):
         return JsonResponse({'success': False, 'error': 'exercise_ids must be a non-empty list'}, status=400)
-    
+
     try:
         exercises = Exercise.objects.filter(id__in=exercise_ids, workout__user=request.user)
         completed_count = 0
@@ -1909,7 +1930,7 @@ def complete_exercises_by_ids(request):
                 exercise.completed = True
                 exercise.save()
                 completed_count += 1
-        
+
         return JsonResponse({
             'success': True,
             'completed_count': completed_count,
@@ -1928,35 +1949,33 @@ def save_set_progress(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     set_data = data.get('set_data', [])  # List of {exercise_id, set_number, completed}
     timer_seconds = data.get('timer_seconds', 0)
     workout_id = data.get('workout_id')
-    
+
     if not set_data or not isinstance(set_data, list):
         return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
-    
+
     try:
-        from django.db.models import Q
-        
         saved_count = 0
         for item in set_data:
             exercise_id = item.get('exercise_id')
             set_number = item.get('set_number')
             completed = item.get('completed', False)
-            
+
             if not exercise_id or not set_number:
                 continue
-            
+
             # Verify user owns this exercise
             exercise = Exercise.objects.filter(
-                id=exercise_id, 
+                id=exercise_id,
                 workout__user=request.user
             ).first()
-            
+
             if not exercise:
                 continue
-            
+
             # Create or update set progress
             from core.models import SetProgress
             progress, created = SetProgress.objects.update_or_create(
@@ -1965,7 +1984,7 @@ def save_set_progress(request):
                 defaults={'completed': completed}
             )
             saved_count += 1
-        
+
         # Save timer seconds to workout if provided
         if workout_id and timer_seconds >= 0:
             workout = Workout.objects.filter(
@@ -1975,7 +1994,7 @@ def save_set_progress(request):
             if workout:
                 workout.current_session_seconds = timer_seconds
                 workout.save(update_fields=['current_session_seconds'])
-        
+
         return JsonResponse({
             'success': True,
             'saved_count': saved_count,
@@ -1990,27 +2009,27 @@ def save_set_progress(request):
 def get_set_progress(request):
     """Get set completion status for a workout's exercises."""
     workout_id = request.GET.get('workout_id')
-    
+
     if not workout_id:
         return JsonResponse({'success': False, 'error': 'workout_id required'}, status=400)
-    
+
     try:
         from core.models import SetProgress
-        
+
         # Verify user owns this workout
         workout = Workout.objects.filter(
             id=workout_id,
             user=request.user
         ).first()
-        
+
         if not workout:
             return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-        
+
         # Get all set progress for this workout's exercises
         progress = SetProgress.objects.filter(
             exercise__workout=workout
         ).values('exercise_id', 'set_number', 'completed')
-        
+
         set_progress_dict = {}
         for item in progress:
             exercise_id = item['exercise_id']
@@ -2020,7 +2039,7 @@ def get_set_progress(request):
                 'set_number': item['set_number'],
                 'completed': item['completed']
             })
-        
+
         return JsonResponse({
             'success': True,
             'set_progress': set_progress_dict,
