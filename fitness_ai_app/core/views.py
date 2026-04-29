@@ -1853,7 +1853,10 @@ def add_exercise(request):
             .first()
         )
         if not training_exercise:
-            messages.error(request, 'Selected exercise was not found in the exercise database.')
+            error_msg = 'Selected exercise was not found in the exercise database.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=400)
+            messages.error(request, error_msg)
             return redirect(base_redirect_url)
 
     if training_exercise:
@@ -1867,7 +1870,10 @@ def add_exercise(request):
             reps = str(training_exercise.default_reps)
 
     if not workout_id or not exercise_name or not muscle_group:
-        messages.error(request, 'Exercise name and muscle group are required.')
+        error_msg = 'Exercise name and muscle group are required.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return redirect(base_redirect_url)
 
     workout = get_object_or_404(Workout, id=workout_id, user=request.user)
@@ -1877,10 +1883,12 @@ def add_exercise(request):
 
     validation_error = sets_error or reps_error or weight_error
     if validation_error:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': validation_error}, status=400)
         messages.error(request, validation_error)
         return redirect(base_redirect_url)
 
-    Exercise.objects.create(
+    exercise = Exercise.objects.create(
         workout=workout,
         name=exercise_name,
         muscle_group=muscle_group,
@@ -1889,6 +1897,10 @@ def add_exercise(request):
         weight=weight_value,
         completed=(status == 'completed'),
     )
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'exercise_id': exercise.id})
+    
     return redirect(base_redirect_url)
 
 
