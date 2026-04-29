@@ -1247,15 +1247,18 @@ def nutrition_page(request):
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
     # Sets used by the template to pre-fill saved bookmark buttons
-    saved_food_names = set(
-        SavedFood.objects.filter(user=request.user).values_list('name', flat=True)
+    saved_food_id_by_name = dict(
+        SavedFood.objects.filter(user=request.user).values_list('name', 'id')
     )
-    saved_supplement_names = set(
-        SavedSupplement.objects.filter(user=request.user).values_list('name', flat=True)
+    saved_supplement_id_by_name = dict(
+        SavedSupplement.objects.filter(user=request.user).values_list('name', 'id')
     )
-    saved_meal_ids = set(
-        SavedMeal.objects.filter(user=request.user).values_list('name', flat=True)
+    saved_meal_id_by_name = dict(
+        SavedMeal.objects.filter(user=request.user).values_list('name', 'id')
     )
+    saved_food_names = set(saved_food_id_by_name)
+    saved_supplement_names = set(saved_supplement_id_by_name)
+    saved_meal_ids = set(saved_meal_id_by_name)
 
     context = {
         'active_tab': 'nutrition',
@@ -1274,6 +1277,9 @@ def nutrition_page(request):
         'saved_food_names': saved_food_names,
         'saved_supplement_names': saved_supplement_names,
         'saved_meal_names': saved_meal_ids,
+        'saved_food_ids_json': json.dumps(saved_food_id_by_name),
+        'saved_supplement_ids_json': json.dumps(saved_supplement_id_by_name),
+        'saved_meal_ids_json': json.dumps(saved_meal_id_by_name),
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
@@ -2411,10 +2417,9 @@ def get_set_progress(request):
 
 # ==================== SAVED ITEMS ====================
 
+@require_POST
 @login_required
 def save_food_item(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2432,6 +2437,10 @@ def save_food_item(request):
         serving_size = float(data.get('serving_size', 1))
     except (TypeError, ValueError):
         return JsonResponse({'success': False, 'error': 'Invalid numeric value'}, status=400)
+    if not (0 <= calories <= 9999 and 0 <= protein <= 999 and 0 <= carbs <= 999 and 0 <= fats <= 999):
+        return JsonResponse({'success': False, 'error': 'Numeric values out of range'}, status=400)
+    if serving_size <= 0:
+        return JsonResponse({'success': False, 'error': 'Serving size must be greater than 0'}, status=400)
     saved = SavedFood.objects.create(
         user=request.user,
         name=name,
@@ -2445,10 +2454,9 @@ def save_food_item(request):
     return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
 
 
+@require_POST
 @login_required
 def save_supplement_item(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2468,10 +2476,9 @@ def save_supplement_item(request):
     return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
 
 
+@require_POST
 @login_required
 def save_meal_template(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2513,10 +2520,9 @@ def save_meal_template(request):
     return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
 
 
+@require_POST
 @login_required
 def save_food_group_template(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2575,10 +2581,9 @@ def get_saved_items(request):
     return JsonResponse({'foods': foods, 'supplements': supplements, 'meals': meals})
 
 
+@require_POST
 @login_required
 def delete_saved_item(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -2596,10 +2601,9 @@ def delete_saved_item(request):
         return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
 
 
+@require_POST
 @login_required
 def add_saved_meal_to_date(request):
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
