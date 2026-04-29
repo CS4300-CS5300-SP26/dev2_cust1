@@ -532,8 +532,8 @@
   }
   animateBars();
 
-  // ── "Just unlocked" detection via localStorage ──────────────────────────
-  const STORAGE_KEY = 'spotter_unlocked_achievements';
+  // ── "Just unlocked" detection via localStorage (namespaced by user) ──────
+  const STORAGE_KEY = 'spotter_achievements_{{ request.user.pk }}';
   const currentEarned = {{ earned_ids_json|safe }};
 
   let seenBefore = [];
@@ -555,6 +555,15 @@
     if (typeof runConfetti === 'function') runConfetti();
     else launchConfetti();
   }
+
+  // ── Reload page when user returns to this tab so data is always fresh ────
+  // (Catches updates from completing workouts, logging food, etc. on other pages)
+  let _pageLoadTime = Date.now();
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - _pageLoadTime > 5000) {
+      location.reload();
+    }
+  });
 
   // ── Minimal confetti ────────────────────────────────────────────────────
   function launchConfetti() {

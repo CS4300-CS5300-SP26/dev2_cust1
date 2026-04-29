@@ -1534,15 +1534,16 @@ def delete_meal_supplement(request):
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
-@login_required
-def social_page(request):
+def compute_achievements_challenges(user):
+    """
+    Compute achievement and challenge state for a user from the real database.
+    Shared by social_page (template render) and achievements_progress_api (JSON endpoint).
+    Returns a dict with achievements, challenges, and summary stats.
+    """
     today = date.today()
     week_start = today - timedelta(days=today.weekday())  # Monday
     week_end = week_start + timedelta(days=6)  # Sunday
-    user = request.user
     calorie_goal = get_user_calorie_goal(user)
-
-    # ── Precomputed datasets ──────────────────────────────────────────────────
 
     # Completed exercises: count by workout date
     exercise_by_date = dict(
@@ -1559,20 +1560,12 @@ def social_page(request):
     workout_dates = set(completed_workouts_qs.values_list('date', flat=True))
 
     # Meals with at least one food item logged
-    meal_dates_qs = (
+    meal_dates = set(
         Meal.objects.filter(user=user, items__isnull=False)
         .values_list('date', flat=True)
         .distinct()
     )
-    meal_dates = set(meal_dates_qs)
     meals_this_week_days = len([d for d in meal_dates if week_start <= d <= week_end])
-
-    # Total distinct meals logged this week (count individual meals, not just days)
-    meals_this_week_count = (
-        Meal.objects.filter(user=user, date__range=(week_start, week_end), items__isnull=False)
-        .distinct()
-        .count()
-    )
 
     # Calorie totals by date (only completed food items)
     calorie_by_date = dict(
@@ -1591,7 +1584,7 @@ def social_page(request):
         .distinct()
     )
 
-    # ── Activity streak (workout or meal days only — supplements excluded to prevent gaming) ─
+    # Activity streak (workout or meal days only)
     all_activity_dates = workout_dates | meal_dates
     activity_streak = 0
     for i in range(400):
@@ -1599,10 +1592,9 @@ def social_page(request):
             activity_streak += 1
         else:
             break
-
     distinct_active_days = len(all_activity_dates)
 
-    # ── Week Warrior: most workouts in any single week ────────────────────────
+    # Week Warrior: most workouts in any single week
     weekly_workout_counts = list(
         completed_workouts_qs
         .annotate(week=TruncWeek('date'))
@@ -1613,7 +1605,7 @@ def social_page(request):
     max_weekly_workouts = max(weekly_workout_counts, default=0)
     week_warrior_unlocked = max_weekly_workouts >= 5
 
-    # ── Weekly challenge data ─────────────────────────────────────────────────
+    # Weekly challenge data
     exercises_this_week = sum(
         v for d, v in exercise_by_date.items() if week_start <= d <= week_end
     )
@@ -1623,14 +1615,12 @@ def social_page(request):
     calorie_goal_days_this_week = len(
         [d for d in calorie_goal_days if week_start <= d <= week_end]
     )
-    # Fuel Your Gains: days this week where user both completed a workout AND logged food
     workout_dates_this_week = set(
         completed_workouts_qs.filter(date__range=(week_start, week_end)).values_list('date', flat=True)
     )
     meal_dates_this_week = {d for d in meal_dates if week_start <= d <= week_end}
     fuel_gains_days = len(workout_dates_this_week & meal_dates_this_week)
 
-    # ── Achievements ──────────────────────────────────────────────────────────
     achievements = [
         {
             'id': 'first_rep',
@@ -1733,13 +1723,10 @@ def social_page(request):
             'rarity': 'epic',
         },
     ]
-    # Earned first, then by progress pct descending
     achievements.sort(key=lambda a: (not a['earned'], -(a['progress'] / a['goal'])))
 
     earned_ids = [a['id'] for a in achievements if a['earned']]
-    earned_count = len(earned_ids)
 
-    # ── Weekly Challenges ─────────────────────────────────────────────────────
     challenges = [
         {
             'id': 'workout_3x',
@@ -1787,23 +1774,58 @@ def social_page(request):
             'completed': fuel_gains_days >= 3,
         },
     ]
-    challenges_completed = sum(1 for c in challenges if c['completed'])
-    streak_to_legend = max(0, 7 - activity_streak)
 
-    return render(request, 'socal_dir/social_page.html', {
-        'active_tab': 'social',
+    return {
+        'achievements': achievements,
+        'challenges': challenges,
+        'earned_ids': earned_ids,
+        'earned_count': len(earned_ids),
+        'challenges_completed': sum(1 for c in challenges if c['completed']),
+        'activity_streak': activity_streak,
+        'distinct_active_days': distinct_active_days,
         'total_exercises': total_exercises,
         'total_workouts': total_workouts,
-        'distinct_active_days': distinct_active_days,
-        'activity_streak': activity_streak,
-        'streak_to_legend': streak_to_legend,
-        'earned_count': earned_count,
-        'achievements': achievements,
-        'earned_ids_json': json.dumps(earned_ids),
-        'challenges': challenges,
-        'challenges_completed': challenges_completed,
         'week_start': week_start,
         'week_end': week_end,
+    }
+
+
+@login_required
+def social_page(request):
+    data = compute_achievements_challenges(request.user)
+    return render(request, 'socal_dir/social_page.html', {
+        'active_tab': 'social',
+        'total_exercises': data['total_exercises'],
+        'total_workouts': data['total_workouts'],
+        'distinct_active_days': data['distinct_active_days'],
+        'activity_streak': data['activity_streak'],
+        'streak_to_legend': max(0, 7 - data['activity_streak']),
+        'earned_count': data['earned_count'],
+        'achievements': data['achievements'],
+        'earned_ids_json': json.dumps(data['earned_ids']),
+        'challenges': data['challenges'],
+        'challenges_completed': data['challenges_completed'],
+        'week_start': data['week_start'],
+        'week_end': data['week_end'],
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def achievements_progress_api(request):
+    """JSON endpoint returning current achievement and challenge state from the real DB."""
+    data = compute_achievements_challenges(request.user)
+    return JsonResponse({
+        'earned_ids': data['earned_ids'],
+        'achievements': data['achievements'],
+        'challenges': data['challenges'],
+        'stats': {
+            'activity_streak': data['activity_streak'],
+            'distinct_active_days': data['distinct_active_days'],
+            'total_exercises': data['total_exercises'],
+            'total_workouts': data['total_workouts'],
+            'challenges_completed': data['challenges_completed'],
+        },
     })
 
 
@@ -2086,11 +2108,22 @@ def complete_workout(request):
     
     workout.status = 'completed'
     workout.save()
-    
+
+    progress = compute_achievements_challenges(request.user)
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
         'status': workout.status,
+        'achievement_progress': {
+            'earned_ids': progress['earned_ids'],
+            'challenges': progress['challenges'],
+            'stats': {
+                'activity_streak': progress['activity_streak'],
+                'total_workouts': progress['total_workouts'],
+                'total_exercises': progress['total_exercises'],
+            },
+        },
     })
 
 

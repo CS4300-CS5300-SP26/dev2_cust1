@@ -71,4 +71,110 @@
         }
     });
 </script>
+
+<!-- Achievement toast notification (shown on any page when progress changes) -->
+<div id="ach-toast" style="
+  display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(246,125,38,0.4);
+  border-radius:14px;padding:12px 18px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:9999;max-width:320px;width:90%;
+  animation:ach-slide-in 0.3s ease;pointer-events:none;
+" aria-live="polite">
+  <span id="ach-toast-emoji" style="font-size:1.4rem;">🏆</span>
+  <div style="flex:1;min-width:0;">
+    <div style="color:#f67d26;font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.5px;">Achievement Unlocked!</div>
+    <div id="ach-toast-title" style="color:#fff;font-weight:600;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+  </div>
+  <a href="/social/" style="color:#f67d26;font-size:0.75rem;font-weight:600;text-decoration:none;white-space:nowrap;pointer-events:auto;">View →</a>
+</div>
+<style>
+  @keyframes ach-slide-in {
+    from { opacity:0; transform:translateX(-50%) translateY(20px); }
+    to   { opacity:1; transform:translateX(-50%) translateY(0); }
+  }
+</style>
+<script>
+(function() {
+  // Namespace by user so cross-account logins don't share state
+  var USER_KEY = 'spotter_achievements_{{ request.user.pk }}';
+  var CHECK_TS_KEY = 'spotter_ach_check_ts_{{ request.user.pk }}';
+  var MIN_INTERVAL_MS = 30000; // don't re-check more often than 30s
+
+  function getSeenIds() {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || '[]'); } catch(e) { return []; }
+  }
+  function saveSeenIds(ids) {
+    try { localStorage.setItem(USER_KEY, JSON.stringify(ids)); } catch(e) {}
+  }
+
+  function showToast(achievement) {
+    var toast = document.getElementById('ach-toast');
+    if (!toast) return;
+    document.getElementById('ach-toast-emoji').textContent = achievement.emoji || '🏆';
+    document.getElementById('ach-toast-title').textContent = achievement.title || '';
+    toast.style.display = 'flex';
+    // Hide after 4.5s
+    setTimeout(function() { toast.style.display = 'none'; }, 4500);
+  }
+
+  // Main check function. Accepts optional preloaded data to skip the fetch.
+  window.checkAchievements = function(preloadedData) {
+    // Throttle: skip if checked recently
+    var lastCheck = parseInt(sessionStorage.getItem(CHECK_TS_KEY) || '0', 10);
+    if (!preloadedData && Date.now() - lastCheck < MIN_INTERVAL_MS) return;
+    sessionStorage.setItem(CHECK_TS_KEY, String(Date.now()));
+
+    function processProgress(data) {
+      if (!data || !data.earned_ids) return;
+      var seenBefore = getSeenIds();
+      var newlyEarned = data.earned_ids.filter(function(id) {
+        return seenBefore.indexOf(id) === -1;
+      });
+      saveSeenIds(data.earned_ids);
+      if (newlyEarned.length > 0) {
+        // Show toast for first new achievement; queue rest briefly after
+        newlyEarned.forEach(function(id, i) {
+          var ach = (data.achievements || []).find(function(a) { return a.id === id; });
+          if (!ach) ach = { emoji: '🏆', title: id };
+          setTimeout(function() { showToast(ach); }, i * 2000);
+        });
+      }
+    }
+
+    if (preloadedData) {
+      processProgress(preloadedData);
+    } else {
+      fetch('/api/achievements/progress/', { credentials: 'same-origin' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) { if (data) processProgress(data); })
+        .catch(function() {});
+    }
+  };
+
+  // Seed localStorage silently on first ever load (no toast spam on first visit)
+  if (getSeenIds().length === 0) {
+    fetch('/api/achievements/progress/', { credentials: 'same-origin' })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.earned_ids) {
+          saveSeenIds(data.earned_ids);
+          sessionStorage.setItem(CHECK_TS_KEY, String(Date.now()));
+        }
+      })
+      .catch(function() {});
+  } else {
+    // Check on every page load (throttled — catches redirects from toggle_exercise, toggle_food_item etc.)
+    window.checkAchievements();
+  }
+
+  // Also check when user returns to this tab from another tab/app
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      // Reset throttle for visibility-based checks (different event from page load check)
+      sessionStorage.removeItem(CHECK_TS_KEY);
+      window.checkAchievements();
+    }
+  });
+})();
+</script>
 {% endblock %}
