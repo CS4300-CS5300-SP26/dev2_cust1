@@ -796,6 +796,19 @@
         registerUserActivity();
     }
 
+    function startThinkingAnimation(element, baseText = '✨ Creating your plan') {
+        const dots = ['.', '..', '...'];
+        let dotIndex = 0;
+        element.textContent = baseText + dots[dotIndex];
+        
+        const intervalId = setInterval(() => {
+            dotIndex = (dotIndex + 1) % dots.length;
+            element.textContent = baseText + dots[dotIndex];
+        }, 500);
+        
+        return intervalId;
+    }
+
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text) return;
@@ -811,9 +824,10 @@
 
         const typing = document.createElement('div');
         typing.className = 'typing';
-        typing.textContent = 'Thinking…';
         chatWindow.appendChild(typing);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        let typingAnimationId = startThinkingAnimation(typing, '✨ Thinking');
 
         try {
             const response = await fetch('/api/chat/stream', {
@@ -826,6 +840,7 @@
             });
             
             if (!response.ok) {
+                clearInterval(typingAnimationId);
                 typing.remove();
                 const errData = await response.json();
                 addBubble('error', errData.error || 'Server error');
@@ -834,6 +849,7 @@
                 return;
             }
 
+            clearInterval(typingAnimationId);
             typing.remove();
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -841,6 +857,7 @@
             let plannerAction = null;
             let currentBubble = null;
             let thinkingIndicator = null;
+            let thinkingAnimationId = null;
             let hasPlannerPayload = false;
             let payloadStartIndex = -1;
 
@@ -884,6 +901,10 @@
                                 // Backend cleaned the text (removed payload)—remove thinking indicator
                                 // Keep routine displayed, just remove the "Creating..." message
                                 if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                    if (thinkingAnimationId) {
+                                        clearInterval(thinkingAnimationId);
+                                        thinkingAnimationId = null;
+                                    }
                                     thinkingIndicator.parentNode.removeChild(thinkingIndicator);
                                     thinkingIndicator = null;
                                 }
@@ -931,8 +952,8 @@
                                         thinkingIndicator.style.paddingTop = '8px';
                                         thinkingIndicator.style.borderTop = '1px solid #eee';
                                         currentBubble.appendChild(thinkingIndicator);
+                                        thinkingAnimationId = startThinkingAnimation(thinkingIndicator);
                                     }
-                                    thinkingIndicator.textContent = '✨ Creating your plan...';
                                     // Don't auto-scroll during thinking—let user control scroll
                                 } else {
                                     // Show streaming text normally
@@ -956,6 +977,7 @@
             history.push(assistantMessage);
 
         } catch (error) {
+            clearInterval(typingAnimationId);
             typing.remove();
             addBubble('error', 'Network error – could not reach server.');
             console.error('Stream error:', error);
