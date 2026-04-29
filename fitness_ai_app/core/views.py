@@ -2299,6 +2299,14 @@ def get_all_foods(request):
     return JsonResponse({'foods': results, 'count': len(results)})
 
 
+def get_food_units(request):
+    """Return distinct serving units from the food database, always including grams, cups, and ounces."""
+    db_units = list(FoodItem.objects.values_list('serving_unit', flat=True).distinct())
+    required = ['grams', 'cups', 'ounces']
+    all_units = list(dict.fromkeys(db_units + required))
+    return JsonResponse({'units': all_units})
+
+
 @login_required
 @require_POST
 def save_food_to_database(request):
