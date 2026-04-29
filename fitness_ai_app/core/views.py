@@ -1662,6 +1662,57 @@ def home_dash(request):
             continue
         break
 
+    # Fetch today's activities (incomplete exercises from today's workouts)
+    today_activities = Exercise.objects.filter(
+        workout__user=request.user,
+        workout__date=today,
+        completed=False,
+    ).select_related('workout').order_by('created_at')
+
+    # Fetch today's nutrition items
+    class NutritionItem:
+        def __init__(self, foods_text, meal_name):
+            self.foods_text = foods_text
+            self.meal_name = meal_name
+
+    today_nutrition_items = []
+
+    # Incomplete food items from today's meals
+    incomplete_food_items = FoodItem.objects.filter(
+        meal__user=request.user,
+        meal__date=today,
+        completed=False,
+    ).select_related('meal').order_by('meal__created_at', 'created_at')
+
+    for food_item in incomplete_food_items:
+        today_nutrition_items.append(
+            NutritionItem(food_item.name, food_item.meal.name)
+        )
+
+    # Meal supplements from today's meals (only untaken ones)
+    meal_supplements = MealSupplement.objects.filter(
+        meal__user=request.user,
+        meal__date=today,
+        taken=False,
+    ).select_related('meal').order_by('meal__created_at', 'created_at')
+
+    for supplement in meal_supplements:
+        today_nutrition_items.append(
+            NutritionItem(supplement.name, supplement.meal.name)
+        )
+
+    # Untaken standalone supplements for today
+    standalone_supplements = SupplementEntry.objects.filter(
+        user=request.user,
+        date=today,
+        taken=False,
+    ).order_by('created_at')
+
+    for supplement in standalone_supplements:
+        today_nutrition_items.append(
+            NutritionItem(supplement.name, 'Supplements')
+        )
+
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
@@ -1671,6 +1722,8 @@ def home_dash(request):
         'completed_exercises': completed_exercises,
         'workout_goal_percentage': workout_goal_percentage,
         'completion_streak': completion_streak,
+        'today_activities': today_activities,
+        'today_nutrition': today_nutrition_items,
     })
 
 

@@ -103,9 +103,13 @@
         <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Nutrition</div>
         {% if today_nutrition %}
             <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
-                {% for meal in today_nutrition %}
+                {% for item in today_nutrition %}
                     <div style="padding:10px 12px;background:#111;border:1px solid #242424;border-radius:8px;font-size:0.85rem;color:#ddd;">
-                        {{ meal.foods_text }} - {{ meal.meal_name }}
+                        {% if item.meal_name %}
+                            {{ item.foods_text }} - {{ item.meal_name }}
+                        {% else %}
+                            {{ item.foods_text }}
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
