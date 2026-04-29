@@ -26,6 +26,8 @@ fi
 
 python manage.py migrate
 python manage.py populate_exercise_db
+python manage.py populate_food_db
+python manage.py populate_supplements
 python manage.py collectstatic --noinput
 python manage.py setup_social_apps
 python manage.py runserver 0.0.0.0:3000

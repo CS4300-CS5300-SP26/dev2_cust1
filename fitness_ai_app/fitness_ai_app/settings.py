@@ -31,6 +31,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+
 def env_list(name: str, default: str = ""):
     value = os.getenv(name, default)
     return [item.strip() for item in value.split(",") if item.strip()]
