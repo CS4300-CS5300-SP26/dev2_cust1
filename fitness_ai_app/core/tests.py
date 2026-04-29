@@ -5,9 +5,11 @@ import unittest
 import json
 from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 from unittest import mock, skip
 from unittest.mock import patch
 
+from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -6855,13 +6857,9 @@ class EditFoodItemFatsTest(TestCase):
         self.assertEqual(self.item.calories, 90)
 
 
-###########################################################################################################################################################################
+# ==================================================================================
 # Management Command Tests: populate_food_db and populate_supplements
-###########################################################################################################################################################################
-
-from io import StringIO
-from django.core.management import call_command
-from .models import FoodItem, Meal
+# ==================================================================================
 
 
 class PopulateFoodDbCommandTests(TestCase):
