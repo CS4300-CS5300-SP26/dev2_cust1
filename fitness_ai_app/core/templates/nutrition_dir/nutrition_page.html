@@ -2050,7 +2050,7 @@
     }
 
     function savedItemCard(content) {
-        return `<div style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${content}</div>`;
+        return `<div class="saved-item-card" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${content}</div>`;
     }
 
     function renderSavedFoods(foods) {
@@ -2125,7 +2125,7 @@
     }
 
     function deleteSavedItem(type, id, btn) {
-        const card = btn.closest('div[style*="border:1px solid"]');
+        const card = btn.closest('.saved-item-card');
         fetch('/nutrition/delete_saved_item/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
