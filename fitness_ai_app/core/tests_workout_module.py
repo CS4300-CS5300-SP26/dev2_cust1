@@ -7,7 +7,6 @@ Tests for the Workout Module functionality including:
 """
 
 import json
-from datetime import datetime
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -43,7 +42,7 @@ class WorkoutModelTests(TestCase):
         """Test that workout status can be set to completed"""
         self.workout.status = 'completed'
         self.workout.save()
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.status, 'completed')
 
@@ -51,7 +50,7 @@ class WorkoutModelTests(TestCase):
         """Test that current_session_seconds is saved"""
         self.workout.current_session_seconds = 300
         self.workout.save()
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.current_session_seconds, 300)
 
@@ -59,7 +58,7 @@ class WorkoutModelTests(TestCase):
         """Test that total_duration_seconds is saved"""
         self.workout.total_duration_seconds = 1200
         self.workout.save()
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.total_duration_seconds, 1200)
 
@@ -102,7 +101,7 @@ class ExerciseCompletionTests(TestCase):
         """Test marking an exercise as completed"""
         self.exercise.completed = True
         self.exercise.save()
-        
+
         refreshed_exercise = Exercise.objects.get(id=self.exercise.id)
         self.assertTrue(refreshed_exercise.completed)
 
@@ -117,10 +116,10 @@ class ExerciseCompletionTests(TestCase):
             weight=185,
             completed=False
         )
-        
+
         self.exercise.completed = True
         self.exercise.save()
-        
+
         refreshed_exercise2 = Exercise.objects.get(id=exercise2.id)
         self.assertFalse(refreshed_exercise2.completed)
 
@@ -170,7 +169,7 @@ class SetProgressTests(TestCase):
                 completed=(i <= 3)  # First 3 completed, 4th not
             )
             sets_data.append(progress)
-        
+
         completed_sets = SetProgress.objects.filter(
             exercise=self.exercise,
             completed=True
@@ -185,7 +184,7 @@ class SetProgressTests(TestCase):
                 set_number=i,
                 completed=True
             )
-        
+
         all_sets = SetProgress.objects.filter(
             exercise=self.exercise
         )
@@ -233,12 +232,12 @@ class CompleteExerciseAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
         self.assertEqual(data['completed_count'], 1)
-        
+
         refreshed_exercise = Exercise.objects.get(id=self.exercise1.id)
         self.assertTrue(refreshed_exercise.completed)
 
@@ -251,7 +250,7 @@ class CompleteExerciseAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -266,7 +265,7 @@ class CompleteExerciseAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         # Should succeed but with 0 completed (since exercise doesn't exist)
@@ -281,7 +280,7 @@ class CompleteExerciseAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Empty list should return 400 (bad request)
         self.assertEqual(response.status_code, 400)
         data = json.loads(response.content)
@@ -297,7 +296,7 @@ class CompleteExerciseAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
 
@@ -331,12 +330,12 @@ class CompleteWorkoutAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
         self.assertEqual(data['status'], 'completed')
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.status, 'completed')
 
@@ -344,7 +343,7 @@ class CompleteWorkoutAPITests(TestCase):
         """Test completing a workout that's already completed"""
         self.workout.status = 'completed'
         self.workout.save()
-        
+
         response = self.client.post(
             '/api/workout/complete/',
             data=json.dumps({
@@ -352,7 +351,7 @@ class CompleteWorkoutAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -366,7 +365,7 @@ class CompleteWorkoutAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 404)
         data = json.loads(response.content)
         self.assertFalse(data['success'])
@@ -378,7 +377,7 @@ class CompleteWorkoutAPITests(TestCase):
             data=json.dumps({}),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 400)
 
     def test_complete_other_users_workout(self):
@@ -394,7 +393,7 @@ class CompleteWorkoutAPITests(TestCase):
             goal='cardio',
             date=timezone.now().date()
         )
-        
+
         response = self.client.post(
             '/api/workout/complete/',
             data=json.dumps({
@@ -402,7 +401,7 @@ class CompleteWorkoutAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 404)
 
     def test_unauthenticated_complete_workout(self):
@@ -415,7 +414,7 @@ class CompleteWorkoutAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
 
@@ -462,7 +461,7 @@ class SaveSetProgressAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -483,12 +482,12 @@ class SaveSetProgressAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
         self.assertEqual(data['saved_count'], 3)
-        
+
         # Verify timer was saved
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.current_session_seconds, 300)
@@ -508,7 +507,7 @@ class SaveSetProgressAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -543,12 +542,12 @@ class SaveWorkoutTimeAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
         self.assertEqual(data['total_seconds'], 1800)
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.total_duration_seconds, 1800)
 
@@ -562,7 +561,7 @@ class SaveWorkoutTimeAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.total_duration_seconds, 0)
@@ -577,7 +576,7 @@ class SaveWorkoutTimeAPITests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.total_duration_seconds, 7200)
@@ -613,7 +612,7 @@ class GetSetProgressAPITests(TestCase):
         response = self.client.get(
             f'/api/set_progress/get/?workout_id={self.workout.id}'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -633,11 +632,11 @@ class GetSetProgressAPITests(TestCase):
             set_number=2,
             completed=False
         )
-        
+
         response = self.client.get(
             f'/api/set_progress/get/?workout_id={self.workout.id}'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertTrue(data['success'])
@@ -647,7 +646,7 @@ class GetSetProgressAPITests(TestCase):
     def test_get_without_workout_id(self):
         """Test get request without workout_id"""
         response = self.client.get('/api/set_progress/get/')
-        
+
         self.assertEqual(response.status_code, 400)
 
 
@@ -701,7 +700,7 @@ class WorkoutIntegrationTests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Step 2: Complete exercises
         response = self.client.post(
             '/api/exercises/complete_by_ids/',
@@ -711,7 +710,7 @@ class WorkoutIntegrationTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
-        
+
         # Step 3: Mark workout as completed
         response = self.client.post(
             '/api/workout/complete/',
@@ -721,15 +720,15 @@ class WorkoutIntegrationTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
-        
+
         # Verify final state
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.status, 'completed')
         self.assertEqual(refreshed_workout.current_session_seconds, 1800)
-        
+
         refreshed_bench = Exercise.objects.get(id=self.bench.id)
         self.assertTrue(refreshed_bench.completed)
-        
+
         refreshed_squat = Exercise.objects.get(id=self.squat.id)
         self.assertTrue(refreshed_squat.completed)
 
@@ -749,7 +748,7 @@ class WorkoutIntegrationTests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Complete only bench press
         self.client.post(
             '/api/exercises/complete_by_ids/',
@@ -758,7 +757,7 @@ class WorkoutIntegrationTests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Mark workout as completed anyway
         self.client.post(
             '/api/workout/complete/',
@@ -767,13 +766,13 @@ class WorkoutIntegrationTests(TestCase):
             }),
             content_type='application/json'
         )
-        
+
         # Verify mixed state
         refreshed_bench = Exercise.objects.get(id=self.bench.id)
         refreshed_squat = Exercise.objects.get(id=self.squat.id)
-        
+
         self.assertTrue(refreshed_bench.completed)
         self.assertFalse(refreshed_squat.completed)
-        
+
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.status, 'completed')

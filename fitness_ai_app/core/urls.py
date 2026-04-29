@@ -25,7 +25,8 @@ urlpatterns = [
     path('api/supplements/', views.get_all_supplements, name='get_all_supplements'),
     path('api/search_supplements/', views.search_supplements, name='search_supplements'),
     path('api/supplement_entries/', views.supplement_entries, name='supplement_entries'),
-    path('api/supplement_entries/<int:entry_id>/toggle/', views.toggle_supplement_taken, name='toggle_supplement_taken'),
+    path('api/supplement_entries/<int:entry_id>/toggle/',
+         views.toggle_supplement_taken, name='toggle_supplement_taken'),
     path('user_get_started/', views.user_get_started, name='user_get_started'),
     path('get_started_profile/', views.get_started_profile, name='get_started_profile'),
     path('user_login/', views.user_login, name='user_login'),
@@ -65,6 +66,10 @@ urlpatterns = [
     # Social login shortcuts
     path('login/google/', RedirectView.as_view(url='/accounts/google/login/', query_string=True), name='google_login'),
     path('login/apple/', RedirectView.as_view(url='/accounts/apple/login/', query_string=True), name='apple_login'),
-    path('login/facebook/', RedirectView.as_view(url='/accounts/facebook/login/', query_string=True), name='facebook_login'),
-    path('login/instagram/', RedirectView.as_view(url='/accounts/instagram/login/', query_string=True), name='instagram_login'),
+    path('login/facebook/',
+         RedirectView.as_view(url='/accounts/facebook/login/', query_string=True),
+         name='facebook_login'),
+    path('login/instagram/',
+         RedirectView.as_view(url='/accounts/instagram/login/', query_string=True),
+         name='instagram_login'),
 ]
