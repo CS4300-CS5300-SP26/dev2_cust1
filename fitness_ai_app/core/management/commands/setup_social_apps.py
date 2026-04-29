@@ -42,7 +42,7 @@ class Command(BaseCommand):
 
         # Get or create the default site
         site = Site.objects.get_or_create(id=1)[0]
-        
+
         # Update site domain from SITE_DOMAIN env var or derive from ALLOWED_HOSTS.
         site_domain_env = os.getenv('SITE_DOMAIN', '')
         site_domain, candidate_count = _pick_site_domain(site_domain_env)
@@ -55,7 +55,9 @@ class Command(BaseCommand):
             site.save()
             self.stdout.write(self.style.SUCCESS(f'✓ Site domain updated to {site_domain}'))
             if candidate_count > 1:
-                self.stdout.write(self.style.WARNING('⚠ Multiple domain candidates found; using the first non-local domain.'))
+                self.stdout.write(self.style.WARNING(
+                    '⚠ Multiple domain candidates found; using the first non-local domain.'
+                ))
 
         # Google OAuth
         google_client_id = os.getenv('GOOGLE_CLIENT_ID', '')
@@ -74,7 +76,7 @@ class Command(BaseCommand):
                 google_app.client_id = google_client_id
                 google_app.secret = google_client_secret
                 google_app.save()
-            
+
             google_app.sites.set([site])
             status = 'created' if created else 'updated'
             self.stdout.write(self.style.SUCCESS(f'✓ Google OAuth {status}'))
@@ -98,7 +100,7 @@ class Command(BaseCommand):
                 apple_app.client_id = apple_client_id
                 apple_app.secret = apple_client_secret
                 apple_app.save()
-            
+
             apple_app.sites.set([site])
             status = 'created' if created else 'updated'
             self.stdout.write(self.style.SUCCESS(f'✓ Apple OAuth {status}'))
@@ -120,7 +122,7 @@ class Command(BaseCommand):
                 facebook_app.client_id = facebook_client_id
                 facebook_app.secret = facebook_client_secret
                 facebook_app.save()
-            
+
             facebook_app.sites.set([site])
             status = 'created' if created else 'updated'
             self.stdout.write(self.style.SUCCESS(f'✓ Facebook OAuth {status}'))
@@ -142,7 +144,7 @@ class Command(BaseCommand):
                 instagram_app.client_id = instagram_client_id
                 instagram_app.secret = instagram_client_secret
                 instagram_app.save()
-            
+
             instagram_app.sites.set([site])
             status = 'created' if created else 'updated'
             self.stdout.write(self.style.SUCCESS(f'✓ Instagram OAuth {status}'))

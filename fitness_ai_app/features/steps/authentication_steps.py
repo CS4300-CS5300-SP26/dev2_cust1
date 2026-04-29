@@ -1,6 +1,5 @@
 """Step definitions for authentication-related BDD scenarios."""
 
-import uuid
 from behave import given, when, then
 from django.contrib.auth.models import User
 
@@ -38,6 +37,7 @@ def step_user_exists_with_password(context, email, password):
     User.objects.create_user(username=email, email=email, password=password)
 
 # ── When steps ───────────────────────────────────────────────────────────────
+
 
 @when('I visit the home page')
 def step_visit_home(context):

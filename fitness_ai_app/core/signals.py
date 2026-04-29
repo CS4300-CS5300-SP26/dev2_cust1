@@ -3,7 +3,6 @@ Signals for social login handling.
 """
 from django.dispatch import receiver
 from allauth.socialaccount.signals import social_account_updated
-from django.contrib.auth.models import User
 from .models import UserProfile
 
 
@@ -19,6 +18,5 @@ def handle_social_account_updated(sender, request, sociallogin, **kwargs):
         if not profile.social_login_user:
             profile.social_login_user = True
             profile.save(update_fields=['social_login_user'])
-    except:
+    except Exception:
         pass
-

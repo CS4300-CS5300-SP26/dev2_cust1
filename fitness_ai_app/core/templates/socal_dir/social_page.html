@@ -6,6 +6,14 @@
 {% block page_css %}
 {{ block.super }}
 <style>
+  /* ── Layout ── */
+  .social-page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 80px 16px 100px;
+  }
+
+  /* ── Top logo ── */
   .top-logo {
     position: absolute;
     top: 18px;
@@ -14,34 +22,344 @@
     align-items: center;
     gap: 8px;
   }
-  .top-logo img {
-    width: 48px;
-    height: auto;
+  .top-logo img { width: 48px; height: auto; }
+  .top-logo-text { display: flex; flex-direction: column; align-items: flex-start; }
+  .top-logo-text h2 { font-size: 1.1rem; font-weight: 800; margin: 0; color: #f67d26; letter-spacing: -0.5px; }
+  .top-logo-text p { font-size: 0.6rem; margin: 0; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Hero ── */
+  .social-hero {
+    text-align: center;
+    padding: 0 0 28px;
   }
-  .top-logo-text {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .top-logo-text h2 {
-    font-size: 1.1rem;
+  .social-hero h1 {
+    font-size: 1.65rem;
     font-weight: 800;
-    margin: 0;
-    color: #f67d26;
-    letter-spacing: -0.5px;
+    margin: 0 0 4px;
+    background: linear-gradient(135deg, #f67d26 0%, #ffb347 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  .top-logo-text p {
-    font-size: 0.6rem;
-    margin: 0;
-    color: #bbb;
+  .social-hero p { font-size: 0.9rem; color: #888; margin: 0; }
+
+  /* ── Stat bubbles ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: default;
+  }
+  .stat-number {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #f67d26;
+    line-height: 1;
+    display: block;
+  }
+  .stat-label { font-size: 0.7rem; color: #777; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 5px; display: block; }
+  .stat-sub { font-size: 0.75rem; color: #555; margin-top: 3px; display: block; }
+
+  /* ── Section header ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.2px;
+  }
+  .section-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(246,125,38,0.15);
+    color: #f67d26;
+    border: 1px solid rgba(246,125,38,0.25);
+  }
+
+  /* ── Achievement grid ── */
+  .achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 380px) {
+    .achievements-grid { grid-template-columns: 1fr; }
+  }
+
+  .achievement-card {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 16px 14px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  /* Earned state */
+  .achievement-card.earned {
+    border-color: rgba(246,125,38,0.45);
+    box-shadow: 0 0 18px rgba(246,125,38,0.12), inset 0 0 30px rgba(246,125,38,0.04);
+  }
+  .achievement-card.earned::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px; bottom: -1px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(246,125,38,0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Rarity colors for earned */
+  .achievement-card.earned.epic { border-color: rgba(168,85,247,0.5); box-shadow: 0 0 22px rgba(168,85,247,0.18), inset 0 0 30px rgba(168,85,247,0.05); }
+  .achievement-card.earned.epic::before { background: linear-gradient(135deg, rgba(168,85,247,0.15) 0%, transparent 60%); }
+  .achievement-card.earned.rare { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 20px rgba(59,130,246,0.15), inset 0 0 30px rgba(59,130,246,0.04); }
+  .achievement-card.earned.rare::before { background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, transparent 60%); }
+
+  /* New unlock pulse */
+  .achievement-card.newly-unlocked {
+    animation: unlockPulse 1.2s ease-out forwards;
+  }
+  @keyframes unlockPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(246,125,38,0.7); }
+    50%  { box-shadow: 0 0 0 10px rgba(246,125,38,0); }
+    100% { box-shadow: 0 0 18px rgba(246,125,38,0.12); }
+  }
+
+  .achievement-emoji {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 8px;
+    filter: grayscale(0);
+  }
+  .achievement-card:not(.earned) .achievement-emoji { filter: grayscale(1); opacity: 0.35; }
+
+  .achievement-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+    line-height: 1.2;
+  }
+  .achievement-card:not(.earned) .achievement-title { color: #555; }
+
+  .achievement-desc {
+    font-size: 0.73rem;
+    color: #666;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+
+  /* Rarity tag */
+  .rarity-tag {
+    font-size: 0.63rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+  .rarity-tag.common  { background: rgba(100,100,100,0.2); color: #777; }
+  .rarity-tag.rare    { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .rarity-tag.epic    { background: rgba(168,85,247,0.15); color: #c084fc; }
+
+  /* Achievement progress bar */
+  .ach-bar-wrap {
+    height: 4px;
+    background: #111;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .ach-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f67d26, #ffb347);
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .achievement-card.earned .ach-bar-fill { background: linear-gradient(90deg, #f67d26, #ffd080); }
+  .achievement-card.earned.rare .ach-bar-fill { background: linear-gradient(90deg, #3b82f6, #7dd3fc); }
+  .achievement-card.earned.epic .ach-bar-fill { background: linear-gradient(90deg, #a855f7, #e879f9); }
+
+  .ach-progress-text {
+    font-size: 0.68rem;
+    color: #555;
+    margin-top: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .achievement-card.earned .ach-progress-text { color: #888; }
+
+  /* Earned checkmark */
+  .earned-check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f67d26, #ffb347);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: #fff;
+    font-weight: 700;
+  }
+  .achievement-card.earned.rare .earned-check  { background: linear-gradient(135deg, #3b82f6, #7dd3fc); }
+  .achievement-card.earned.epic .earned-check  { background: linear-gradient(135deg, #a855f7, #e879f9); }
+
+  /* ── Weekly Challenges ── */
+  .challenges-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+
+  .challenge-card {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 16px 16px 14px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  .challenge-card.completed {
+    border-color: rgba(34,197,94,0.35);
+    box-shadow: 0 0 14px rgba(34,197,94,0.08);
+  }
+  .challenge-card.completed::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px; bottom: -1px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(34,197,94,0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .challenge-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .challenge-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+  .challenge-emoji { font-size: 1.4rem; flex-shrink: 0; margin-top: 1px; }
+  .challenge-info { flex: 1; min-width: 0; }
+  .challenge-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+  .challenge-desc { font-size: 0.75rem; color: #666; line-height: 1.3; }
+  .challenge-pct {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #f67d26;
+    flex-shrink: 0;
+    margin-left: 12px;
+    margin-top: 1px;
+  }
+  .challenge-card.completed .challenge-pct { color: #22c55e; }
+
+  .challenge-bar-wrap {
+    height: 6px;
+    background: #111;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+  .challenge-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #f67d26, #ffb347);
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .challenge-card.completed .challenge-bar-fill {
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+  }
+
+  /* Days left tag */
+  .days-left-tag {
+    font-size: 0.65rem;
+    color: #555;
+    margin-top: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .progress-fraction { font-size: 0.7rem; color: #555; }
+  .challenge-card.completed .progress-fraction { color: #22c55e; }
+
+  /* ── Streak banner ── */
+  .streak-banner {
+    background: linear-gradient(135deg, rgba(246,125,38,0.12) 0%, rgba(246,125,38,0.04) 100%);
+    border: 1px solid rgba(246,125,38,0.3);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .streak-flame { font-size: 2.4rem; flex-shrink: 0; animation: flicker 2s ease-in-out infinite; }
+  @keyframes flicker {
+    0%, 100% { transform: scale(1) rotate(-2deg); }
+    50%       { transform: scale(1.08) rotate(2deg); }
+  }
+  .streak-text {}
+  .streak-days { font-size: 1.5rem; font-weight: 800; color: #f67d26; line-height: 1; }
+  .streak-sub  { font-size: 0.8rem; color: #888; margin-top: 3px; }
+
+  /* ── Empty states ── */
+  .empty-hint {
+    text-align: center;
+    padding: 24px 0 8px;
+    font-size: 0.82rem;
+    color: #555;
+  }
+  .empty-hint a { color: #f67d26; text-decoration: none; font-weight: 600; }
+  .empty-hint a:hover { text-decoration: underline; }
+
+  /* ── Confetti canvas ── */
+  #confetti-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ach-bar-fill, .challenge-bar-fill { transition: none; }
+    .streak-flame { animation: none; }
+    .achievement-card.newly-unlocked { animation: none; }
   }
 </style>
 {% endblock %}
 
 {% block pre_content %}
-<!-- Logo on same line as profile bubble -->
 <div class="top-logo">
   <img src="{% static 'core/images/logo.png' %}" alt="Spotter.ai">
   <div class="top-logo-text">
@@ -53,12 +371,246 @@
 {% endblock %}
 
 {% block content %}
-<div style="text-align:center;padding-top:40px;">
-    <div style="font-size:1.5rem;font-weight:700;margin-bottom:6px;">Social</div>
-    <div style="font-size:1rem;color:rgba(255,255,255,0.85);">Connect with your fitness community</div>
-</div>
+<canvas id="confetti-canvas"></canvas>
 
+<div class="social-page">
 
+  <!-- Hero -->
+  <div class="social-hero">
+    <h1>Your Progress</h1>
+    <p>Achievements &amp; weekly challenges</p>
+  </div>
+
+  <!-- Stat Row -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <span class="stat-number">{{ total_exercises }}</span>
+      <span class="stat-label">Exercises</span>
+      <span class="stat-sub">All time</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-number">{{ total_workouts }}</span>
+      <span class="stat-label">Workouts</span>
+      <span class="stat-sub">Completed</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-number">{{ distinct_active_days }}</span>
+      <span class="stat-label">Active Days</span>
+      <span class="stat-sub">Total logged</span>
+    </div>
+  </div>
+
+  <!-- Streak Banner -->
+  <div class="streak-banner">
+    <div class="streak-flame">🔥</div>
+    <div class="streak-text">
+      <div class="streak-days">{{ activity_streak }} day{% if activity_streak != 1 %}s{% endif %}</div>
+      <div class="streak-sub">
+        {% if activity_streak == 0 %}
+          Start your activity streak today
+        {% elif activity_streak == 1 %}
+          Current streak — keep it going!
+        {% elif streak_to_legend > 0 %}
+          {{ streak_to_legend }} more day{% if streak_to_legend != 1 %}s{% endif %} to unlock Streak Legend
+        {% else %}
+          Incredible streak — you're unstoppable! 💪
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements -->
+  <div class="section-header">
+    <div class="section-title">🏅 Achievements</div>
+    <div class="section-badge">{{ earned_count }} / {{ achievements|length }}</div>
+  </div>
+
+  <div class="achievements-grid" id="achievements-grid">
+    {% for ach in achievements %}
+    <div class="achievement-card {% if ach.earned %}earned {{ ach.rarity }}{% endif %}"
+         data-id="{{ ach.id }}"
+         data-pct="{% if ach.goal > 0 %}{{ ach.progress|floatformat:0 }}{% else %}0{% endif %}"
+         data-goal="{{ ach.goal }}">
+
+      {% if ach.earned %}
+      <div class="earned-check">✓</div>
+      {% endif %}
+
+      <span class="achievement-emoji">{{ ach.emoji }}</span>
+      <span class="rarity-tag {{ ach.rarity }}">{{ ach.rarity }}</span>
+      <div class="achievement-title">{{ ach.title }}</div>
+      <div class="achievement-desc">{{ ach.desc }}</div>
+
+      <div class="ach-bar-wrap">
+        <div class="ach-bar-fill" data-fill="{{ ach.progress }}" data-total="{{ ach.goal }}"></div>
+      </div>
+      <div class="ach-progress-text">
+        <span>{{ ach.progress }} / {{ ach.goal }}</span>
+        {% if ach.earned %}<span style="color:#f67d26;">✓ Unlocked</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if total_exercises == 0 and distinct_active_days == 0 %}
+  <div class="empty-hint" style="margin-top: -12px; margin-bottom: 20px;">
+    No activity yet — <a href="{% url 'train_page' %}">log your first workout</a> to start unlocking achievements!
+  </div>
+  {% endif %}
+
+  <!-- Weekly Challenges -->
+  <div class="section-header">
+    <div class="section-title">⚡ Weekly Challenges</div>
+    <div class="section-badge">{{ challenges_completed }} / {{ challenges|length }} done</div>
+  </div>
+  <div style="font-size:0.75rem;color:#555;margin-bottom:14px;">
+    Week of {{ week_start|date:"M j" }} – {{ week_end|date:"M j, Y" }}
+  </div>
+
+  <div class="challenges-list" id="challenges-list">
+    {% for ch in challenges %}
+    <div class="challenge-card {% if ch.completed %}completed{% endif %}"
+         data-id="{{ ch.id }}">
+      <div class="challenge-header">
+        <div class="challenge-left">
+          <div class="challenge-emoji">{{ ch.emoji }}</div>
+          <div class="challenge-info">
+            <div class="challenge-title">{{ ch.title }}</div>
+            <div class="challenge-desc">{{ ch.desc }}</div>
+          </div>
+        </div>
+        <div class="challenge-pct">
+          {% if ch.completed %}✓{% else %}{% widthratio ch.progress ch.goal 100 %}%{% endif %}
+        </div>
+      </div>
+      <div class="challenge-bar-wrap">
+        <div class="challenge-bar-fill" data-fill="{{ ch.progress }}" data-total="{{ ch.goal }}"></div>
+      </div>
+      <div class="days-left-tag">
+        {% if ch.completed %}
+          <span style="color:#22c55e;font-weight:600;">Challenge complete! 🎉</span>
+        {% else %}
+          <span>Keep going</span>
+        {% endif %}
+        <span class="progress-fraction">{{ ch.progress }}/{{ ch.goal }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- CTA links -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+    <a href="{% url 'train_page' %}" style="flex:1;min-width:120px;display:block;padding:13px 0;background:rgba(246,125,38,0.12);border:1px solid rgba(246,125,38,0.3);border-radius:12px;text-align:center;text-decoration:none;color:#f67d26;font-weight:700;font-size:0.85rem;transition:background 0.2s;">
+      🏋️ Train
+    </a>
+    <a href="{% url 'nutrition_page' %}" style="flex:1;min-width:120px;display:block;padding:13px 0;background:rgba(246,125,38,0.12);border:1px solid rgba(246,125,38,0.3);border-radius:12px;text-align:center;text-decoration:none;color:#f67d26;font-weight:700;font-size:0.85rem;transition:background 0.2s;">
+      🍎 Nutrition
+    </a>
+    <a href="{% url 'ai_page' %}" style="flex:1;min-width:120px;display:block;padding:13px 0;background:rgba(246,125,38,0.12);border:1px solid rgba(246,125,38,0.3);border-radius:12px;text-align:center;text-decoration:none;color:#f67d26;font-weight:700;font-size:0.85rem;transition:background 0.2s;">
+      🤖 AI Coach
+    </a>
+  </div>
+
+</div><!-- /social-page -->
+
+<script>
+(function () {
+  // ── Progress bar animations (triggered after paint) ─────────────────────
+  function animateBars() {
+    document.querySelectorAll('.ach-bar-fill, .challenge-bar-fill').forEach(function (bar) {
+      const fill  = parseFloat(bar.dataset.fill)  || 0;
+      const total = parseFloat(bar.dataset.total) || 1;
+      const pct   = Math.min(fill / total, 1);
+      requestAnimationFrame(function () {
+        setTimeout(function () { bar.style.transform = 'scaleX(' + pct + ')'; }, 80);
+      });
+    });
+  }
+  animateBars();
+
+  // ── "Just unlocked" detection via localStorage (namespaced by user) ──────
+  const STORAGE_KEY = 'spotter_achievements_{{ request.user.pk }}';
+  const currentEarned = {{ earned_ids_json|safe }};
+
+  let seenBefore = [];
+  try { seenBefore = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch (e) {}
+
+  const newlyUnlocked = currentEarned.filter(function (id) {
+    return seenBefore.indexOf(id) === -1;
+  });
+
+  // Persist updated list
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentEarned)); } catch (e) {}
+
+  if (newlyUnlocked.length > 0) {
+    newlyUnlocked.forEach(function (id) {
+      const card = document.querySelector('[data-id="' + id + '"]');
+      if (card) card.classList.add('newly-unlocked');
+    });
+    // Trigger confetti
+    if (typeof runConfetti === 'function') runConfetti();
+    else launchConfetti();
+  }
+
+  // ── Reload page when user returns to this tab so data is always fresh ────
+  // (Catches updates from completing workouts, logging food, etc. on other pages)
+  let _pageLoadTime = Date.now();
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && Date.now() - _pageLoadTime > 5000) {
+      location.reload();
+    }
+  });
+
+  // ── Minimal confetti ────────────────────────────────────────────────────
+  function launchConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ['#f67d26', '#ffb347', '#ffd080', '#3b82f6', '#a855f7', '#22c55e'];
+    const pieces = Array.from({ length: 80 }, function () {
+      return {
+        x: Math.random() * canvas.width,
+        y: -10 - Math.random() * 100,
+        w: 6 + Math.random() * 6,
+        h: 10 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: (Math.random() - 0.5) * 3,
+        vy: 2 + Math.random() * 3,
+        rot: Math.random() * 360,
+        rotV: (Math.random() - 0.5) * 6,
+        opacity: 1,
+      };
+    });
+
+    let frame = 0;
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      pieces.forEach(function (p) {
+        if (p.y > canvas.height + 20) return;
+        alive = true;
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.rot += p.rotV;
+        if (p.y > canvas.height * 0.6) p.opacity -= 0.015;
+        ctx.save();
+        ctx.globalAlpha = Math.max(p.opacity, 0);
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rot * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      if (alive && frame++ < 240) requestAnimationFrame(draw);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    requestAnimationFrame(draw);
+  }
+})();
+</script>
 
 <!-- The River JS -->
 <script src="{% static 'js/river.js' %}"></script>
