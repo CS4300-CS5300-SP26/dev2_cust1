@@ -3009,6 +3009,8 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, 'Exercises')
         self.assertContains(response, 'Calories')
         self.assertContains(response, 'Score Streak')
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, "Today's Nutrition")
 
     def test_home_dash_includes_daily_workout_goal_progress(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
@@ -3049,6 +3051,145 @@ class HomeDashViewTests(TestCase):
         self.assertEqual(response.context['workout_goal_percentage'], 20.0)
         self.assertContains(response, 'Goal: 1/5')
 
+    def test_home_dash_shows_no_activities_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_todays_activities_and_train_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Workout',
+            goal='strength',
+            date=date.today() - timedelta(days=1),
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Push Up',
+            muscle_group='chest',
+            completed=False,
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Completed Curl',
+            muscle_group='arms',
+            completed=True,
+        )
+        Exercise.objects.create(
+            workout=yesterday_workout,
+            name='Past Lunge',
+            muscle_group='legs',
+            completed=False,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'Push Up - Today Workout')
+        self.assertNotContains(response, 'Completed Curl')
+        self.assertNotContains(response, 'Past Lunge')
+        self.assertContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_no_nutrition_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_todays_nutrition_and_nutrition_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        yesterday_dinner = Meal.objects.create(
+            user=self.user,
+            name='Yesterday Dinner',
+            date=date.today() - timedelta(days=1),
+        )
+        FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Oatmeal',
+            calories=250,
+        )
+        FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Completed Banana',
+            calories=120,
+            completed=True,
+        )
+        FoodItem.objects.create(
+            meal=yesterday_dinner,
+            name='Steak',
+            calories=500,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Oatmeal - Today Breakfast')
+        self.assertNotContains(response, 'Completed Banana')
+        self.assertNotContains(response, 'Yesterday Dinner - Steak')
+        self.assertContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_meal_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=today_breakfast,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Creatine - Today Breakfast')
+        self.assertContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_standalone_supplements_in_todays_nutrition(self):
+        from core.models import SupplementEntry
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertContains(response, 'Go to Nutrition Page')
+
     def test_home_dash_updates_after_toggling_exercise_completion(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
         workout = Workout.objects.create(
@@ -3071,6 +3212,87 @@ class HomeDashViewTests(TestCase):
         response = self.client.get('/home_dash/')
         self.assertEqual(response.context['completed_exercises'], 1)
         self.assertContains(response, 'Goal: 1/5')
+        self.assertNotContains(response, 'Lunge - Daily Workout')
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_updates_after_toggling_food_item_completion(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Lunch',
+            date=date.today(),
+        )
+        food_item = FoodItem.objects.create(
+            meal=meal,
+            name='Chicken Bowl',
+            calories=550,
+            completed=False,
+        )
+
+        self.client.post('/nutrition/toggle_food_item/', {
+            'item_id': food_item.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        response = self.client.get('/home_dash/')
+
+        self.assertNotContains(response, 'Chicken Bowl - Lunch')
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_only_untaken_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Dinner',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+            taken=False,
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Zinc',
+            supplement_type='mineral',
+            dosage='25',
+            unit='mg',
+            taken=True,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='500',
+            unit='mg',
+            date=date.today(),
+            taken=True,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, 'Creatine - Dinner')
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertNotContains(response, 'Zinc')
+        self.assertNotContains(response, 'Vitamin C')
+        self.assertContains(response, 'Go to Nutrition Page')
 
     def test_home_dash_streak_counts_consecutive_days_meeting_both_goals(self):
         from core.models import UserProfile
@@ -6631,3 +6853,132 @@ class EditFoodItemFatsTest(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.fats, 8)
         self.assertEqual(self.item.calories, 90)
+
+
+###########################################################################################################################################################################
+# Management Command Tests: populate_food_db and populate_supplements
+###########################################################################################################################################################################
+
+from io import StringIO
+from django.core.management import call_command
+from .models import FoodItem, Meal
+
+
+class PopulateFoodDbCommandTests(TestCase):
+    """Tests for the populate_food_db management command."""
+
+    def test_command_creates_food_items(self):
+        """Command creates food items in the database."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(FoodItem.objects.exists())
+
+    def test_command_creates_exactly_20_items(self):
+        """Command seeds exactly 20 distinct food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        system_meal = Meal.objects.get(name='Food Database', date='2000-01-01')
+        self.assertEqual(FoodItem.objects.filter(meal=system_meal).count(), 20)
+
+    def test_command_creates_system_user_and_meal(self):
+        """Command creates the system user and 'Food Database' meal."""
+        from django.contrib.auth.models import User
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(User.objects.filter(username='system@spotter.ai').exists())
+        self.assertTrue(Meal.objects.filter(name='Food Database').exists())
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        count_after_first = FoodItem.objects.count()
+        call_command('populate_food_db', stdout=out)
+        self.assertEqual(FoodItem.objects.count(), count_after_first)
+
+    def test_food_items_have_valid_nutrition_data(self):
+        """All seeded food items have non-negative calories and macro values."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        for item in FoodItem.objects.filter(meal__name='Food Database'):
+            self.assertGreaterEqual(item.calories, 0, f'{item.name} has negative calories')
+            self.assertGreaterEqual(item.protein, 0, f'{item.name} has negative protein')
+            self.assertGreaterEqual(item.carbs, 0, f'{item.name} has negative carbs')
+            self.assertGreaterEqual(item.fats, 0, f'{item.name} has negative fats')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created item."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Food database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        out2 = StringIO()
+        call_command('populate_food_db', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())
+
+
+class PopulateSupplementsCommandTests(TestCase):
+    """Tests for the populate_supplements management command."""
+
+    def test_command_creates_supplements(self):
+        """Command creates supplement records in the database."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertTrue(SupplementDatabase.objects.exists())
+
+    def test_command_creates_exactly_20_supplements(self):
+        """Command seeds exactly 20 distinct supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), 20)
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        count_after_first = SupplementDatabase.objects.count()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), count_after_first)
+
+    def test_supplements_have_valid_types(self):
+        """All seeded supplements use a recognised supplement_type choice."""
+        from .models import SupplementDatabase
+        valid_types = {t[0] for t in SupplementDatabase.TYPE_CHOICES}
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        for s in SupplementDatabase.objects.all():
+            self.assertIn(s.supplement_type, valid_types, f'{s.name} has invalid type')
+
+    def test_supplements_cover_all_types(self):
+        """Seeded data includes vitamins, minerals, herbs, proteins, and amino acids."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        types_present = set(SupplementDatabase.objects.values_list('supplement_type', flat=True))
+        for expected in ('vitamin', 'mineral', 'herb', 'protein', 'amino_acid'):
+            self.assertIn(expected, types_present, f'Missing supplement type: {expected}')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created supplement."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Supplement database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        out2 = StringIO()
+        call_command('populate_supplements', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())

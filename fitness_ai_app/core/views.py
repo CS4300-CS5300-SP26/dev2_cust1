@@ -899,6 +899,45 @@ def home_dash(request):
         .annotate(total_exercises=Count('id'))
         .values_list('workout__date', 'total_exercises')
     )
+    today_activities = list(
+        Exercise.objects.filter(
+            workout__user=request.user,
+            workout__date=today,
+            completed=False,
+        )
+        .select_related('workout')
+        .order_by('workout__created_at', 'created_at')
+    )
+    today_meals = list(
+        Meal.objects.filter(
+            user=request.user,
+            date=today,
+        )
+        .prefetch_related('items', 'supplements')
+        .order_by('created_at')
+    )
+    today_nutrition = []
+    for meal in today_meals:
+        food_names = [item.name for item in meal.items.all() if not item.completed]
+        supplement_names = [supplement.name for supplement in meal.supplements.all() if not supplement.taken]
+        nutrition_names = food_names + supplement_names
+        if not nutrition_names:
+            continue
+        foods_text = ', '.join(nutrition_names)
+        today_nutrition.append({
+            'meal_name': meal.name,
+            'foods_text': foods_text,
+        })
+    today_supplements = SupplementEntry.objects.filter(
+        user=request.user,
+        date=today,
+        taken=False,
+    ).order_by('name')
+    for supplement in today_supplements:
+        today_nutrition.append({
+            'meal_name': 'Supplements',
+            'foods_text': supplement.name,
+        })
 
     completion_streak = 0
     streak_date = today
@@ -920,6 +959,8 @@ def home_dash(request):
         'completed_exercises': completed_exercises,
         'workout_goal_percentage': workout_goal_percentage,
         'completion_streak': completion_streak,
+        'today_activities': today_activities,
+        'today_nutrition': today_nutrition,
     })
 
 
@@ -1379,6 +1420,21 @@ def toggle_food_item(request):
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.completed = not food_item.completed
     food_item.save()
+
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
+def toggle_food_group(request):
+    group_id = request.POST.get('group_id')
+    date_param = request.POST.get('date')
+
+    group = get_object_or_404(FoodGroup, id=group_id, meal__user=request.user)
+    items = group.grouped_items.all()
+    # If every item in the group is already completed, uncheck all; otherwise check all.
+    all_completed = items.exists() and not items.filter(completed=False).exists()
+    items.update(completed=not all_completed)
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
