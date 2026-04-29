@@ -18,6 +18,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncWeek
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
@@ -1581,9 +1582,299 @@ def delete_meal_supplement(request):
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
+def compute_achievements_challenges(user):
+    """
+    Compute achievement and challenge state for a user from the real database.
+    Shared by social_page (template render) and achievements_progress_api (JSON endpoint).
+    Returns a dict with achievements, challenges, and summary stats.
+    """
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # Monday
+    week_end = week_start + timedelta(days=6)  # Sunday
+    calorie_goal = get_user_calorie_goal(user)
+
+    # Completed exercises: count by workout date
+    exercise_by_date = dict(
+        Exercise.objects.filter(workout__user=user, completed=True)
+        .values('workout__date')
+        .annotate(count=Count('id'))
+        .values_list('workout__date', 'count')
+    )
+    total_exercises = sum(exercise_by_date.values())
+
+    # Completed workouts
+    completed_workouts_qs = Workout.objects.filter(user=user, status='completed')
+    total_workouts = completed_workouts_qs.count()
+    workout_dates = set(completed_workouts_qs.values_list('date', flat=True))
+
+    # Meals with at least one food item logged
+    meal_dates = set(
+        Meal.objects.filter(user=user, items__isnull=False)
+        .values_list('date', flat=True)
+        .distinct()
+    )
+    meals_this_week_days = len([d for d in meal_dates if week_start <= d <= week_end])
+
+    # Calorie totals by date (only completed food items)
+    calorie_by_date = dict(
+        FoodItem.objects.filter(meal__user=user, completed=True)
+        .values('meal__date')
+        .annotate(total=Sum('calories'))
+        .values_list('meal__date', 'total')
+    )
+    calorie_goal_days = {d for d, cal in calorie_by_date.items() if cal >= calorie_goal}
+
+    # Days with non-zero macros logged (completed items with any macro > 0)
+    macro_days = set(
+        FoodItem.objects.filter(meal__user=user, completed=True)
+        .filter(Q(protein__gt=0) | Q(carbs__gt=0) | Q(fats__gt=0))
+        .values_list('meal__date', flat=True)
+        .distinct()
+    )
+
+    # Activity streak (workout or meal days only)
+    all_activity_dates = workout_dates | meal_dates
+    activity_streak = 0
+    for i in range(400):
+        if (today - timedelta(days=i)) in all_activity_dates:
+            activity_streak += 1
+        else:
+            break
+    distinct_active_days = len(all_activity_dates)
+
+    # Week Warrior: most workouts in any single week
+    weekly_workout_counts = list(
+        completed_workouts_qs
+        .annotate(week=TruncWeek('date'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('count', flat=True)
+    )
+    max_weekly_workouts = max(weekly_workout_counts, default=0)
+    week_warrior_unlocked = max_weekly_workouts >= 5
+
+    # Weekly challenge data
+    exercises_this_week = sum(
+        v for d, v in exercise_by_date.items() if week_start <= d <= week_end
+    )
+    workouts_this_week = completed_workouts_qs.filter(
+        date__range=(week_start, week_end)
+    ).count()
+    calorie_goal_days_this_week = len(
+        [d for d in calorie_goal_days if week_start <= d <= week_end]
+    )
+    workout_dates_this_week = set(
+        completed_workouts_qs.filter(date__range=(week_start, week_end)).values_list('date', flat=True)
+    )
+    meal_dates_this_week = {d for d in meal_dates if week_start <= d <= week_end}
+    fuel_gains_days = len(workout_dates_this_week & meal_dates_this_week)
+
+    achievements = [
+        {
+            'id': 'first_rep',
+            'emoji': '🏋️',
+            'title': 'First Rep',
+            'desc': 'Logged your very first exercise',
+            'earned': total_exercises >= 1,
+            'progress': min(total_exercises, 1),
+            'goal': 1,
+            'rarity': 'common',
+        },
+        {
+            'id': 'nutrition_nerd',
+            'emoji': '🍎',
+            'title': 'Nutrition Nerd',
+            'desc': 'Logged meals on 7 different days',
+            'earned': len(meal_dates) >= 7,
+            'progress': min(len(meal_dates), 7),
+            'goal': 7,
+            'rarity': 'common',
+        },
+        {
+            'id': 'iron_will',
+            'emoji': '💪',
+            'title': 'Iron Will',
+            'desc': 'Completed 50 exercises total',
+            'earned': total_exercises >= 50,
+            'progress': min(total_exercises, 50),
+            'goal': 50,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'week_warrior',
+            'emoji': '🗓️',
+            'title': 'Week Warrior',
+            'desc': '5 workouts in a single week',
+            'earned': week_warrior_unlocked,
+            'progress': 5 if week_warrior_unlocked else min(max_weekly_workouts, 5),
+            'goal': 5,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'calorie_king',
+            'emoji': '🎯',
+            'title': 'Calorie King',
+            'desc': 'Hit your calorie goal on 5 different days',
+            'earned': len(calorie_goal_days) >= 5,
+            'progress': min(len(calorie_goal_days), 5),
+            'goal': 5,
+            'rarity': 'common',
+        },
+        {
+            'id': 'macro_master',
+            'emoji': '🥗',
+            'title': 'Macro Master',
+            'desc': 'Tracked macros on 10 different days',
+            'earned': len(macro_days) >= 10,
+            'progress': min(len(macro_days), 10),
+            'goal': 10,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'gym_rat',
+            'emoji': '🏟️',
+            'title': 'Gym Rat',
+            'desc': 'Completed 10 workouts total',
+            'earned': total_workouts >= 10,
+            'progress': min(total_workouts, 10),
+            'goal': 10,
+            'rarity': 'common',
+        },
+        {
+            'id': 'centurion',
+            'emoji': '🏆',
+            'title': 'Centurion',
+            'desc': 'Completed 100 exercises total',
+            'earned': total_exercises >= 100,
+            'progress': min(total_exercises, 100),
+            'goal': 100,
+            'rarity': 'epic',
+        },
+        {
+            'id': 'streak_legend',
+            'emoji': '⚡',
+            'title': 'Streak Legend',
+            'desc': 'Stayed active 7 days in a row',
+            'earned': activity_streak >= 7,
+            'progress': min(activity_streak, 7),
+            'goal': 7,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'dedicated',
+            'emoji': '🔥',
+            'title': 'Dedicated',
+            'desc': 'Logged activity on 30 different days',
+            'earned': distinct_active_days >= 30,
+            'progress': min(distinct_active_days, 30),
+            'goal': 30,
+            'rarity': 'epic',
+        },
+    ]
+    achievements.sort(key=lambda a: (not a['earned'], -(a['progress'] / a['goal'])))
+
+    earned_ids = [a['id'] for a in achievements if a['earned']]
+
+    challenges = [
+        {
+            'id': 'workout_3x',
+            'emoji': '🏋️',
+            'title': 'Workout 3× This Week',
+            'desc': 'Complete 3 workouts between Monday and Sunday',
+            'progress': min(workouts_this_week, 3),
+            'goal': 3,
+            'completed': workouts_this_week >= 3,
+        },
+        {
+            'id': 'log_meals',
+            'emoji': '🍽️',
+            'title': 'Log Meals 5 Days This Week',
+            'desc': 'Track your nutrition on 5 different days',
+            'progress': min(meals_this_week_days, 5),
+            'goal': 5,
+            'completed': meals_this_week_days >= 5,
+        },
+        {
+            'id': 'exercises_20',
+            'emoji': '💥',
+            'title': 'Complete 20 Exercises This Week',
+            'desc': 'Finish 20 exercises across all workouts',
+            'progress': min(exercises_this_week, 20),
+            'goal': 20,
+            'completed': exercises_this_week >= 20,
+        },
+        {
+            'id': 'calorie_goal_3',
+            'emoji': '🎯',
+            'title': 'Hit Calorie Goal 3 Days',
+            'desc': 'Reach your calorie target on 3 days this week',
+            'progress': min(calorie_goal_days_this_week, 3),
+            'goal': 3,
+            'completed': calorie_goal_days_this_week >= 3,
+        },
+        {
+            'id': 'fuel_gains',
+            'emoji': '⚡',
+            'title': 'Fuel Your Gains',
+            'desc': 'Log food on the same day as a workout, 3 times this week',
+            'progress': min(fuel_gains_days, 3),
+            'goal': 3,
+            'completed': fuel_gains_days >= 3,
+        },
+    ]
+
+    return {
+        'achievements': achievements,
+        'challenges': challenges,
+        'earned_ids': earned_ids,
+        'earned_count': len(earned_ids),
+        'challenges_completed': sum(1 for c in challenges if c['completed']),
+        'activity_streak': activity_streak,
+        'distinct_active_days': distinct_active_days,
+        'total_exercises': total_exercises,
+        'total_workouts': total_workouts,
+        'week_start': week_start,
+        'week_end': week_end,
+    }
+
+
 @login_required
 def social_page(request):
-    return render(request, 'socal_dir/social_page.html', {'active_tab': 'social'})
+    data = compute_achievements_challenges(request.user)
+    return render(request, 'socal_dir/social_page.html', {
+        'active_tab': 'social',
+        'total_exercises': data['total_exercises'],
+        'total_workouts': data['total_workouts'],
+        'distinct_active_days': data['distinct_active_days'],
+        'activity_streak': data['activity_streak'],
+        'streak_to_legend': max(0, 7 - data['activity_streak']),
+        'earned_count': data['earned_count'],
+        'achievements': data['achievements'],
+        'earned_ids_json': json.dumps(data['earned_ids']),
+        'challenges': data['challenges'],
+        'challenges_completed': data['challenges_completed'],
+        'week_start': data['week_start'],
+        'week_end': data['week_end'],
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def achievements_progress_api(request):
+    """JSON endpoint returning current achievement and challenge state from the real DB."""
+    data = compute_achievements_challenges(request.user)
+    return JsonResponse({
+        'earned_ids': data['earned_ids'],
+        'achievements': data['achievements'],
+        'challenges': data['challenges'],
+        'stats': {
+            'activity_streak': data['activity_streak'],
+            'distinct_active_days': data['distinct_active_days'],
+            'total_exercises': data['total_exercises'],
+            'total_workouts': data['total_workouts'],
+            'challenges_completed': data['challenges_completed'],
+        },
+    })
 
 
 @login_required
@@ -1875,10 +2166,21 @@ def complete_workout(request):
     workout.status = 'completed'
     workout.save()
 
+    progress = compute_achievements_challenges(request.user)
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
         'status': workout.status,
+        'achievement_progress': {
+            'earned_ids': progress['earned_ids'],
+            'challenges': progress['challenges'],
+            'stats': {
+                'activity_streak': progress['activity_streak'],
+                'total_workouts': progress['total_workouts'],
+                'total_exercises': progress['total_exercises'],
+            },
+        },
     })
 
 
