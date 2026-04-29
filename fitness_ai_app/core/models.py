@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 import uuid
 
+
 class UserProfile(models.Model):
     PRIMARY_GOAL_CHOICES = [
         ('weight_loss', 'Weight Loss'),
@@ -12,13 +13,13 @@ class UserProfile(models.Model):
         ('flexibility', 'Flexibility & Mobility'),
         ('general_health', 'General Health & Wellness'),
     ]
-    
+
     EXPERIENCE_LEVEL_CHOICES = [
         ('beginner', 'Beginner'),
         ('intermediate', 'Intermediate'),
         ('advanced', 'Advanced'),
     ]
-    
+
     DIETARY_PREFERENCE_CHOICES = [
         ('omnivore', 'Omnivore'),
         ('vegetarian', 'Vegetarian'),
@@ -27,7 +28,7 @@ class UserProfile(models.Model):
         ('paleo', 'Paleo'),
         ('gluten_free', 'Gluten-Free'),
     ]
-    
+
     HOME_EQUIPMENT_CHOICES = [
         ('dumbbells', 'Dumbbells'),
         ('resistance_bands', 'Resistance Bands'),
@@ -40,11 +41,11 @@ class UserProfile(models.Model):
         ('jump_rope', 'Jump Rope'),
         ('medicine_ball', 'Medicine Ball'),
     ]
-    
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     calorie_goal = models.PositiveIntegerField(default=2400)
     height = models.PositiveIntegerField(null=True, blank=True, help_text="Height in cm")
-    weight = models.PositiveIntegerField(null=True, blank=True, help_text="Weight in kg")
+    weight = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Weight in kg")
     age = models.PositiveIntegerField(null=True, blank=True, help_text="Age in years")
     primary_goal = models.CharField(max_length=20, choices=PRIMARY_GOAL_CHOICES, null=True, blank=True)
     experience_level = models.CharField(max_length=20, choices=EXPERIENCE_LEVEL_CHOICES, null=True, blank=True)
@@ -52,7 +53,10 @@ class UserProfile(models.Model):
     has_home_gym = models.BooleanField(null=True, blank=True, help_text="Does user have home gym setup")
     home_equipment = models.JSONField(default=list, blank=True, help_text="Available home exercise equipment")
     bio = models.TextField(null=True, blank=True, help_text="About you and your fitness journey")
-    onboarding_completed = models.BooleanField(default=False, help_text="Whether user has completed the get_started_profile onboarding")
+    onboarding_completed = models.BooleanField(
+        default=False,
+        help_text="Whether user has completed the get_started_profile onboarding"
+    )
     social_login_user = models.BooleanField(default=False, help_text="Whether user came from a social login")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -105,6 +109,11 @@ class FoodGroup(models.Model):
     class Meta:
         ordering = ['created_at']
 
+    @property
+    def all_completed(self):
+        items = self.grouped_items.all()
+        return items.exists() and not items.filter(completed=False).exists()
+
     def __str__(self):
         return f"{self.name} ({self.meal.name})"
 
@@ -151,7 +160,10 @@ class Workout(models.Model):
     goal = models.CharField(max_length=20, choices=GOAL_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
     date = models.DateField()
-    total_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text='Total workout duration in seconds')
+    total_duration_seconds = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Total workout duration in seconds'
+    )
     current_session_seconds = models.PositiveIntegerField(default=0, help_text='Current session timer in seconds')
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -210,10 +222,10 @@ class ExerciseType(models.Model):
     """Exercise classification by type (Strength, Cardio, etc.)"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    
+
     class Meta:
         ordering = ['name']
-    
+
     def __str__(self):
         return self.name
 
@@ -222,10 +234,10 @@ class MuscleGroup(models.Model):
     """Primary muscle groups (Upper Body, Lower Body, etc.)"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    
+
     class Meta:
         ordering = ['name']
-    
+
     def __str__(self):
         return self.name
 
@@ -235,10 +247,10 @@ class Muscle(models.Model):
     name = models.CharField(max_length=100, unique=True)
     muscle_group = models.ForeignKey(MuscleGroup, on_delete=models.CASCADE, related_name='muscles')
     description = models.TextField(blank=True)
-    
+
     class Meta:
         ordering = ['muscle_group', 'name']
-    
+
     def __str__(self):
         return f"{self.name} ({self.muscle_group.name})"
 
@@ -247,10 +259,10 @@ class Equipment(models.Model):
     """Equipment types available at home or gym"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    
+
     class Meta:
         ordering = ['name']
-    
+
     def __str__(self):
         return self.name
 
@@ -262,50 +274,53 @@ class TrainingExercise(models.Model):
         ('intermediate', 'Intermediate'),
         ('advanced', 'Advanced'),
     ]
-    
+
     LOCATION_CHOICES = [
         ('home', 'At Home'),
         ('gym', 'At Gym'),
         ('both', 'Both Home & Gym'),
     ]
-    
+
     # Basic info
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField()
     instructions = models.TextField(blank=True, help_text="Step-by-step exercise instructions")
     difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='intermediate')
-    
+
     # Exercise classification
     exercise_type = models.ForeignKey(ExerciseType, on_delete=models.PROTECT, related_name='exercises')
     muscle_groups = models.ManyToManyField(MuscleGroup, related_name='training_exercises')
     primary_muscles = models.ManyToManyField(Muscle, related_name='primary_exercises')
     secondary_muscles = models.ManyToManyField(Muscle, related_name='secondary_exercises')
-    
+
     # Location & Equipment
     location = models.CharField(max_length=20, choices=LOCATION_CHOICES, default='both')
     equipment = models.ManyToManyField(Equipment, blank=True, related_name='exercises')
-    
+
     # Default rep/set schemes
     default_sets = models.PositiveIntegerField(default=3)
     default_reps = models.PositiveIntegerField(default=10)
     default_duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="For timed exercises")
-    
+
     # Injury considerations
     high_impact = models.BooleanField(default=False, help_text="Mark if exercise is high-impact")
-    joint_stress = models.CharField(max_length=200, blank=True, help_text="Which joints are stressed (e.g., knees, shoulders)")
-    
+    joint_stress = models.CharField(
+        max_length=200, blank=True,
+        help_text="Which joints are stressed (e.g., knees, shoulders)"
+    )
+
     # Admin
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['exercise_type', 'name']
         indexes = [
             models.Index(fields=['exercise_type', 'location']),
             models.Index(fields=['difficulty']),
         ]
-    
+
     def __str__(self):
         return f"{self.name} ({self.exercise_type.name})"
 
@@ -317,7 +332,7 @@ class UserInjury(models.Model):
         ('moderate', 'Moderate'),
         ('severe', 'Severe'),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='injuries')
     muscle = models.ForeignKey(Muscle, on_delete=models.PROTECT)
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES)
@@ -326,10 +341,10 @@ class UserInjury(models.Model):
     end_date = models.DateField(null=True, blank=True, help_text="Leave blank if ongoing")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['-start_date']
-    
+
     def __str__(self):
         return f"{self.user.email} - {self.muscle.name} ({self.get_severity_display()})"
 
@@ -340,7 +355,7 @@ class UserEquipmentProfile(models.Model):
     location = models.CharField(max_length=20, choices=[('home', 'At Home'), ('gym', 'At Gym'), ('both', 'Both')])
     equipment = models.ManyToManyField(Equipment, related_name='user_profiles')
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"{self.user.email} - {self.get_location_display()}"
 
@@ -410,3 +425,44 @@ class MealSupplement(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.meal.name}"
+
+
+class AIChatConversation(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_chat_conversations')
+    title = models.CharField(max_length=120, default='New Chat')
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['user', 'updated_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.title}"
+
+
+class AIChatMessage(models.Model):
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+    ]
+
+    conversation = models.ForeignKey(
+        AIChatConversation,
+        on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['conversation', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.conversation_id} - {self.role}"

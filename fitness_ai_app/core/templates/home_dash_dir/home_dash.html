@@ -58,7 +58,7 @@
     <div style="font-size:1rem;color:rgba(255,255,255,0.85);margin-bottom:40px;">Your Spotter.ai dashboard</div>
     
     <!-- Today's Progress Container -->
-    <div style="max-width:640px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;">
+    <div style="max-width:640px;margin:0 auto 12px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;">
         <div style="font-size:0.9rem;color:#aaa;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Today's Progress</div>
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
             <div style="padding:12px;background:#111;border:1px solid #242424;border-radius:10px;">
@@ -79,18 +79,56 @@
         </div>
     </div>
     
+    <!-- Today's Activities Container -->
+    <div style="max-width:640px;margin:0 auto 12px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Activities</div>
+        {% if today_activities %}
+            <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
+                {% for activity in today_activities %}
+                    <div style="padding:10px 12px;background:#111;border:1px solid #242424;border-radius:8px;font-size:0.85rem;color:#ddd;">
+                        {{ activity.name }} - {{ activity.workout.name }}
+                    </div>
+                {% endfor %}
+            </div>
+            <a href="{% url 'train_page' %}" style="display:inline-block;padding:10px 14px;background:rgba(246,125,38,0.2);border:1px solid rgba(246,125,38,0.4);border-radius:8px;text-decoration:none;color:#f67d26;font-weight:600;">
+                Go to Train Page
+            </a>
+        {% else %}
+            <div style="font-size:0.85rem;color:#bbb;">No activities for today, enjoy your day off</div>
+        {% endif %}
+    </div>
+
+    <!-- Today's Nutrition Container -->
+    <div style="max-width:640px;margin:0 auto 40px;padding:16px;background:#181818;border:1px solid #242424;border-radius:12px;text-align:center;">
+        <div style="font-size:0.9rem;color:#aaa;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Today's Nutrition</div>
+        {% if today_nutrition %}
+            <div style="display:flex;flex-direction:column;gap:8px;margin:0 auto 12px;max-width:520px;">
+                {% for meal in today_nutrition %}
+                    <div style="padding:10px 12px;background:#111;border:1px solid #242424;border-radius:8px;font-size:0.85rem;color:#ddd;">
+                        {{ meal.foods_text }} - {{ meal.meal_name }}
+                    </div>
+                {% endfor %}
+            </div>
+            <a href="{% url 'nutrition_page' %}" style="display:inline-block;padding:10px 14px;background:rgba(246,125,38,0.2);border:1px solid rgba(246,125,38,0.4);border-radius:8px;text-decoration:none;color:#f67d26;font-weight:600;">
+                Go to Nutrition Page
+            </a>
+        {% else %}
+            <div style="font-size:0.85rem;color:#bbb;">No meals for today, enjoy your day off</div>
+        {% endif %}
+    </div>
+    
     <!-- Quick Links -->
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:400px;margin:0 auto;">
-        <a href="{% url 'nutrition_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:400px;margin:0 auto;position:relative;z-index:30;">
+        <a href="{% url 'nutrition_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;position:relative;z-index:31;touch-action:manipulation;">
             📊 Nutrition Tracker
         </a>
-        <a href="{% url 'train_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+        <a href="{% url 'train_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;position:relative;z-index:31;touch-action:manipulation;">
             💪 Training Log
         </a>
-        <a href="{% url 'ai_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+        <a href="{% url 'ai_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;position:relative;z-index:31;touch-action:manipulation;">
             🤖 AI Coach
         </a>
-        <a href="{% url 'social_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;">
+        <a href="{% url 'social_page' %}" style="padding:20px;background:rgba(232,92,0,0.15);border:1px solid rgba(232,92,0,0.3);border-radius:12px;text-decoration:none;color:#f67d26;font-weight:600;transition:all 0.2s;position:relative;z-index:31;touch-action:manipulation;">
             👥 Community
         </a>
     </div>

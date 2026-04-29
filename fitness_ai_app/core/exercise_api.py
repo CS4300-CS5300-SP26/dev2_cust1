@@ -41,11 +41,11 @@ def get_muscle_groups(request):
 def get_muscles(request):
     """Get all available muscles, optionally filtered by muscle group"""
     muscle_group_id = request.GET.get('group_id')
-    
+
     query = Muscle.objects.select_related('muscle_group')
     if muscle_group_id:
         query = query.filter(muscle_group_id=muscle_group_id)
-    
+
     muscles = query.values('id', 'name', 'muscle_group__name', 'description')
     return JsonResponse({'muscles': list(muscles)})
 
@@ -62,7 +62,7 @@ def get_equipment(request):
 def filter_exercises(request):
     """
     Comprehensive exercise filtering endpoint
-    
+
     Query Parameters:
     - exercise_type: ID of exercise type (Strength, Cardio, etc.)
     - muscle_group: ID of muscle group (Upper Body, Lower Body, etc.)
@@ -72,7 +72,7 @@ def filter_exercises(request):
     - difficulty: 'beginner', 'intermediate', 'advanced'
     - exclude_injured: 'true' to exclude exercises affecting injured muscles
     """
-    
+
     exercises = TrainingExercise.objects.filter(is_active=True).prefetch_related(
         'exercise_type',
         'muscle_groups',
@@ -80,7 +80,7 @@ def filter_exercises(request):
         'secondary_muscles',
         'equipment'
     )
-    
+
     query_text = request.GET.get('q', '').strip()
     if query_text:
         exercises = exercises.filter(
@@ -93,31 +93,31 @@ def filter_exercises(request):
     exercise_type_id = _safe_int(request.GET.get('exercise_type'))
     if exercise_type_id:
         exercises = exercises.filter(exercise_type_id=exercise_type_id)
-    
+
     # Filter by muscle group
     muscle_group_id = _safe_int(request.GET.get('muscle_group'))
     if muscle_group_id:
         exercises = exercises.filter(muscle_groups__id=muscle_group_id).distinct()
-    
+
     # Filter by specific muscle
     muscle_id = _safe_int(request.GET.get('muscle'))
     if muscle_id:
         exercises = exercises.filter(
             Q(primary_muscles__id=muscle_id) | Q(secondary_muscles__id=muscle_id)
         ).distinct()
-    
+
     # Filter by location
     location = request.GET.get('location')
     if location in ['home', 'gym']:
         exercises = exercises.filter(Q(location=location) | Q(location='both'))
     elif location == 'both':
         exercises = exercises.filter(location='both')
-    
+
     # Filter by difficulty
     difficulty = request.GET.get('difficulty')
     if difficulty in ['beginner', 'intermediate', 'advanced']:
         exercises = exercises.filter(difficulty=difficulty)
-    
+
     # Filter by equipment (user has at least one of these)
     equipment_ids = request.GET.get('equipment')
     if equipment_ids:
@@ -130,7 +130,7 @@ def filter_exercises(request):
                 exercises = exercises.distinct()
             else:
                 exercises = exercises.filter(equipment__id__in=equipment_list).distinct()
-    
+
     # Exclude exercises affecting injured muscles
     exclude_injured = request.GET.get('exclude_injured', 'false').lower() == 'true'
     if exclude_injured:
@@ -138,7 +138,7 @@ def filter_exercises(request):
             user=request.user,
             is_active=True
         ).values_list('muscle_id', flat=True)
-        
+
         exercises = exercises.exclude(
             Q(primary_muscles__id__in=user_injuries) |
             Q(secondary_muscles__id__in=user_injuries)
@@ -179,7 +179,7 @@ def filter_exercises(request):
         exercises = exercises.order_by('-created_at', 'name')
     else:
         exercises = exercises.order_by('name')
-    
+
     # Serialize response
     exercise_list = []
     for exercise in exercises:
@@ -218,7 +218,7 @@ def filter_exercises(request):
             'high_impact': exercise.high_impact,
             'joint_stress': exercise.joint_stress,
         })
-    
+
     return JsonResponse({
         'count': len(exercise_list),
         'exercises': exercise_list
@@ -230,50 +230,50 @@ def filter_exercises(request):
 def get_user_safe_exercises(request):
     """
     Get exercises safe for the current user based on injuries and equipment
-    
+
     Query Parameters:
     - exercise_type: ID of exercise type (optional)
     - muscle_group: ID of muscle group (optional)
     - location: 'home' or 'gym' (required for filtering equipment)
     """
-    
+
     location = request.GET.get('location', 'gym')
-    
+
     # Get user's equipment profile
     try:
         user_equipment = UserEquipmentProfile.objects.get(user=request.user)
         available_equipment = list(user_equipment.equipment.values_list('id', flat=True))
     except UserEquipmentProfile.DoesNotExist:
         available_equipment = []
-    
+
     # Get user's active injuries
-    user_injuries = UserInjury.objects.filter(
+    user_injuries = UserInjury.objects.filter(  # noqa: F841
         user=request.user,
         is_active=True
     ).values_list('muscle_id', flat=True)
-    
+
     # Build filter params
     params = {
         'exclude_injured': 'true',
         'location': location,
     }
-    
+
     if available_equipment:
         params['equipment'] = ','.join(map(str, available_equipment))
-    
+
     exercise_type_id = request.GET.get('exercise_type')
     if exercise_type_id:
         params['exercise_type'] = exercise_type_id
-    
+
     muscle_group_id = request.GET.get('muscle_group')
     if muscle_group_id:
         params['muscle_group'] = muscle_group_id
-    
+
     # Call filter_exercises with user context
     request.GET = request.GET.copy()
     for key, value in params.items():
         request.GET[key] = value
-    
+
     return filter_exercises(request)
 
 
@@ -288,7 +288,7 @@ def get_exercise_detail(request, exercise_id):
             'secondary_muscles',
             'equipment'
         ).get(id=exercise_id, is_active=True)
-        
+
         return JsonResponse({
             'id': exercise.id,
             'name': exercise.name,
@@ -336,7 +336,7 @@ def add_user_injury(request):
         muscle_id = data.get('muscle_id')
         severity = data.get('severity', 'moderate')
         notes = data.get('notes', '')
-        
+
         injury = UserInjury.objects.create(
             user=request.user,
             muscle_id=muscle_id,
@@ -344,7 +344,7 @@ def add_user_injury(request):
             notes=notes,
             start_date=timezone.now().date()
         )
-        
+
         return JsonResponse({
             'success': True,
             'injury_id': injury.id,
@@ -362,12 +362,12 @@ def update_user_equipment(request):
         data = json.loads(request.body)
         location = data.get('location', 'gym')
         equipment_ids = data.get('equipment', [])
-        
+
         profile, created = UserEquipmentProfile.objects.get_or_create(user=request.user)
         profile.location = location
         profile.save()
         profile.equipment.set(equipment_ids)
-        
+
         return JsonResponse({
             'success': True,
             'message': 'Equipment profile updated'

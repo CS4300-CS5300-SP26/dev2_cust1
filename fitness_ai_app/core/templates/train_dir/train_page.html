@@ -115,6 +115,73 @@
   .delete-confirmation-buttons .btn-delete:hover {
     background: #c0392b;
   }
+
+  .select-workout-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  
+  .select-workout-modal.active {
+    display: flex;
+  }
+  
+  .select-workout-content {
+    background: #1a1a1a;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(246, 125, 38, 0.2);
+  }
+  
+  .select-workout-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    margin: 0 0 16px 0;
+  }
+  
+  .select-workout-message {
+    font-size: 14px;
+    color: #aaa;
+    margin: 0 0 32px 0;
+    line-height: 1.5;
+  }
+  
+  .select-workout-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  
+  .select-workout-buttons button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .select-workout-buttons .btn-ok {
+    background: #f67d26;
+    color: white;
+  }
+  
+  .select-workout-buttons .btn-ok:hover {
+    background: #ff8c42;
+    color: white;
+  }
 </style>
 {% endblock %}
 
@@ -641,6 +708,16 @@
     </div>
 </div>
 
+<div id="selectWorkoutModal" class="select-workout-modal">
+    <div class="select-workout-content">
+        <h2 class="select-workout-title">Select a Workout</h2>
+        <p class="select-workout-message" id="selectWorkoutMessage">Select a workout first so we know where to add this exercise.</p>
+        <div class="select-workout-buttons">
+            <button class="btn-ok" onclick="closeSelectWorkoutModal()">Got it</button>
+        </div>
+    </div>
+</div>
+
 <form id="exerciseLibraryQuickAddForm" method="POST" action="{% url 'add_exercise' %}" style="display:none;">
     {% csrf_token %}
     <input type="hidden" name="workout_id" id="libraryQuickAddWorkoutId">
@@ -940,7 +1017,7 @@
                 const workoutSelect = document.getElementById('libraryWorkoutSelect');
                 const selectedWorkout = workoutSelect ? workoutSelect.value : '';
                 if (!selectedWorkout) {
-                    alert('Select a workout first so we know where to add this exercise.');
+                    showSelectWorkoutModal();
                     if (workoutSelect) workoutSelect.focus();
                     return;
                 }
@@ -1100,6 +1177,36 @@
         checkbox.addEventListener('change', loadExerciseLibrary);
     });
 
+    // Persist and restore workout selection (per date)
+    const workoutSelectElement = document.getElementById('libraryWorkoutSelect');
+    if (workoutSelectElement) {
+        const currentDate = '{{ date_string }}';
+        const storageKey = `selectedWorkoutForLibrary_${currentDate}`;
+        
+        // Restore saved selection for this date
+        const savedWorkoutId = localStorage.getItem(storageKey);
+        if (savedWorkoutId) {
+            // Verify the saved workout still exists in the current options
+            const option = workoutSelectElement.querySelector(`option[value="${savedWorkoutId}"]`);
+            if (option) {
+                workoutSelectElement.value = savedWorkoutId;
+            } else {
+                // Saved workout doesn't exist (may have been deleted), reset to default
+                localStorage.removeItem(storageKey);
+                workoutSelectElement.value = '';
+            }
+        }
+
+        // Save selection when changed
+        workoutSelectElement.addEventListener('change', function() {
+            if (this.value) {
+                localStorage.setItem(storageKey, this.value);
+            } else {
+                localStorage.removeItem(storageKey);
+            }
+        });
+    }
+
     if ('{{ selected_tab|default:"today" }}' === 'search') {
         loadExerciseLibrary();
     }
@@ -1135,6 +1242,22 @@
     document.getElementById('deleteConfirmationModal').addEventListener('click', function(e) {
         if (e.target === this) {
             closeDeleteConfirmation();
+        }
+    });
+
+    // Select workout modal
+    function showSelectWorkoutModal() {
+        document.getElementById('selectWorkoutModal').classList.add('active');
+    }
+
+    function closeSelectWorkoutModal() {
+        document.getElementById('selectWorkoutModal').classList.remove('active');
+    }
+
+    // Close select workout modal when clicking outside
+    document.getElementById('selectWorkoutModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeSelectWorkoutModal();
         }
     });
 
