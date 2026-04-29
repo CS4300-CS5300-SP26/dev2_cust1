@@ -1,25 +1,30 @@
+import os
 import uuid
 import smtplib
 import unittest
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
+from unittest import mock, skip
 from unittest.mock import patch
-from unittest import skip
 
+from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
+from django.urls import reverse
 from django.utils import timezone
 
 from .models import (
     EmailVerification, ExerciseType, MuscleGroup, Muscle, Equipment,
-    TrainingExercise, UserInjury, UserEquipmentProfile, SupplementDatabase, SupplementEntry
+    TrainingExercise, UserInjury, UserEquipmentProfile, SupplementDatabase, SupplementEntry,
+    Meal, FoodItem, Workout, Exercise
 )
 from .forms import RegistrationForm
 
 
-##    Added from feature/log-in branch
-###########################################################################################################################################################################
+# Added from feature/log-in branch
+# ---------------------------------------------------------------------------
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class RegistrationFormTests(TestCase):
@@ -123,7 +128,7 @@ class SplashViewTests(TestCase):
         self.assertContains(r, 'Spotter.ai')
 
     def test_splash_redirects_authenticated_user(self):
-        user = User.objects.create_user(username='auth@test.com', email='auth@test.com', password='pass12345')
+        User.objects.create_user(username='auth@test.com', email='auth@test.com', password='pass12345')
         self.client.login(username='auth@test.com', password='pass12345')
         r = self.client.get('/')
         self.assertEqual(r.status_code, 302)
@@ -465,15 +470,13 @@ class SocialLoginRedirectTests(TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertIn('/accounts/instagram/login/', r.url)
 
-##    END of: Added from feature/log-in branch
-###########################################################################################################################################################################
+# END of: Added from feature/log-in branch
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
 #  Nutrition feature – Model tests (TDD)
 # ---------------------------------------------------------------------------
-from datetime import date
-from .models import Meal, FoodItem
 
 
 class MealModelTests(TestCase):
@@ -536,8 +539,8 @@ class FoodItemModelTests(TestCase):
         self.assertEqual(FoodItem.objects.count(), 0)
 
     def test_food_item_ordering_by_created_at(self):
-        a = FoodItem.objects.create(meal=self.meal, name='AAA', calories=100)
-        b = FoodItem.objects.create(meal=self.meal, name='ZZZ', calories=200)
+        FoodItem.objects.create(meal=self.meal, name='AAA', calories=100)
+        FoodItem.objects.create(meal=self.meal, name='ZZZ', calories=200)
         items = list(FoodItem.objects.values_list('name', flat=True))
         self.assertEqual(items, ['AAA', 'ZZZ'])
 
@@ -841,7 +844,7 @@ class ToggleFoodItemViewTests(TestCase):
     def test_toggle_marks_incomplete(self):
         self.item.completed = True
         self.item.save()
-        r = self.client.post('/nutrition/toggle_food_item/', {
+        self.client.post('/nutrition/toggle_food_item/', {
             'item_id': self.item.id,
             'date': str(date.today()),
         })
@@ -940,9 +943,6 @@ class DeleteFoodItemViewTests(TestCase):
 # ---------------------------------------------------------------------------
 #  API Chat – View tests (with OpenAI mock)
 # ---------------------------------------------------------------------------
-import json
-import os
-from unittest import mock
 
 
 class ApiChatViewTests(TestCase):
@@ -1216,7 +1216,7 @@ class ApiChatViewTests(TestCase):
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_invalid_conversation_id_returns_400(self, mock_openai_cls):
-        user = User.objects.create_user(
+        User.objects.create_user(
             username='invalidchatid@example.com',
             email='invalidchatid@example.com',
             password='TestPass123!',
@@ -1250,7 +1250,7 @@ class ApiChatViewTests(TestCase):
             email='ownerchat@example.com',
             password='TestPass123!',
         )
-        intruder = User.objects.create_user(
+        User.objects.create_user(
             username='intruderchat@example.com',
             email='intruderchat@example.com',
             password='TestPass123!',
@@ -1285,7 +1285,8 @@ class ApiChatViewTests(TestCase):
         )
         conversation = AIChatConversation.objects.create(user=user, title='Leg day tweaks')
         AIChatMessage.objects.create(conversation=conversation, role='user', content='How to warm up knees?')
-        AIChatMessage.objects.create(conversation=conversation, role='assistant', content='Start with low-impact mobility.')
+        AIChatMessage.objects.create(
+            conversation=conversation, role='assistant', content='Start with low-impact mobility.')
         self.client.login(username='historychat@example.com', password='TestPass123!')
 
         list_response = self.client.get('/api/chat/history/')
@@ -1308,7 +1309,7 @@ class ApiChatViewTests(TestCase):
             email='ownerhistory@example.com',
             password='TestPass123!',
         )
-        intruder = User.objects.create_user(
+        User.objects.create_user(
             username='intruderhistory@example.com',
             email='intruderhistory@example.com',
             password='TestPass123!',
@@ -1745,9 +1746,6 @@ class ApiChatPlannerApplyTests(TestCase):
 # ---------------------------------------------------------------------------
 #  Food Database Views – Coverage Tests
 # ---------------------------------------------------------------------------
-from datetime import date
-from django.urls import reverse
-from .models import Meal, FoodItem
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -1925,12 +1923,9 @@ class FoodDatabaseViewsCoverageTests(TestCase):
         self.assertEqual(food.protein, 20)
         self.assertEqual(food.carbs, 30)
         self.assertEqual(food.fats, 8)
-###########################################################################################################################################################################
+# ---------------------------------------------------------------------------
 # Train Page Tests
-###########################################################################################################################################################################
-
-from datetime import date
-from .models import Workout, Exercise
+# ---------------------------------------------------------------------------
 
 
 class TrainPageViewTests(TestCase):
@@ -1990,10 +1985,11 @@ class TrainPageViewTests(TestCase):
         today = date.today()
         yesterday = today - timedelta(days=1)
 
-        workout_today = Workout.objects.create(
+        Workout.objects.create(
+
             user=self.user, name='Today Workout', goal='strength', date=today
         )
-        workout_yesterday = Workout.objects.create(
+        Workout.objects.create(
             user=self.user, name='Yesterday Workout', goal='cardio', date=yesterday
         )
 
@@ -2443,7 +2439,6 @@ class DeleteExerciseTests(TestCase):
         self.assertTrue(Exercise.objects.filter(id=other_exercise.id).exists())
 
 
-
 class SocialAdapterTests(TestCase):
     """Tests for the AutoSocialAdapter - social login and auto-connect functionality."""
 
@@ -2451,17 +2446,17 @@ class SocialAdapterTests(TestCase):
         """Test that email is set on user from data dict."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         user = User()
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {}
-        
+
         data = {'email': 'test@google.com', 'first_name': 'Test'}
         result = adapter.populate_user(None, sociallogin, data)
-        
+
         self.assertEqual(result.email, 'test@google.com')
         self.assertEqual(result.username, 'test@google.com')
 
@@ -2469,17 +2464,17 @@ class SocialAdapterTests(TestCase):
         """Test that email is set from extra_data when not in data dict."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         user = User()
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'social@example.com'}
-        
+
         data = {}
         result = adapter.populate_user(None, sociallogin, data)
-        
+
         self.assertEqual(result.email, 'social@example.com')
         self.assertEqual(result.username, 'social@example.com')
 
@@ -2487,17 +2482,17 @@ class SocialAdapterTests(TestCase):
         """Test that first_name is set from given_name in extra_data."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         user = User()
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'given_name': 'John', 'family_name': 'Doe'}
-        
+
         data = {}
         result = adapter.populate_user(None, sociallogin, data)
-        
+
         self.assertEqual(result.first_name, 'John')
         self.assertEqual(result.last_name, 'Doe')
 
@@ -2505,40 +2500,40 @@ class SocialAdapterTests(TestCase):
         """Test that email from data dict takes precedence over extra_data."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         user = User()
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'social@example.com'}
-        
+
         data = {'email': 'data@example.com'}
         result = adapter.populate_user(None, sociallogin, data)
-        
+
         self.assertEqual(result.email, 'data@example.com')
 
     def test_pre_social_login_auto_connects_by_email(self):
         """Test that social account auto-connects to existing user with same email."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         # Create existing user
         existing_user = User.objects.create_user(
             username='existing@example.com',
             email='existing@example.com',
             password='test123'
         )
-        
+
         adapter = AutoSocialAdapter()
         sociallogin = MagicMock()
         sociallogin.is_existing = False
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'existing@example.com'}
-        
+
         request = MagicMock()
         adapter.pre_social_login(request, sociallogin)
-        
+
         # Verify connect was called with existing user
         sociallogin.connect.assert_called_once_with(request, existing_user)
 
@@ -2546,39 +2541,39 @@ class SocialAdapterTests(TestCase):
         """Test that social account auto-connects when email matches username."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         # Create user with email as username but empty email field
         existing_user = User.objects.create_user(
             username='user@example.com',
             email='',
             password='test123'
         )
-        
+
         adapter = AutoSocialAdapter()
         sociallogin = MagicMock()
         sociallogin.is_existing = False
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'user@example.com'}
-        
+
         request = MagicMock()
         adapter.pre_social_login(request, sociallogin)
-        
+
         sociallogin.connect.assert_called_once_with(request, existing_user)
 
     def test_pre_social_login_allows_signup_for_new_email(self):
         """Test that social login allows new signup when no existing user found."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         sociallogin = MagicMock()
         sociallogin.is_existing = False
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'newuser@example.com'}
-        
+
         request = MagicMock()
         adapter.pre_social_login(request, sociallogin)
-        
+
         # connect should NOT be called - allow normal signup
         sociallogin.connect.assert_not_called()
 
@@ -2586,22 +2581,22 @@ class SocialAdapterTests(TestCase):
         """Test that email is updated for existing social account user."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock, patch
-        
+
         existing_user = User.objects.create_user(
             username='test',
             email='',
             password='test123'
         )
-        
+
         adapter = AutoSocialAdapter()
         sociallogin = MagicMock()
         sociallogin.is_existing = True
         sociallogin.user = existing_user
         sociallogin.account = MagicMock()
         sociallogin.account.extra_data = {'email': 'newemail@example.com'}
-        
+
         request = MagicMock()
-        
+
         with patch.object(existing_user, 'save') as mock_save:
             adapter.pre_social_login(request, sociallogin)
             mock_save.assert_called_once()
@@ -2611,103 +2606,103 @@ class SocialAdapterTests(TestCase):
         from core.adapter import AutoSocialAdapter
         from allauth.socialaccount.models import SocialAccount
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
-        
+
         # Create user without email
         user = User(username='noname')
-        
+
         # Create social account with email in extra_data
         social_account = SocialAccount(
             provider='google',
             uid='123',
             extra_data={'email': 'fromextra@example.com'}
         )
-        
+
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = social_account
-        
+
         request = MagicMock()
-        
+
         # Call save_user (it calls super().save_user which may create user)
         with patch.object(adapter.__class__.__bases__[0], 'save_user', return_value=user):
-            result = adapter.save_user(request, sociallogin, form=None)
-        
+            adapter.save_user(request, sociallogin, form=None)
+
         # Email should be set from extra_data
         self.assertEqual(user.email, 'fromextra@example.com')
-    
+
     def test_save_user_sets_username_from_email_when_no_username(self):
         """Test that save_user sets username from email when user has no username."""
         from core.adapter import AutoSocialAdapter
         from allauth.socialaccount.models import SocialAccount
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
-        
+
         # Create user without email OR username
         user = User()
         user.email = ''
         user.username = ''
-        
+
         # Create social account with email in extra_data
         social_account = SocialAccount(
             provider='google',
             uid='456',
             extra_data={'email': 'setusername@example.com'}
         )
-        
+
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = social_account
-        
+
         request = MagicMock()
-        
+
         # Call save_user
         with patch.object(adapter.__class__.__bases__[0], 'save_user', return_value=user):
-            result = adapter.save_user(request, sociallogin, form=None)
-        
+            adapter.save_user(request, sociallogin, form=None)
+
         # Username should be set from email
         self.assertEqual(user.username, 'setusername@example.com')
-    
+
     def test_pre_social_login_no_email_returns_early(self):
         """Test that pre_social_login returns early when no email available."""
         from core.adapter import AutoSocialAdapter
         from allauth.socialaccount.models import SocialAccount
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
-        
+
         user = User(username='test')
-        
+
         social_account = SocialAccount(
             provider='google',
             uid='123',
             extra_data={}  # No email
         )
-        
+
         sociallogin = MagicMock()
         sociallogin.user = user
         sociallogin.account = social_account
         sociallogin.is_existing = False
-        
+
         request = MagicMock()
-        
+
         # Should not raise and should return without connecting
         adapter.pre_social_login(request, sociallogin)
-        
+
         # connect should not have been called
         sociallogin.connect.assert_not_called()
-    
+
     def test_is_auto_signup_allowed_returns_true(self):
         """Test that is_auto_signup_allowed returns True."""
         from core.adapter import AutoSocialAdapter
         from unittest.mock import MagicMock
-        
+
         adapter = AutoSocialAdapter()
         request = MagicMock()
         sociallogin = MagicMock()
-        
+
         result = adapter.is_auto_signup_allowed(request, sociallogin)
         self.assertTrue(result)
 
@@ -2720,14 +2715,14 @@ class SocialLoginIntegrationTests(TestCase):
         # Create user via regular registration
         test_email = 'integration@example.com'
         test_password = 'IntegrationTest123!'
-        
+
         user = User.objects.create_user(
             username=test_email,
             email=test_email,
             password=test_password,
             is_active=True
         )
-        
+
         # Verify user was created
         self.assertTrue(User.objects.filter(email=test_email).exists())
         self.assertEqual(user.email, test_email)
@@ -2735,14 +2730,14 @@ class SocialLoginIntegrationTests(TestCase):
     def test_social_login_sets_email_correctly(self):
         """Test that social login properly sets email on user."""
         from allauth.socialaccount.models import SocialAccount
-        
+
         # Create user with empty email (simulating initial social login)
         user = User.objects.create_user(
             username='social_user@example.com',
             email='social_user@example.com',
             password='test123'
         )
-        
+
         # Create social account
         social_account = SocialAccount.objects.create(
             user=user,
@@ -2754,7 +2749,7 @@ class SocialLoginIntegrationTests(TestCase):
                 'family_name': 'User'
             }
         )
-        
+
         # Verify social account was created
         self.assertTrue(SocialAccount.objects.filter(user=user).exists())
         self.assertEqual(social_account.extra_data['email'], 'social_user@example.com')
@@ -2762,29 +2757,29 @@ class SocialLoginIntegrationTests(TestCase):
     def test_multiple_providers_same_user(self):
         """Test that same user can connect multiple social providers."""
         from allauth.socialaccount.models import SocialAccount
-        
+
         user = User.objects.create_user(
             username='multiauth@example.com',
             email='multiauth@example.com',
             password='test123'
         )
-        
+
         # Connect Google
-        google = SocialAccount.objects.create(
+        SocialAccount.objects.create(
             user=user,
             provider='google',
             uid='google_123',
             extra_data={'email': 'multiauth@example.com'}
         )
-        
+
         # Connect Facebook
-        facebook = SocialAccount.objects.create(
+        SocialAccount.objects.create(
             user=user,
             provider='facebook',
             uid='facebook_456',
             extra_data={'email': 'multiauth@example.com'}
         )
-        
+
         # Verify both connected to same user
         self.assertEqual(user.socialaccount_set.count(), 2)
         self.assertIn('google', [s.provider for s in user.socialaccount_set.all()])
@@ -2793,48 +2788,48 @@ class SocialLoginIntegrationTests(TestCase):
 
 class SignalHandlerTests(TestCase):
     """Tests for signal handlers, particularly social account update signals."""
-    
+
     def test_social_account_updated_signal_marks_user(self):
         """Test that social account updated signal marks user as social login user."""
         from core.signals import handle_social_account_updated
         from unittest.mock import MagicMock
-        
+
         user = User.objects.create_user(
             username='signaltest@example.com',
             email='signaltest@example.com',
             password='test123'
         )
-        
+
         from core.models import UserProfile
         profile = UserProfile.objects.create(user=user, social_login_user=False)
-        
+
         # Mock the sociallogin object
         sociallogin = MagicMock()
         sociallogin.user = user
-        
+
         # Call the signal handler
         handle_social_account_updated(sender=None, request=None, sociallogin=sociallogin)
-        
+
         # Verify profile was updated
         profile.refresh_from_db()
         self.assertTrue(profile.social_login_user)
-    
+
     def test_social_account_updated_signal_handles_exception(self):
         """Test that signal handler gracefully handles exceptions."""
         from core.signals import handle_social_account_updated
         from unittest.mock import MagicMock
-        
+
         # Create a user without a profile (will cause DoesNotExist or AttributeError)
         user = User.objects.create_user(
             username='noprofile@example.com',
             email='noprofile@example.com',
             password='test123'
         )
-        
+
         # Mock sociallogin with deleted profile
         sociallogin = MagicMock()
         sociallogin.user = user
-        
+
         # This should not raise an exception (it has a try-except)
         try:
             handle_social_account_updated(sender=None, request=None, sociallogin=sociallogin)
@@ -2844,7 +2839,7 @@ class SignalHandlerTests(TestCase):
 
 class ExerciseAPITests(TestCase):
     """Tests for the exercise API filtering endpoints."""
-    
+
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
@@ -2854,7 +2849,7 @@ class ExerciseAPITests(TestCase):
             is_active=True
         )
         self.client.login(username='exerciseapi@example.com', password='TestPass123!')
-    
+
     def test_get_exercise_types_returns_json(self):
         """Test that exercise types endpoint returns JSON."""
         response = self.client.get('/api/exercises/types/')
@@ -2863,7 +2858,7 @@ class ExerciseAPITests(TestCase):
         data = response.json()
         self.assertIn('exercise_types', data)
         self.assertIsInstance(data['exercise_types'], list)
-    
+
     def test_get_muscle_groups_returns_json(self):
         """Test that muscle groups endpoint returns JSON."""
         response = self.client.get('/api/exercises/muscle-groups/')
@@ -2872,7 +2867,7 @@ class ExerciseAPITests(TestCase):
         data = response.json()
         self.assertIn('muscle_groups', data)
         self.assertIsInstance(data['muscle_groups'], list)
-    
+
     def test_get_muscles_returns_json(self):
         """Test that muscles endpoint returns JSON."""
         response = self.client.get('/api/exercises/muscles/')
@@ -2881,7 +2876,7 @@ class ExerciseAPITests(TestCase):
         data = response.json()
         self.assertIn('muscles', data)
         self.assertIsInstance(data['muscles'], list)
-    
+
     def test_get_equipment_returns_json(self):
         """Test that equipment endpoint returns JSON."""
         response = self.client.get('/api/exercises/equipment/')
@@ -2890,14 +2885,14 @@ class ExerciseAPITests(TestCase):
         data = response.json()
         self.assertIn('equipment', data)
         self.assertIsInstance(data['equipment'], list)
-    
+
     def test_filter_exercises_requires_login(self):
         """Test that exercise filtering requires login."""
         self.client.logout()
         response = self.client.get('/api/exercises/filter/')
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
-    
+
     def test_filter_exercises_returns_empty_list_initially(self):
         """Test that filter returns empty list when no exercises exist."""
         response = self.client.get('/api/exercises/filter/')
@@ -2905,16 +2900,16 @@ class ExerciseAPITests(TestCase):
         data = response.json()
         self.assertIn('exercises', data)
         self.assertEqual(len(data['exercises']), 0)
-    
+
     def test_filter_exercises_by_muscle_group(self):
         """Test filtering exercises by muscle group."""
         from core.models import ExerciseType, MuscleGroup, Muscle, TrainingExercise
-        
+
         # Create test data
         exercise_type = ExerciseType.objects.create(name='Strength')
         muscle_group = MuscleGroup.objects.create(name='Upper Body')
         muscle = Muscle.objects.create(name='Biceps', muscle_group=muscle_group)
-        
+
         exercise = TrainingExercise.objects.create(
             name='Dumbbell Curl',
             exercise_type=exercise_type,
@@ -2922,33 +2917,33 @@ class ExerciseAPITests(TestCase):
         )
         exercise.muscle_groups.add(muscle_group)
         exercise.primary_muscles.add(muscle)
-        
+
         response = self.client.get(f'/api/exercises/filter/?muscle_group={muscle_group.id}')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['exercises']), 1)
         self.assertEqual(data['exercises'][0]['name'], 'Dumbbell Curl')
-    
+
     def test_filter_exercises_by_location(self):
         """Test filtering exercises by location."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Cardio')
-        
+
         # Create home and gym exercises
-        home_exercise = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Running',
             exercise_type=exercise_type,
             location='home',
             is_active=True
         )
-        gym_exercise = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Treadmill',
             exercise_type=exercise_type,
             location='gym',
             is_active=True
         )
-        
+
         # Filter by home
         response = self.client.get('/api/exercises/filter/?location=home')
         self.assertEqual(response.status_code, 200)
@@ -2956,68 +2951,72 @@ class ExerciseAPITests(TestCase):
         # Should include both home and 'both' location exercises
         names = [e['name'] for e in data['exercises']]
         self.assertIn('Running', names)
-    
+
     def test_filter_exercises_by_difficulty(self):
         """Test filtering exercises by difficulty level."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
-        
-        beginner = TrainingExercise.objects.create(
+
+        TrainingExercise.objects.create(
+
             name='Push-up',
             exercise_type=exercise_type,
             difficulty='beginner',
             is_active=True
         )
-        advanced = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Planche',
             exercise_type=exercise_type,
             difficulty='advanced',
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?difficulty=beginner')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         names = [e['name'] for e in data['exercises']]
         self.assertIn('Push-up', names)
         self.assertNotIn('Planche', names)
-    
+
     def test_get_user_safe_exercises_endpoint(self):
         """Test the user-safe exercise endpoint."""
         response = self.client.get('/api/exercises/safe/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn('exercises', data)
-    
+
     def test_filter_exercises_by_equipment_any_mode(self):
         """Test filtering exercises by equipment with 'any' mode."""
         from core.models import ExerciseType, Equipment, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
         equipment1 = Equipment.objects.create(name='Dumbbell')
         equipment2 = Equipment.objects.create(name='Barbell')
-        
+
         exercise = TrainingExercise.objects.create(
             name='Curl',
             exercise_type=exercise_type,
             is_active=True
         )
         exercise.equipment.add(equipment1)
-        
-        response = self.client.get(f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=any')
+
+        url = (
+            f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=any'
+        )
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertGreater(len(data['exercises']), 0)
-    
+
     def test_filter_exercises_by_equipment_all_mode(self):
         """Test filtering exercises by equipment with 'all' mode."""
         from core.models import ExerciseType, Equipment, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
         equipment1 = Equipment.objects.create(name='Dumbbell')
         equipment2 = Equipment.objects.create(name='Barbell')
-        
+
         # Create exercise with both equipment
         exercise = TrainingExercise.objects.create(
             name='Compound Curl',
@@ -3025,85 +3024,90 @@ class ExerciseAPITests(TestCase):
             is_active=True
         )
         exercise.equipment.add(equipment1, equipment2)
-        
-        response = self.client.get(f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=all')
+
+        url = (
+            f'/api/exercises/filter/?equipment={equipment1.id},{equipment2.id}&equipment_mode=all'
+        )
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         # Should find the exercise that has both equipment
         names = [e['name'] for e in data['exercises']]
         self.assertIn('Compound Curl', names)
-    
+
     def test_filter_exercises_exclude_high_impact(self):
         """Test filtering exercises excluding high impact ones."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Cardio')
-        
-        low_impact = TrainingExercise.objects.create(
+
+        TrainingExercise.objects.create(
+
             name='Swimming',
             exercise_type=exercise_type,
             high_impact=False,
             is_active=True
         )
-        high_impact = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Sprinting',
             exercise_type=exercise_type,
             high_impact=True,
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?exclude_high_impact=true')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         names = [e['name'] for e in data['exercises']]
         self.assertIn('Swimming', names)
         self.assertNotIn('Sprinting', names)
-    
+
     def test_filter_exercises_timed_only(self):
         """Test filtering exercises with timed duration only."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Cardio')
-        
+
         # Exercise with duration
-        timed = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Run 5K',
             exercise_type=exercise_type,
             default_duration_seconds=1800,
             is_active=True
         )
         # Exercise without duration
-        untimed = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Pull-ups',
             exercise_type=exercise_type,
             default_duration_seconds=None,
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?timed_only=true')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         names = [e['name'] for e in data['exercises']]
         self.assertIn('Run 5K', names)
         self.assertNotIn('Pull-ups', names)
-    
+
     def test_filter_exercises_sort_by_name_desc(self):
         """Test sorting exercises by name descending."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
-        
-        ex1 = TrainingExercise.objects.create(
+
+        TrainingExercise.objects.create(
+
             name='Apple Lift',
             exercise_type=exercise_type,
             is_active=True
         )
-        ex2 = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Zebra Lift',
             exercise_type=exercise_type,
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?sort=name_desc')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -3114,52 +3118,54 @@ class ExerciseAPITests(TestCase):
             apple_idx = next((i for i, e in enumerate(names) if 'Apple' in e), -1)
             if zebra_idx >= 0 and apple_idx >= 0:
                 self.assertLess(zebra_idx, apple_idx)
-    
+
     def test_filter_exercises_sort_by_difficulty_asc(self):
         """Test sorting exercises by difficulty ascending."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
-        
-        adv = TrainingExercise.objects.create(
+
+        TrainingExercise.objects.create(
+
             name='Planche',
             exercise_type=exercise_type,
             difficulty='advanced',
             is_active=True
         )
-        beg = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Push-up',
             exercise_type=exercise_type,
             difficulty='beginner',
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?sort=difficulty_asc')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         names = [e['name'] for e in data['exercises']]
         if 'Push-up' in names and 'Planche' in names:
             self.assertLess(names.index('Push-up'), names.index('Planche'))
-    
+
     def test_filter_exercises_sort_by_difficulty_desc(self):
         """Test sorting exercises by difficulty descending."""
         from core.models import ExerciseType, TrainingExercise
-        
+
         exercise_type = ExerciseType.objects.create(name='Strength')
-        
-        adv = TrainingExercise.objects.create(
+
+        TrainingExercise.objects.create(
+
             name='Planche',
             exercise_type=exercise_type,
             difficulty='advanced',
             is_active=True
         )
-        beg = TrainingExercise.objects.create(
+        TrainingExercise.objects.create(
             name='Push-up',
             exercise_type=exercise_type,
             difficulty='beginner',
             is_active=True
         )
-        
+
         response = self.client.get('/api/exercises/filter/?sort=difficulty_desc')
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -3175,13 +3181,13 @@ class AccountEmailHandlingTests(TestCase):
         """Test that regular user registration stores email in User model."""
         test_email = 'regular@example.com'
         test_password = 'RegularPass123!'
-        
+
         user = User.objects.create_user(
             username=test_email,
             email=test_email,
             password=test_password
         )
-        
+
         # Verify email is properly stored
         stored_user = User.objects.get(id=user.id)
         self.assertEqual(stored_user.email, test_email)
@@ -3190,33 +3196,33 @@ class AccountEmailHandlingTests(TestCase):
     def test_social_user_email_from_extra_data(self):
         """Test that social user email can be retrieved from extra_data."""
         from allauth.socialaccount.models import SocialAccount
-        
+
         user = User.objects.create_user(
             username='social@example.com',
             email='',  # Empty - comes from extra_data
             password='test123'
         )
-        
+
         account = SocialAccount.objects.create(
             user=user,
             provider='google',
             uid='google_uid',
             extra_data={'email': 'social@example.com'}
         )
-        
+
         # Verify email is in extra_data
         self.assertEqual(account.extra_data.get('email'), 'social@example.com')
 
     def test_email_case_insensitive_matching(self):
         """Test that email matching is case-insensitive for auto-connect."""
         test_email = 'CaseTest@Example.COM'
-        
+
         user = User.objects.create_user(
             username=test_email.lower(),
             email=test_email.lower(),
             password='test123'
         )
-        
+
         # Try to match with different case
         found = User.objects.filter(email__iexact=test_email)
         self.assertEqual(found.count(), 1)
@@ -3225,13 +3231,13 @@ class AccountEmailHandlingTests(TestCase):
     def test_username_as_email_fallback(self):
         """Test that username is used as fallback when email field is empty."""
         email = 'fallback@example.com'
-        
+
         user = User.objects.create_user(
             username=email,
             email='',
             password='test123'
         )
-        
+
         # Verify can be found by username
         found = User.objects.filter(username__iexact=email)
         self.assertEqual(found.count(), 1)
@@ -3260,11 +3266,11 @@ class PasswordResetTests(TestCase):
         response = self.client.post('/forgot_password/', {
             'email': 'reset@example.com'
         })
-        
+
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
         self.assertIn('/user_login/', response.url)
-        
+
         # Email should have been sent
         mock_send_mail.assert_called_once()
         call_args = mock_send_mail.call_args
@@ -3276,7 +3282,7 @@ class PasswordResetTests(TestCase):
         response = self.client.post('/forgot_password/', {
             'email': 'RESET@EXAMPLE.COM'  # Different case
         })
-        
+
         self.assertEqual(response.status_code, 302)
         mock_send_mail.assert_called_once()
 
@@ -3286,7 +3292,7 @@ class PasswordResetTests(TestCase):
         response = self.client.post('/forgot_password/', {
             'email': 'nonexistent@example.com'
         })
-        
+
         # Should still redirect and show generic message (security)
         self.assertEqual(response.status_code, 302)
         # Email should NOT be sent for non-existent user
@@ -3296,7 +3302,7 @@ class PasswordResetTests(TestCase):
         """Test reset password page loads with valid token."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user)
-        
+
         response = self.client.get(f'/reset_password/{reset.token}/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('form', response.context)
@@ -3305,7 +3311,7 @@ class PasswordResetTests(TestCase):
         """Test reset password page with invalid token."""
         import uuid
         fake_token = uuid.uuid4()
-        
+
         response = self.client.get(f'/reset_password/{fake_token}/')
         self.assertEqual(response.status_code, 200)
         # Should show error message
@@ -3315,17 +3321,17 @@ class PasswordResetTests(TestCase):
         """Test that password is updated with valid reset token."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user)
-        
+
         new_password = 'NewPassword123!'
         response = self.client.post(f'/reset_password/{reset.token}/', {
             'password': new_password,
             'confirm_password': new_password
         })
-        
+
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
         self.assertIn('/user_login/', response.url)
-        
+
         # Verify password was changed
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(new_password))
@@ -3334,12 +3340,12 @@ class PasswordResetTests(TestCase):
         """Test that reset token is marked as used after use."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user)
-        
+
         self.client.post(f'/reset_password/{reset.token}/', {
             'password': 'NewPass123!',
             'confirm_password': 'NewPass123!'
         })
-        
+
         # Verify token is marked as used
         reset.refresh_from_db()
         self.assertTrue(reset.used)
@@ -3348,7 +3354,7 @@ class PasswordResetTests(TestCase):
         """Test that password reset token cannot be reused."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user, used=True)
-        
+
         response = self.client.get(f'/reset_password/{reset.token}/')
         self.assertIn('Invalid or expired', response.content.decode())
 
@@ -3356,13 +3362,13 @@ class PasswordResetTests(TestCase):
         """Test that expired password reset token is rejected."""
         from core.models import PasswordReset
         from django.utils import timezone
-        
+
         # Create an old reset token
         reset = PasswordReset.objects.create(user=self.user)
         # Manually set created_at to 25 hours ago
         reset.created_at = timezone.now() - timedelta(hours=25)
         reset.save()
-        
+
         response = self.client.get(f'/reset_password/{reset.token}/')
         self.assertIn('Invalid or expired', response.content.decode())
 
@@ -3370,15 +3376,15 @@ class PasswordResetTests(TestCase):
         """Test that mismatched passwords are rejected."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user)
-        
+
         response = self.client.post(f'/reset_password/{reset.token}/', {
             'password': 'NewPass123!',
             'confirm_password': 'DifferentPass123!'
         })
-        
+
         # Should show error
         self.assertIn('do not match', response.content.decode())
-        
+
         # Password should NOT be changed
         self.user.refresh_from_db()
         self.assertFalse(self.user.check_password('NewPass123!'))
@@ -3387,15 +3393,15 @@ class PasswordResetTests(TestCase):
         """Test that weak passwords are rejected."""
         from core.models import PasswordReset
         reset = PasswordReset.objects.create(user=self.user)
-        
+
         response = self.client.post(f'/reset_password/{reset.token}/', {
             'password': 'weak',
             'confirm_password': 'weak'
         })
-        
+
         # Should show validation error
         self.assertEqual(response.status_code, 200)
-        
+
         # Password should NOT be changed
         self.user.refresh_from_db()
         self.assertFalse(self.user.check_password('weak'))
@@ -3403,7 +3409,7 @@ class PasswordResetTests(TestCase):
     def test_forgot_password_redirects_authenticated_user(self):
         """Test that authenticated users are redirected from forgot password."""
         self.client.login(username='reset@example.com', password='OldPassword123!')
-        
+
         response = self.client.get('/forgot_password/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/home_dash/', response.url)
@@ -3415,7 +3421,7 @@ class PasswordResetTests(TestCase):
 
 class ChatPageViewTests(TestCase):
     """Tests for the chat_page view."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='chatuser@example.com',
@@ -3424,13 +3430,13 @@ class ChatPageViewTests(TestCase):
         )
         self.user.is_active = True
         self.user.save()
-    
+
     def test_chat_page_requires_login(self):
         """Test that chat page requires authentication."""
         response = self.client.get('/ai/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('user_login', response.url)
-    
+
     def test_chat_page_loads_for_authenticated_user(self):
         """Test that chat page loads for logged in user."""
         self.client.login(username='chatuser@example.com', password='TestPass123!')
@@ -3441,7 +3447,7 @@ class ChatPageViewTests(TestCase):
 
 class HomeDashViewTests(TestCase):
     """Tests for the home_dash view."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='dashuser@example.com',
@@ -3450,13 +3456,13 @@ class HomeDashViewTests(TestCase):
         )
         self.user.is_active = True
         self.user.save()
-    
+
     def test_home_dash_requires_login(self):
         """Test that home_dash requires authentication."""
         response = self.client.get('/home_dash/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('user_login', response.url)
-    
+
     def test_home_dash_loads_for_authenticated_user(self):
         """Test that home_dash loads for logged in user."""
         self.client.login(username='dashuser@example.com', password='TestPass123!')
@@ -3466,6 +3472,8 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, 'Exercises')
         self.assertContains(response, 'Calories')
         self.assertContains(response, 'Score Streak')
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, "Today's Nutrition")
 
     def test_home_dash_includes_daily_workout_goal_progress(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
@@ -3506,6 +3514,145 @@ class HomeDashViewTests(TestCase):
         self.assertEqual(response.context['workout_goal_percentage'], 20.0)
         self.assertContains(response, 'Goal: 1/5')
 
+    def test_home_dash_shows_no_activities_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_todays_activities_and_train_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_workout = Workout.objects.create(
+            user=self.user,
+            name='Today Workout',
+            goal='strength',
+            date=date.today(),
+        )
+        yesterday_workout = Workout.objects.create(
+            user=self.user,
+            name='Yesterday Workout',
+            goal='strength',
+            date=date.today() - timedelta(days=1),
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Push Up',
+            muscle_group='chest',
+            completed=False,
+        )
+        Exercise.objects.create(
+            workout=today_workout,
+            name='Completed Curl',
+            muscle_group='arms',
+            completed=True,
+        )
+        Exercise.objects.create(
+            workout=yesterday_workout,
+            name='Past Lunge',
+            muscle_group='legs',
+            completed=False,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Activities")
+        self.assertContains(response, 'Push Up - Today Workout')
+        self.assertNotContains(response, 'Completed Curl')
+        self.assertNotContains(response, 'Past Lunge')
+        self.assertContains(response, 'Go to Train Page')
+
+    def test_home_dash_shows_no_nutrition_message_when_none_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_todays_nutrition_and_nutrition_button_when_planned(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        yesterday_dinner = Meal.objects.create(
+            user=self.user,
+            name='Yesterday Dinner',
+            date=date.today() - timedelta(days=1),
+        )
+        FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Oatmeal',
+            calories=250,
+        )
+        FoodItem.objects.create(
+            meal=today_breakfast,
+            name='Completed Banana',
+            calories=120,
+            completed=True,
+        )
+        FoodItem.objects.create(
+            meal=yesterday_dinner,
+            name='Steak',
+            calories=500,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Oatmeal - Today Breakfast')
+        self.assertNotContains(response, 'Completed Banana')
+        self.assertNotContains(response, 'Yesterday Dinner - Steak')
+        self.assertContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_meal_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        today_breakfast = Meal.objects.create(
+            user=self.user,
+            name='Today Breakfast',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=today_breakfast,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Creatine - Today Breakfast')
+        self.assertContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_standalone_supplements_in_todays_nutrition(self):
+        from core.models import SupplementEntry
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, "Today's Nutrition")
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertContains(response, 'Go to Nutrition Page')
+
     def test_home_dash_updates_after_toggling_exercise_completion(self):
         self.client.login(username='dashuser@example.com', password='TestPass123!')
         workout = Workout.objects.create(
@@ -3528,6 +3675,87 @@ class HomeDashViewTests(TestCase):
         response = self.client.get('/home_dash/')
         self.assertEqual(response.context['completed_exercises'], 1)
         self.assertContains(response, 'Goal: 1/5')
+        self.assertNotContains(response, 'Lunge - Daily Workout')
+        self.assertContains(response, 'No activities for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Train Page')
+
+    def test_home_dash_updates_after_toggling_food_item_completion(self):
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Lunch',
+            date=date.today(),
+        )
+        food_item = FoodItem.objects.create(
+            meal=meal,
+            name='Chicken Bowl',
+            calories=550,
+            completed=False,
+        )
+
+        self.client.post('/nutrition/toggle_food_item/', {
+            'item_id': food_item.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+        })
+        response = self.client.get('/home_dash/')
+
+        self.assertNotContains(response, 'Chicken Bowl - Lunch')
+        self.assertContains(response, 'No meals for today, enjoy your day off')
+        self.assertNotContains(response, 'Go to Nutrition Page')
+
+    def test_home_dash_shows_only_untaken_supplements_in_todays_nutrition(self):
+        from core.models import MealSupplement
+
+        self.client.login(username='dashuser@example.com', password='TestPass123!')
+        meal = Meal.objects.create(
+            user=self.user,
+            name='Dinner',
+            date=date.today(),
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Creatine',
+            supplement_type='other',
+            dosage='5',
+            unit='g',
+            taken=False,
+        )
+        MealSupplement.objects.create(
+            meal=meal,
+            name='Zinc',
+            supplement_type='mineral',
+            dosage='25',
+            unit='mg',
+            taken=True,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Fish Oil',
+            supplement_type='other',
+            dosage='1000',
+            unit='mg',
+            date=date.today(),
+            taken=False,
+        )
+        SupplementEntry.objects.create(
+            user=self.user,
+            supplement=None,
+            name='Vitamin C',
+            supplement_type='vitamin',
+            dosage='500',
+            unit='mg',
+            date=date.today(),
+            taken=True,
+        )
+
+        response = self.client.get('/home_dash/')
+
+        self.assertContains(response, 'Creatine - Dinner')
+        self.assertContains(response, 'Fish Oil - Supplements')
+        self.assertNotContains(response, 'Zinc')
+        self.assertNotContains(response, 'Vitamin C')
+        self.assertContains(response, 'Go to Nutrition Page')
 
     def test_home_dash_streak_counts_consecutive_days_meeting_both_goals(self):
         from core.models import UserProfile
@@ -3758,9 +3986,9 @@ class HomeDashViewTests(TestCase):
         self.assertContains(response, '0 Day Streak')
 
 
-class TrainPageViewTests(TestCase):
+class TrainPageGoalViewTests(TestCase):
     """Tests for the train_page view."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='trainuser@example.com',
@@ -3769,13 +3997,13 @@ class TrainPageViewTests(TestCase):
         )
         self.user.is_active = True
         self.user.save()
-    
+
     def test_train_page_requires_login(self):
         """Test that train page requires authentication."""
         response = self.client.get('/train/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('user_login', response.url)
-    
+
     def test_train_page_loads_for_authenticated_user(self):
         """Test that train page loads for logged in user."""
         self.client.login(username='trainuser@example.com', password='TestPass123!')
@@ -3814,7 +4042,11 @@ class TrainPageViewTests(TestCase):
         response = self.client.get('/train/')
         self.assertContains(response, '<option value="muscle_gain">Muscle Gain</option>', html=True)
         self.assertContains(response, '<option value="endurance">Endurance &amp; Cardio</option>', html=True)
-        self.assertContains(response, '<option value="general_health">General Health &amp; Wellness</option>', html=True)
+        self.assertContains(
+            response,
+            '<option value="general_health">General Health &amp; Wellness</option>',
+            html=True
+        )
 
     def test_train_page_goal_options_match_profile_order(self):
         self.client.login(username='trainuser@example.com', password='TestPass123!')
@@ -3828,7 +4060,7 @@ class TrainPageViewTests(TestCase):
 
 class SocialPageViewTests(TestCase):
     """Tests for the social_page view."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='socialuser@example.com',
@@ -3837,13 +4069,13 @@ class SocialPageViewTests(TestCase):
         )
         self.user.is_active = True
         self.user.save()
-    
+
     def test_social_page_requires_login(self):
         """Test that social page requires authentication."""
         response = self.client.get('/social/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('user_login', response.url)
-    
+
     def test_social_page_loads_for_authenticated_user(self):
         """Test that social page loads for logged in user."""
         self.client.login(username='socialuser@example.com', password='TestPass123!')
@@ -3854,10 +4086,10 @@ class SocialPageViewTests(TestCase):
 
 class VerifyEmailViewDetailedTests(TestCase):
     """Additional detailed tests for verify_email view."""
-    
+
     def setUp(self):
         from .models import EmailVerification
-        
+
         self.user = User.objects.create_user(
             username='verifydetail@example.com',
             email='verifydetail@example.com',
@@ -3865,59 +4097,59 @@ class VerifyEmailViewDetailedTests(TestCase):
             is_active=False
         )
         self.verification = EmailVerification.objects.create(user=self.user)
-    
+
     def test_verify_email_already_verified(self):
         """Test that already verified email shows info message."""
         self.verification.verified = True
         self.verification.save()
-        
+
         response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('already verified' in str(m).lower() for m in messages))
-    
+
     def test_verify_email_expired(self):
         """Test that expired verification link is handled."""
         # Expire the verification by setting created_at to 25 hours ago
         self.verification.created_at = timezone.now() - timedelta(hours=25)
         self.verification.save()
-        
+
         response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('expired' in str(m).lower() for m in messages))
-        
+
         # User should be deleted
         self.assertFalse(User.objects.filter(username='verifydetail@example.com').exists())
-    
+
     def test_verify_email_invalid_token(self):
         """Test that invalid token shows error."""
         invalid_token = uuid.uuid4()
-        
+
         response = self.client.get(f'/verify_email/{invalid_token}/', follow=True)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('invalid' in str(m).lower() for m in messages))
-    
+
     def test_verify_email_success_activates_user(self):
         """Test that successful verification activates user."""
         response = self.client.get(f'/verify_email/{self.verification.token}/', follow=True)
-        
+
         # User should be active now
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_active)
-        
+
         # Verification should be marked as verified
         self.verification.refresh_from_db()
         self.assertTrue(self.verification.verified)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('verified' in str(m).lower() for m in messages))
 
 
 class UserLoginViewDetailedTests(TestCase):
     """Additional detailed tests for user_login view."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='logindetail@example.com',
@@ -3926,32 +4158,32 @@ class UserLoginViewDetailedTests(TestCase):
         )
         self.user.is_active = True
         self.user.save()
-    
+
     def test_login_redirects_authenticated_user(self):
         """Test that authenticated user is redirected from login page."""
         self.client.login(username='logindetail@example.com', password='TestPass123!')
-        
+
         response = self.client.get('/user_login/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/home_dash/', response.url)
-    
+
     def test_login_with_next_parameter(self):
         """Test that login redirects to next parameter after success."""
         response = self.client.post('/user_login/?next=/nutrition/', {
             'email': 'logindetail@example.com',
             'password': 'TestPass123!'
         })
-        
+
         self.assertEqual(response.status_code, 302)
         self.assertIn('/nutrition/', response.url)
-    
+
     def test_login_invalid_credentials_shows_error(self):
         """Test that invalid credentials show error message."""
         response = self.client.post('/user_login/', {
             'email': 'logindetail@example.com',
             'password': 'WrongPassword'
         }, follow=True)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('invalid' in str(m).lower() for m in messages))
 
@@ -3959,21 +4191,21 @@ class UserLoginViewDetailedTests(TestCase):
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class UserGetStartedViewDetailedTests(TestCase):
     """Additional detailed tests for user_get_started view."""
-    
+
     def test_get_started_redirects_authenticated_user(self):
         """Test that authenticated user is redirected from signup page."""
-        user = User.objects.create_user(
+        User.objects.create_user(
             username='existinguser@example.com',
             email='existinguser@example.com',
             password='TestPass123!',
             is_active=True
         )
         self.client.login(username='existinguser@example.com', password='TestPass123!')
-        
+
         response = self.client.get('/user_get_started/')
         self.assertEqual(response.status_code, 302)
         self.assertIn('/home_dash/', response.url)
-    
+
     @override_settings(EMAIL_VERIFICATION_ENABLED=False)
     def test_signup_without_email_verification(self):
         """Test signup flow when email verification is disabled."""
@@ -3982,55 +4214,55 @@ class UserGetStartedViewDetailedTests(TestCase):
             'password': 'SecurePass123!',
             'confirm_password': 'SecurePass123!'
         }, follow=True)
-        
+
         # User should be created and active
         user = User.objects.get(username='newuser@example.com')
         self.assertTrue(user.is_active)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('created' in str(m).lower() for m in messages))
-    
+
     @override_settings(EMAIL_VERIFICATION_ENABLED=True)
     @patch('core.views.send_mail')
     def test_signup_with_email_verification(self, mock_send_mail):
         """Test signup flow when email verification is enabled."""
         mock_send_mail.return_value = 1
-        
+
         response = self.client.post('/user_get_started/', {
             'email': 'verifyuser@example.com',
             'password': 'SecurePass123!',
             'confirm_password': 'SecurePass123!'
         }, follow=True)
-        
+
         # User should be created but NOT active
         user = User.objects.get(username='verifyuser@example.com')
         self.assertFalse(user.is_active)
-        
+
         # Email should have been sent
         self.assertTrue(mock_send_mail.called)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('verify' in str(m).lower() or 'check' in str(m).lower() for m in messages))
-    
+
     @override_settings(EMAIL_VERIFICATION_ENABLED=True)
     @patch('core.views.send_mail')
     def test_signup_email_failure_shows_error(self, mock_send_mail):
         """Test that email failure during signup is handled."""
         mock_send_mail.side_effect = smtplib.SMTPException('SMTP error')
-        
+
         response = self.client.post('/user_get_started/', {
             'email': 'emailfail@example.com',
             'password': 'SecurePass123!',
             'confirm_password': 'SecurePass123!'
         })
-        
+
         self.assertEqual(response.status_code, 200)
         self.assertIn('form', response.context)
 
 
 class ForgotPasswordEmailErrorTests(TestCase):
     """Tests for forgot_password email sending error handling."""
-    
+
     def setUp(self):
         self.user = User.objects.create_user(
             username='emailerror@example.com',
@@ -4038,16 +4270,16 @@ class ForgotPasswordEmailErrorTests(TestCase):
             password='TestPass123!',
             is_active=True
         )
-    
+
     @patch('core.views.send_mail')
     def test_forgot_password_email_failure_is_logged(self, mock_send_mail):
         """Test that email failure during password reset is handled gracefully."""
         mock_send_mail.side_effect = smtplib.SMTPException('SMTP unavailable')
-        
+
         response = self.client.post('/forgot_password/', {
             'email': 'emailerror@example.com'
         }, follow=True)
-        
+
         # Should still show success message (security - don't reveal if account exists)
         messages = list(response.context['messages'])
         self.assertTrue(any('if an account exists' in str(m).lower() for m in messages))
@@ -4055,22 +4287,22 @@ class ForgotPasswordEmailErrorTests(TestCase):
 
 class SetupSocialAppsCommandTests(TestCase):
     """Tests for the setup_social_apps management command."""
-    
+
     def test_command_runs_without_credentials(self):
         """Test that command runs successfully even without credentials."""
         from django.core.management import call_command
         from io import StringIO
-        
+
         out = StringIO()
-        
+
         # Clear any existing env vars
         with patch.dict('os.environ', {}, clear=True):
             call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('Setting up social authentication', output)
         self.assertIn('complete', output.lower())
-    
+
     @patch.dict('os.environ', {
         'GOOGLE_CLIENT_ID': 'test-google-id',
         'GOOGLE_CLIENT_SECRET': 'test-google-secret'
@@ -4080,18 +4312,18 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.core.management import call_command
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('Google', output)
-        
+
         # Verify SocialApp was created
         self.assertTrue(SocialApp.objects.filter(provider='google').exists())
         app = SocialApp.objects.get(provider='google')
         self.assertEqual(app.client_id, 'test-google-id')
-    
+
     @patch.dict('os.environ', {
         'GOOGLE_CLIENT_ID': 'updated-google-id',
         'GOOGLE_CLIENT_SECRET': 'updated-google-secret'
@@ -4102,7 +4334,7 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.contrib.sites.models import Site
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         # Create existing app
         site = Site.objects.get_or_create(id=1)[0]
         existing_app = SocialApp.objects.create(
@@ -4112,17 +4344,17 @@ class SetupSocialAppsCommandTests(TestCase):
             secret='old-secret'
         )
         existing_app.sites.set([site])
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('updated', output.lower())
-        
+
         # Verify app was updated
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-google-id')
-    
+
     @patch.dict('os.environ', {
         'APPLE_CLIENT_ID': 'test-apple-id',
         'APPLE_CLIENT_SECRET': 'test-apple-secret'
@@ -4132,15 +4364,15 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.core.management import call_command
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('Apple', output)
-        
+
         self.assertTrue(SocialApp.objects.filter(provider='apple').exists())
-    
+
     @patch.dict('os.environ', {
         'FACEBOOK_CLIENT_ID': 'test-fb-id',
         'FACEBOOK_CLIENT_SECRET': 'test-fb-secret'
@@ -4150,15 +4382,15 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.core.management import call_command
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('Facebook', output)
-        
+
         self.assertTrue(SocialApp.objects.filter(provider='facebook').exists())
-    
+
     @patch.dict('os.environ', {
         'INSTAGRAM_CLIENT_ID': 'test-insta-id',
         'INSTAGRAM_CLIENT_SECRET': 'test-insta-secret'
@@ -4168,15 +4400,15 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.core.management import call_command
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         output = out.getvalue()
         self.assertIn('Instagram', output)
-        
+
         self.assertTrue(SocialApp.objects.filter(provider='instagram').exists())
-    
+
     @patch.dict('os.environ', {
         'APPLE_CLIENT_ID': 'updated-apple-id',
         'APPLE_CLIENT_SECRET': 'updated-apple-secret'
@@ -4187,7 +4419,7 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.contrib.sites.models import Site
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         site = Site.objects.get_or_create(id=1)[0]
         existing_app = SocialApp.objects.create(
             provider='apple',
@@ -4196,13 +4428,13 @@ class SetupSocialAppsCommandTests(TestCase):
             secret='old-apple-secret'
         )
         existing_app.sites.set([site])
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-apple-id')
-    
+
     @patch.dict('os.environ', {
         'FACEBOOK_CLIENT_ID': 'updated-fb-id',
         'FACEBOOK_CLIENT_SECRET': 'updated-fb-secret'
@@ -4213,7 +4445,7 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.contrib.sites.models import Site
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         site = Site.objects.get_or_create(id=1)[0]
         existing_app = SocialApp.objects.create(
             provider='facebook',
@@ -4222,13 +4454,13 @@ class SetupSocialAppsCommandTests(TestCase):
             secret='old-fb-secret'
         )
         existing_app.sites.set([site])
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-fb-id')
-    
+
     @patch.dict('os.environ', {
         'INSTAGRAM_CLIENT_ID': 'updated-insta-id',
         'INSTAGRAM_CLIENT_SECRET': 'updated-insta-secret'
@@ -4239,7 +4471,7 @@ class SetupSocialAppsCommandTests(TestCase):
         from django.contrib.sites.models import Site
         from allauth.socialaccount.models import SocialApp
         from io import StringIO
-        
+
         site = Site.objects.get_or_create(id=1)[0]
         existing_app = SocialApp.objects.create(
             provider='instagram',
@@ -4248,10 +4480,10 @@ class SetupSocialAppsCommandTests(TestCase):
             secret='old-insta-secret'
         )
         existing_app.sites.set([site])
-        
+
         out = StringIO()
         call_command('setup_social_apps', stdout=out)
-        
+
         existing_app.refresh_from_db()
         self.assertEqual(existing_app.client_id, 'updated-insta-id')
 
@@ -4285,7 +4517,6 @@ class SetupSocialAppsCommandTests(TestCase):
 
         site = Site.objects.get(id=1)
         self.assertEqual(site.domain, 'spotter-ai.dev')
-
 
 
 # ============================================================================
@@ -4364,7 +4595,7 @@ class DeleteButtonStructureTests(TestCase):
             password='testpass123'
         )
         self.client.login(username='deletemodal2', password='testpass123')
-        
+
         # Create test data
         self.workout = Workout.objects.create(
             user=self.user,
@@ -4442,7 +4673,7 @@ class DeleteModalCSSTests(TestCase):
     def test_train_page_has_modal_css_classes(self):
         """Test that train page template contains modal CSS classes"""
         response = self.client.get('/train/')
-        
+
         css_classes = [
             'delete-confirmation-modal',
             'delete-confirmation-content',
@@ -4450,7 +4681,7 @@ class DeleteModalCSSTests(TestCase):
             'btn-cancel',
             'btn-delete',
         ]
-        
+
         for css_class in css_classes:
             with self.subTest(css_class=css_class):
                 self.assertContains(response, f'class="{css_class}"')
@@ -4458,7 +4689,7 @@ class DeleteModalCSSTests(TestCase):
     def test_nutrition_page_has_modal_css_classes(self):
         """Test that nutrition page template contains modal CSS classes"""
         response = self.client.get('/nutrition/')
-        
+
         css_classes = [
             'delete-confirmation-modal',
             'delete-confirmation-content',
@@ -4466,7 +4697,7 @@ class DeleteModalCSSTests(TestCase):
             'btn-cancel',
             'btn-delete',
         ]
-        
+
         for css_class in css_classes:
             with self.subTest(css_class=css_class):
                 self.assertContains(response, f'class="{css_class}"')
@@ -4475,14 +4706,14 @@ class DeleteModalCSSTests(TestCase):
         """Test that train page has CSS styles for modal"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         styles = [
             '.delete-confirmation-modal',
             '.delete-confirmation-content',
             '.btn-cancel',
             '.btn-delete',
         ]
-        
+
         for style in styles:
             with self.subTest(style=style):
                 self.assertIn(style, content)
@@ -4491,14 +4722,14 @@ class DeleteModalCSSTests(TestCase):
         """Test that nutrition page has CSS styles for modal"""
         response = self.client.get('/nutrition/')
         content = response.content.decode()
-        
+
         styles = [
             '.delete-confirmation-modal',
             '.delete-confirmation-content',
             '.btn-cancel',
             '.btn-delete',
         ]
-        
+
         for style in styles:
             with self.subTest(style=style):
                 self.assertIn(style, content)
@@ -4519,9 +4750,9 @@ class DeleteModalJavaScriptTests(TestCase):
     def test_train_page_has_javascript_functions(self):
         """Test that train page contains required JavaScript functions"""
         response = self.client.get('/train/')
-        
+
         functions = ['closeDeleteConfirmation', 'confirmDelete']
-        
+
         for func in functions:
             with self.subTest(func=func):
                 self.assertContains(response, f'function {func}')
@@ -4529,9 +4760,9 @@ class DeleteModalJavaScriptTests(TestCase):
     def test_nutrition_page_has_javascript_functions(self):
         """Test that nutrition page contains required JavaScript functions"""
         response = self.client.get('/nutrition/')
-        
+
         functions = ['closeDeleteConfirmation', 'confirmDelete']
-        
+
         for func in functions:
             with self.subTest(func=func):
                 self.assertContains(response, f'function {func}')
@@ -4540,7 +4771,7 @@ class DeleteModalJavaScriptTests(TestCase):
         """Test that train page has event listener for delete buttons"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('[data-delete-message]', content)
         self.assertIn('addEventListener', content)
         self.assertIn('deleteConfirmationModal', content)
@@ -4549,7 +4780,7 @@ class DeleteModalJavaScriptTests(TestCase):
         """Test that nutrition page has event listener for delete buttons"""
         response = self.client.get('/nutrition/')
         content = response.content.decode()
-        
+
         self.assertIn('[data-delete-message]', content)
         self.assertIn('addEventListener', content)
         self.assertIn('deleteConfirmationModal', content)
@@ -4558,7 +4789,7 @@ class DeleteModalJavaScriptTests(TestCase):
         """Test that train page has logic to toggle modal active state"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('deleteConfirmationModal', content)
         self.assertIn('classList.add', content)
         self.assertIn('classList.remove', content)
@@ -4568,7 +4799,7 @@ class DeleteModalJavaScriptTests(TestCase):
         """Test that nutrition page has logic to toggle modal active state"""
         response = self.client.get('/nutrition/')
         content = response.content.decode()
-        
+
         self.assertIn('deleteConfirmationModal', content)
         self.assertIn('classList.add', content)
         self.assertIn('classList.remove', content)
@@ -4586,7 +4817,7 @@ class DeleteModalMessagesTests(TestCase):
             password='testpass123'
         )
         self.client.login(username='deletemodal5', password='testpass123')
-        
+
         # Create test data
         self.workout = Workout.objects.create(
             user=self.user,
@@ -4639,7 +4870,7 @@ class DeleteModalIntegrationTests(TestCase):
             password='testpass123'
         )
         self.client.login(username='deletemodal6', password='testpass123')
-        
+
         self.workout = Workout.objects.create(
             user=self.user,
             name='Test Workout',
@@ -4656,7 +4887,7 @@ class DeleteModalIntegrationTests(TestCase):
         """Test that only one modal is created"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         modal_count = content.count('id="deleteConfirmationModal"')
         self.assertEqual(modal_count, 1, "There should be exactly one modal container")
 
@@ -4664,7 +4895,7 @@ class DeleteModalIntegrationTests(TestCase):
         """Test that same modal works for different delete types"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('data-delete-type="workout"', content)
         self.assertEqual(content.count('id="deleteConfirmationModal"'), 1)
 
@@ -4685,21 +4916,21 @@ class DeleteModalEventHandlingTests(TestCase):
         """Test that event listener uses data-delete-message selector"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('[data-delete-message]', content)
 
     def test_modal_prevents_default_form_submission(self):
         """Test that modal prevents default form submission"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('preventDefault', content)
 
     def test_modal_captures_form_reference(self):
         """Test that modal captures form reference before showing"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('currentDeleteForm', content)
         self.assertIn('closest', content)
 
@@ -4707,14 +4938,14 @@ class DeleteModalEventHandlingTests(TestCase):
         """Test that modal extracts message from data attribute"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('dataset.deleteMessage', content)
 
     def test_confirm_function_submits_form(self):
         """Test that confirmDelete function submits the captured form"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('function confirmDelete', content)
         self.assertIn('.submit()', content)
 
@@ -4722,7 +4953,7 @@ class DeleteModalEventHandlingTests(TestCase):
         """Test that closeDeleteConfirmation removes active class"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('function closeDeleteConfirmation', content)
         self.assertIn('classList.remove', content)
         self.assertIn('active', content)
@@ -4731,7 +4962,7 @@ class DeleteModalEventHandlingTests(TestCase):
         """Test that clicking outside modal closes it"""
         response = self.client.get('/train/')
         content = response.content.decode()
-        
+
         self.assertIn('addEventListener', content)
         self.assertIn('closeDeleteConfirmation', content)
 
@@ -5370,9 +5601,11 @@ class InjuryAwareFilteringTestCase(TestCase):
         exercise_names = [ex['name'] for ex in data['exercises']]
         self.assertIn('Dumbbell Curl', exercise_names)
         self.assertIn('Tricep Extension', exercise_names)
+
+
 class UserProfileFormTests(TestCase):
     """Tests for the UserProfile form and data persistence on get_started_profile page."""
-    
+
     def setUp(self):
         self.client = Client()
         # Create and login a user
@@ -5383,19 +5616,19 @@ class UserProfileFormTests(TestCase):
             is_active=True
         )
         self.client.login(username='testuser@example.com', password='TestPass123!')
-    
+
     def test_profile_page_accessible_to_authenticated_user(self):
         """Test that authenticated user can access the get_started_profile page."""
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Get Started')
-    
+
     def test_profile_page_redirects_unauthenticated_user(self):
         """Test that unauthenticated user is redirected from get_started_profile."""
         self.client.logout()
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 302)
-    
+
     def test_new_user_sees_imperial_units_default(self):
         """Test that new users see imperial units (ft/in, lbs) by default."""
         response = self.client.get('/get_started_profile/')
@@ -5403,33 +5636,33 @@ class UserProfileFormTests(TestCase):
         # Check that the imperial options are set as default
         self.assertContains(response, 'value="imperial" selected')
         self.assertContains(response, 'value="lbs" selected')
-    
+
     def test_save_user_name_field(self):
         """Test that user name is saved to User.first_name."""
-        response = self.client.post('/get_started_profile/', {
+        self.client.post('/get_started_profile/', {
             'name': 'John Doe',
         }, follow=True)
-        
+
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'John Doe')
-    
+
     def test_empty_name_field_not_saved(self):
         """Test that empty name doesn't overwrite existing name."""
         self.user.first_name = 'Original Name'
         self.user.save()
-        
+
         self.client.post('/get_started_profile/', {})
-        
+
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Original Name')
-    
+
     def test_save_height_field(self):
         """Test that height (ft/in) is converted and saved in cm."""
         self.client.post('/get_started_profile/', {
             'height_ft': '5',
             'height_in': '11',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.height, 180)
 
@@ -5442,13 +5675,13 @@ class UserProfileFormTests(TestCase):
 
         profile = self.user.profile
         self.assertEqual(profile.height, 183)
-    
+
     def test_save_weight_field(self):
         """Test that weight (lbs) is converted and saved in kg."""
         self.client.post('/get_started_profile/', {
             'weight_lbs': '165',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.weight, Decimal('74.84'))
 
@@ -5461,121 +5694,121 @@ class UserProfileFormTests(TestCase):
 
         profile = self.user.profile
         self.assertEqual(profile.weight, 80)
-    
+
     def test_save_age_field(self):
         """Test that age is saved to UserProfile."""
         self.client.post('/get_started_profile/', {
             'age': '28',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.age, 28)
-    
+
     def test_save_primary_goal_bubble_selection(self):
         """Test that primary_goal bubble selection is saved."""
         self.client.post('/get_started_profile/', {
             'primary_goal': 'muscle_gain',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.primary_goal, 'muscle_gain')
-    
+
     def test_all_primary_goal_options_save(self):
         """Test that all primary goal options can be saved."""
         goals = ['weight_loss', 'muscle_gain', 'strength', 'endurance', 'flexibility', 'general_health']
-        
+
         for goal in goals:
             self.client.post('/get_started_profile/', {
                 'primary_goal': goal,
             }, follow=True)
-            
+
             self.user.refresh_from_db()
             profile = self.user.profile
             self.assertEqual(profile.primary_goal, goal)
-    
+
     def test_save_experience_level_bubble_selection(self):
         """Test that experience_level bubble selection is saved."""
         self.client.post('/get_started_profile/', {
             'experience_level': 'intermediate',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.experience_level, 'intermediate')
-    
+
     def test_all_experience_level_options_save(self):
         """Test that all experience level options can be saved."""
         levels = ['beginner', 'intermediate', 'advanced']
-        
+
         for level in levels:
             self.client.post('/get_started_profile/', {
                 'experience_level': level,
             }, follow=True)
-            
+
             self.user.refresh_from_db()
             profile = self.user.profile
             self.assertEqual(profile.experience_level, level)
-    
+
     def test_save_dietary_preference_bubble_selection(self):
         """Test that dietary_preference bubble selection is saved."""
         self.client.post('/get_started_profile/', {
             'dietary_preference': 'vegan',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.dietary_preference, 'vegan')
-    
+
     def test_all_dietary_preference_options_save(self):
         """Test that all dietary preference options can be saved."""
         prefs = ['omnivore', 'vegetarian', 'vegan', 'keto', 'paleo', 'gluten_free']
-        
+
         for pref in prefs:
             self.client.post('/get_started_profile/', {
                 'dietary_preference': pref,
             }, follow=True)
-            
+
             self.user.refresh_from_db()
             profile = self.user.profile
             self.assertEqual(profile.dietary_preference, pref)
-    
+
     def test_save_home_gym_yes(self):
         """Test that has_home_gym is saved when user selects 'yes'."""
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'yes',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertTrue(profile.has_home_gym)
-    
+
     def test_save_home_gym_no(self):
         """Test that has_home_gym is saved when user selects 'no'."""
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'no',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertFalse(profile.has_home_gym)
-    
+
     def test_save_single_home_equipment(self):
         """Test that single home equipment selection is saved."""
         self.client.post('/get_started_profile/', {
             'home_equipment': ['dumbbells'],
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertIn('dumbbells', profile.home_equipment)
         self.assertEqual(len(profile.home_equipment), 1)
-    
+
     def test_save_multiple_home_equipment(self):
         """Test that multiple home equipment selections are saved."""
         equipment = ['dumbbells', 'yoga_mat', 'resistance_bands', 'kettlebell']
         self.client.post('/get_started_profile/', {
             'home_equipment': equipment,
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(set(profile.home_equipment), set(equipment))
         self.assertEqual(len(profile.home_equipment), 4)
-    
+
     def test_all_home_equipment_options_save(self):
         """Test that all home equipment options can be saved."""
         equipment = [
@@ -5583,68 +5816,68 @@ class UserProfileFormTests(TestCase):
             'pull_up_bar', 'bench', 'treadmill', 'stationary_bike',
             'jump_rope', 'medicine_ball'
         ]
-        
+
         self.client.post('/get_started_profile/', {
             'home_equipment': equipment,
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(set(profile.home_equipment), set(equipment))
-    
+
     def test_save_empty_home_equipment_list(self):
         """Test that empty home equipment list is saved correctly."""
         # First save some equipment
         self.client.post('/get_started_profile/', {
             'home_equipment': ['dumbbells', 'yoga_mat'],
         }, follow=True)
-        
+
         # Then clear it
         self.client.post('/get_started_profile/', {
             'home_equipment': [],
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.home_equipment, [])
-    
+
     def test_save_bio_field(self):
         """Test that bio text is saved to UserProfile."""
         bio_text = 'I love fitness and want to improve my endurance!'
         self.client.post('/get_started_profile/', {
             'bio': bio_text,
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.bio, bio_text)
-    
+
     def test_save_multiline_bio(self):
         """Test that multiline bio text is saved correctly."""
         bio_text = 'I love fitness.\nI want to improve my endurance.\nLooking forward to training!'
         self.client.post('/get_started_profile/', {
             'bio': bio_text,
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.bio, bio_text)
-    
+
     def test_save_calorie_goal_custom_value(self):
         """Test that custom calorie goal is saved."""
         self.client.post('/get_started_profile/', {
             'calorie_goal': '3000',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.calorie_goal, 3000)
-    
+
     def test_calorie_goal_defaults_to_2400(self):
         """Test that calorie_goal defaults to 2400 when not provided."""
         # Create profile without specifying calorie_goal
         self.client.post('/get_started_profile/', {
             'name': 'Test User',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertEqual(profile.calorie_goal, 2400)
-    
+
     def test_profile_persists_when_revisiting_page(self):
         """Test that all saved profile data persists when revisiting the page."""
         # Save initial data
@@ -5662,10 +5895,10 @@ class UserProfileFormTests(TestCase):
             'calorie_goal': '2800',
             'bio': 'Fitness enthusiast',
         }, follow=True)
-        
+
         # Revisit the page
         response = self.client.get('/get_started_profile/')
-        
+
         # Verify all data is present in the response
         self.assertContains(response, 'John Smith')
         self.assertContains(response, 'Height')
@@ -5673,7 +5906,7 @@ class UserProfileFormTests(TestCase):
         self.assertContains(response, '165')
         self.assertContains(response, '28')
         self.assertContains(response, 'Fitness enthusiast')
-        
+
         # Verify data in the database
         profile = self.user.profile
         self.user.refresh_from_db()
@@ -5689,40 +5922,40 @@ class UserProfileFormTests(TestCase):
         self.assertIn('yoga_mat', profile.home_equipment)
         self.assertEqual(profile.calorie_goal, 2800)
         self.assertEqual(profile.bio, 'Fitness enthusiast')
-    
+
     def test_form_submission_redirects_to_home_dash(self):
         """Test that form submission redirects to home_dash."""
         response = self.client.post('/get_started_profile/', {
             'name': 'Test User',
         })
-        
+
         self.assertEqual(response.status_code, 302)
         self.assertIn('/home_dash/', response.url)
-    
+
     def test_form_submission_shows_success_message(self):
         """Test that form submission shows a success message."""
         response = self.client.post('/get_started_profile/', {
             'name': 'Test User',
         }, follow=True)
-        
+
         messages = list(response.context['messages'])
         self.assertTrue(any('updated' in str(m).lower() or 'saved' in str(m).lower() for m in messages))
-    
+
     def test_invalid_height_value_not_saved(self):
         """Test that invalid height value is not saved."""
         self.client.post('/get_started_profile/', {
             'height_ft': 'not_a_number',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertIsNone(profile.height)
-    
+
     def test_invalid_weight_value_not_saved(self):
         """Test that invalid weight value is not saved."""
         self.client.post('/get_started_profile/', {
             'weight_lbs': 'invalid',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertIsNone(profile.weight)
 
@@ -5744,32 +5977,32 @@ class UserProfileFormTests(TestCase):
 
         profile = self.user.profile
         self.assertIsNone(profile.weight)
-    
+
     def test_invalid_age_value_not_saved(self):
         """Test that invalid age value is not saved."""
         self.client.post('/get_started_profile/', {
             'age': 'not_numeric',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertIsNone(profile.age)
-    
+
     def test_invalid_calorie_goal_value_not_saved(self):
         """Test that invalid calorie goal value is not saved (reverts to default)."""
         # First create profile with initial calorie goal
         self.client.post('/get_started_profile/', {
             'calorie_goal': '2500',
         }, follow=True)
-        
+
         # Try to save invalid value
         self.client.post('/get_started_profile/', {
             'calorie_goal': 'not_valid',
         }, follow=True)
-        
+
         profile = self.user.profile
         # Should keep the original value since invalid value wasn't saved
         self.assertEqual(profile.calorie_goal, 2500)
-    
+
     def test_partial_form_submission(self):
         """Test that partial form submission (only some fields) saves correctly."""
         # Save some fields
@@ -5778,14 +6011,14 @@ class UserProfileFormTests(TestCase):
             'height_ft': '5',
             'height_in': '9',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Partial User')
         self.assertEqual(profile.height, 175)
         self.assertIsNone(profile.weight)
         self.assertIsNone(profile.age)
-    
+
     def test_updating_existing_profile_data(self):
         """Test that updating existing profile data overwrites old values."""
         # Save initial data
@@ -5795,7 +6028,7 @@ class UserProfileFormTests(TestCase):
             'height_in': '7',
             'primary_goal': 'weight_loss',
         }, follow=True)
-        
+
         # Update with new data
         self.client.post('/get_started_profile/', {
             'name': 'Updated Name',
@@ -5803,16 +6036,17 @@ class UserProfileFormTests(TestCase):
             'height_in': '11',
             'primary_goal': 'muscle_gain',
         }, follow=True)
-        
+
         profile = self.user.profile
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Updated Name')
         self.assertEqual(profile.height, 180)
         self.assertEqual(profile.primary_goal, 'muscle_gain')
-    
+
+
 class UserProfileHomeGymTests(TestCase):
     """Tests for home gym conditional functionality."""
-    
+
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
@@ -5822,30 +6056,30 @@ class UserProfileHomeGymTests(TestCase):
             is_active=True
         )
         self.client.login(username='homeuser@example.com', password='TestPass123!')
-    
+
     def test_home_gym_yes_enables_equipment_selection(self):
         """Test that selecting yes allows saving equipment."""
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'yes',
             'home_equipment': ['dumbbells', 'yoga_mat'],
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertTrue(profile.has_home_gym)
         self.assertIn('dumbbells', profile.home_equipment)
         self.assertIn('yoga_mat', profile.home_equipment)
-    
+
     def test_home_gym_no_disables_equipment_selection(self):
         """Test that selecting no doesn't save equipment."""
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'no',
             'home_equipment': [],
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertFalse(profile.has_home_gym)
         self.assertEqual(profile.home_equipment, [])
-    
+
     def test_equipment_persists_when_switching_back_to_yes(self):
         """Test that equipment list is preserved when toggling home gym."""
         # First select yes with equipment
@@ -5853,39 +6087,39 @@ class UserProfileHomeGymTests(TestCase):
             'has_home_gym': 'yes',
             'home_equipment': ['dumbbells', 'yoga_mat'],
         }, follow=True)
-        
+
         # Then switch to no
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'no',
         }, follow=True)
-        
+
         # Switch back to yes (equipment should still be there)
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'yes',
             'home_equipment': ['dumbbells', 'yoga_mat'],
         }, follow=True)
-        
+
         profile = self.user.profile
         self.assertTrue(profile.has_home_gym)
         self.assertIn('dumbbells', profile.home_equipment)
         self.assertIn('yoga_mat', profile.home_equipment)
-    
+
     def test_home_gym_selection_persists_on_reload(self):
         """Test that home gym yes/no selection is preserved when reloading."""
         # Save yes selection
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'yes',
         }, follow=True)
-        
+
         # Reload and verify
         response = self.client.get('/get_started_profile/')
         self.assertContains(response, 'value="yes" checked')
-        
+
         # Now switch to no
         self.client.post('/get_started_profile/', {
             'has_home_gym': 'no',
         }, follow=True)
-        
+
         # Reload and verify no is checked
         response = self.client.get('/get_started_profile/')
         self.assertContains(response, 'value="no" checked')
@@ -5897,7 +6131,7 @@ class UserProfileHomeGymTests(TestCase):
 
 class OnboardingCompletionTests(TestCase):
     """Tests for onboarding_completed field and skip button functionality."""
-    
+
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
@@ -5907,87 +6141,87 @@ class OnboardingCompletionTests(TestCase):
             is_active=True
         )
         self.client.login(username='onboard@example.com', password='TestPass123!')
-    
+
     def test_profile_created_on_get_started_access(self):
         """Test that UserProfile is created when accessing get_started_profile if it doesn't exist."""
         # Delete profile if it exists
         from core.models import UserProfile
         UserProfile.objects.filter(user=self.user).delete()
-        
+
         # Access the page
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 200)
-        
+
         # Profile should now exist
         profile = self.user.profile
         self.assertIsNotNone(profile)
         self.assertFalse(profile.onboarding_completed)
-    
+
     def test_onboarding_completed_false_by_default(self):
         """Test that new profiles have onboarding_completed=False."""
         from core.models import UserProfile
         UserProfile.objects.filter(user=self.user).delete()
-        
+
         # Access the page (creates profile)
         self.client.get('/get_started_profile/')
-        
+
         profile = self.user.profile
         self.assertFalse(profile.onboarding_completed)
-    
+
     def test_skip_button_shows_for_new_users(self):
         """Test that skip button is visible for users with onboarding_completed=False."""
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=self.user)
         profile.onboarding_completed = False
         profile.save()
-        
+
         response = self.client.get('/get_started_profile/')
         self.assertContains(response, 'Skip for Now')
-    
+
     def test_skip_button_hidden_after_completion(self):
         """Test that skip button is hidden after onboarding_completed=True."""
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=self.user)
         profile.onboarding_completed = True
         profile.save()
-        
+
         response = self.client.get('/get_started_profile/')
         self.assertNotContains(response, 'Skip for Now')
-    
+
     def test_skip_parameter_marks_onboarding_complete(self):
         """Test that ?skip=true parameter sets onboarding_completed=True."""
         response = self.client.get('/get_started_profile/?skip=true', follow=True)
-        
+
         self.user.refresh_from_db()
         profile = self.user.profile
         self.assertTrue(profile.onboarding_completed)
-        
+
         # Should redirect to home_dash
         self.assertContains(response, 'home')
-    
+
     def test_skip_parameter_redirects_to_home(self):
         """Test that ?skip=true redirects to home_dash."""
         response = self.client.get('/get_started_profile/?skip=true', follow=False)
         self.assertEqual(response.status_code, 302)
         self.assertIn('home_dash', response.url)
-    
+
     def test_form_submission_marks_onboarding_complete(self):
         """Test that form submission sets onboarding_completed=True."""
-        response = self.client.post('/get_started_profile/', {
+        self.client.post('/get_started_profile/', {
             'name': 'Test User',
             'height_ft': '5',
             'height_in': '11',
             'weight_lbs': '165',
         }, follow=True)
-        
+
         self.user.refresh_from_db()
         profile = self.user.profile
         self.assertTrue(profile.onboarding_completed)
-    
+
     def test_discard_button_marks_onboarding_complete(self):
         """Test that discard button redirects with skip parameter."""
-        response = self.client.get('/get_started_profile/?skip=true', follow=True)
-        
+        self.client.get('/get_started_profile/?skip=true', follow=True)
+
         self.user.refresh_from_db()
         profile = self.user.profile
         self.assertTrue(profile.onboarding_completed)
@@ -5995,10 +6229,10 @@ class OnboardingCompletionTests(TestCase):
 
 class SocialLoginUserFieldTests(TestCase):
     """Tests for social_login_user field tracking."""
-    
+
     def setUp(self):
         self.client = Client()
-    
+
     def test_social_login_user_false_by_default(self):
         """Test that new profiles have social_login_user=False."""
         from core.models import UserProfile
@@ -6008,14 +6242,13 @@ class SocialLoginUserFieldTests(TestCase):
             password='TestPass123!',
             is_active=True
         )
-        
+
         profile = UserProfile.objects.create(user=user)
         self.assertFalse(profile.social_login_user)
-    
+
     def test_email_verified_user_shows_skip_button(self):
         """Test that email-verified users see skip button on first onboarding."""
-        from core.models import UserProfile, EmailVerification
-        
+
         # Create user via email signup
         user = User.objects.create_user(
             username='emailsignup@example.com',
@@ -6023,121 +6256,121 @@ class SocialLoginUserFieldTests(TestCase):
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Simulate email verification and redirect to get_started_profile
         self.client.login(username='emailsignup@example.com', password='TestPass123!')
-        
+
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 200)
-        
+
         # Profile should be created
         profile = user.profile
         self.assertFalse(profile.onboarding_completed)
         self.assertFalse(profile.social_login_user)
-        
+
         # Skip button should show
         self.assertContains(response, 'Skip for Now')
 
 
 class OnboardingMiddlewareTests(TestCase):
     """Tests for SocialLoginOnboardingMiddleware behavior."""
-    
+
     def setUp(self):
         self.client = Client()
-    
+
     def test_middleware_redirects_incomplete_social_user(self):
         """Test that middleware redirects users with social_login_user=True and onboarding_completed=False."""
         from core.models import UserProfile
-        
+
         user = User.objects.create_user(
             username='socialuser@example.com',
             email='socialuser@example.com',
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Mark as social login user with incomplete onboarding
-        profile = UserProfile.objects.create(
+        UserProfile.objects.create(
             user=user,
             social_login_user=True,
             onboarding_completed=False
         )
-        
+
         self.client.login(username='socialuser@example.com', password='TestPass123!')
-        
+
         # Accessing home_dash should redirect to get_started_profile
         response = self.client.get('/home_dash/', follow=False)
         self.assertEqual(response.status_code, 302)
         self.assertIn('get_started_profile', response.url)
-    
+
     def test_middleware_does_not_redirect_completed_user(self):
         """Test that middleware doesn't redirect users with onboarding_completed=True."""
         from core.models import UserProfile
-        
+
         user = User.objects.create_user(
             username='completeduser@example.com',
             email='completeduser@example.com',
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Mark as social login user with completed onboarding
-        profile = UserProfile.objects.create(
+        UserProfile.objects.create(
             user=user,
             social_login_user=True,
             onboarding_completed=True
         )
-        
+
         self.client.login(username='completeduser@example.com', password='TestPass123!')
-        
+
         # Accessing home_dash should NOT redirect to get_started_profile
         response = self.client.get('/home_dash/', follow=False)
         self.assertEqual(response.status_code, 200)
-    
+
     def test_middleware_does_not_redirect_non_social_user(self):
         """Test that middleware doesn't redirect regular (non-social) users."""
         from core.models import UserProfile
-        
+
         user = User.objects.create_user(
             username='regularuser@example.com',
             email='regularuser@example.com',
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Create profile but mark social_login_user=False
-        profile = UserProfile.objects.create(
+        UserProfile.objects.create(
             user=user,
             social_login_user=False,
             onboarding_completed=False
         )
-        
+
         self.client.login(username='regularuser@example.com', password='TestPass123!')
-        
+
         # Accessing home_dash should NOT redirect
         response = self.client.get('/home_dash/', follow=False)
         self.assertEqual(response.status_code, 200)
-    
+
     def test_middleware_does_not_redirect_from_onboarding_page(self):
         """Test that middleware doesn't create redirect loop on onboarding page."""
         from core.models import UserProfile
-        
+
         user = User.objects.create_user(
             username='looptest@example.com',
             email='looptest@example.com',
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Mark as incomplete social user
-        profile = UserProfile.objects.create(
+        UserProfile.objects.create(
             user=user,
             social_login_user=True,
             onboarding_completed=False
         )
-        
+
         self.client.login(username='looptest@example.com', password='TestPass123!')
-        
+
         # Accessing get_started_profile should NOT redirect
         response = self.client.get('/get_started_profile/', follow=False)
         self.assertEqual(response.status_code, 200)
@@ -6145,14 +6378,13 @@ class OnboardingMiddlewareTests(TestCase):
 
 class GetStartedProfileIntegrationTests(TestCase):
     """Integration tests for complete get_started_profile flow."""
-    
+
     def setUp(self):
         self.client = Client()
-    
+
     def test_complete_onboarding_flow_email_signup(self):
         """Test complete flow: create account -> verify email -> skip onboarding -> access home."""
-        from core.models import UserProfile, EmailVerification
-        
+
         # Step 1: Create account
         user = User.objects.create_user(
             username='fullflow@example.com',
@@ -6160,30 +6392,30 @@ class GetStartedProfileIntegrationTests(TestCase):
             password='TestPass123!',
             is_active=True
         )
-        
+
         # Step 2: Login (simulating after email verification)
         self.client.login(username='fullflow@example.com', password='TestPass123!')
-        
+
         # Step 3: Access get_started_profile - should show skip button
         response = self.client.get('/get_started_profile/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Skip for Now')
-        
+
         # Step 4: Click skip
         response = self.client.get('/get_started_profile/?skip=true', follow=True)
-        
+
         # Step 5: Verify onboarding is completed
         user.refresh_from_db()
         profile = user.profile
         self.assertTrue(profile.onboarding_completed)
-        
+
         # Step 6: Verify redirect to home_dash succeeded
         self.assertContains(response, 'home')
-        
+
         # Step 7: Verify skip button is hidden on subsequent visits
         response = self.client.get('/get_started_profile/')
         self.assertNotContains(response, 'Skip for Now')
-    
+
     def test_complete_onboarding_flow_form_submission(self):
         """Test complete flow: create account -> fill form -> completion."""
         user = User.objects.create_user(
@@ -6192,11 +6424,11 @@ class GetStartedProfileIntegrationTests(TestCase):
             password='TestPass123!',
             is_active=True
         )
-        
+
         self.client.login(username='formflow@example.com', password='TestPass123!')
-        
+
         # Submit form
-        response = self.client.post('/get_started_profile/', {
+        self.client.post('/get_started_profile/', {
             'name': 'John Doe',
             'height_ft': '5',
             'height_in': '11',
@@ -6207,7 +6439,7 @@ class GetStartedProfileIntegrationTests(TestCase):
             'dietary_preference': 'omnivore',
             'has_home_gym': 'yes',
         }, follow=True)
-        
+
         # Verify onboarding completed
         user.refresh_from_db()
         profile = user.profile
@@ -6218,9 +6450,10 @@ class GetStartedProfileIntegrationTests(TestCase):
 
 # ==================== SUPPLEMENT TESTS ====================
 
+
 class SupplementDatabaseModelTests(TestCase):
     """Tests for the SupplementDatabase model"""
-    
+
     def test_create_supplement(self):
         """Test creating a supplement in the database"""
         supplement = SupplementDatabase.objects.create(
@@ -6233,7 +6466,7 @@ class SupplementDatabaseModelTests(TestCase):
         self.assertEqual(supplement.supplement_type, 'vitamin')
         self.assertEqual(supplement.dosage, '1000')
         self.assertEqual(supplement.unit, 'mg')
-    
+
     def test_supplement_str(self):
         """Test string representation of supplement"""
         supplement = SupplementDatabase.objects.create(
@@ -6243,7 +6476,7 @@ class SupplementDatabaseModelTests(TestCase):
             unit='IU'
         )
         self.assertEqual(str(supplement), 'Vitamin D (Vitamin)')
-    
+
     def test_unique_supplement_name(self):
         """Test that supplement names are unique"""
         SupplementDatabase.objects.create(
@@ -6259,13 +6492,13 @@ class SupplementDatabaseModelTests(TestCase):
                 dosage='500',
                 unit='mg'
             )
-    
+
     def test_supplement_ordering(self):
         """Test that supplements are ordered by name"""
         SupplementDatabase.objects.create(name='Zinc', supplement_type='mineral', dosage='11', unit='mg')
         SupplementDatabase.objects.create(name='Vitamin A', supplement_type='vitamin', dosage='1000', unit='mcg')
         SupplementDatabase.objects.create(name='Iron', supplement_type='mineral', dosage='18', unit='mg')
-        
+
         supplements = SupplementDatabase.objects.all()
         names = [s.name for s in supplements]
         self.assertEqual(names, sorted(names))
@@ -6273,21 +6506,22 @@ class SupplementDatabaseModelTests(TestCase):
 
 class SupplementEntryModelTests(TestCase):
     """Tests for the SupplementEntry model"""
-    
+
     def setUp(self):
         """Set up test user and supplement"""
-        self.user = User.objects.create_user(username='supplement_entry_test_user', email='test@spotter.ai', password='testpass123')
+        self.user = User.objects.create_user(
+            username='supplement_entry_test_user', email='test@spotter.ai', password='testpass123')
         self.supplement = SupplementDatabase.objects.create(
             name='Vitamin C',
             supplement_type='vitamin',
             dosage='1000',
             unit='mg'
         )
-    
+
     def test_create_supplement_entry(self):
         """Test creating a supplement entry for a user"""
         from datetime import date
-        
+
         entry = SupplementEntry.objects.create(
             user=self.user,
             supplement=self.supplement,
@@ -6301,11 +6535,11 @@ class SupplementEntryModelTests(TestCase):
         self.assertEqual(entry.user, self.user)
         self.assertEqual(entry.supplement, self.supplement)
         self.assertFalse(entry.taken)
-    
+
     def test_supplement_entry_str(self):
         """Test string representation of supplement entry"""
         from datetime import date
-        
+
         entry = SupplementEntry.objects.create(
             user=self.user,
             supplement=self.supplement,
@@ -6318,11 +6552,11 @@ class SupplementEntryModelTests(TestCase):
         )
         self.assertIn('Vitamin C', str(entry))
         self.assertIn(self.user.email, str(entry))
-    
+
     def test_toggle_supplement_taken(self):
         """Test toggling the taken status of a supplement"""
         from datetime import date
-        
+
         entry = SupplementEntry.objects.create(
             user=self.user,
             supplement=self.supplement,
@@ -6334,16 +6568,16 @@ class SupplementEntryModelTests(TestCase):
             taken=False
         )
         self.assertFalse(entry.taken)
-        
+
         entry.taken = True
         entry.save()
         entry.refresh_from_db()
         self.assertTrue(entry.taken)
-    
+
     def test_supplement_entry_without_supplement_link(self):
         """Test creating a supplement entry without linking to database supplement"""
         from datetime import date
-        
+
         entry = SupplementEntry.objects.create(
             user=self.user,
             supplement=None,
@@ -6356,16 +6590,16 @@ class SupplementEntryModelTests(TestCase):
         )
         self.assertIsNone(entry.supplement)
         self.assertEqual(entry.name, 'Custom Supplement')
-    
+
     def test_supplement_entries_filtered_by_date_and_user(self):
         """Test filtering supplement entries by user and date"""
         from datetime import date, timedelta
-        
+
         today = date.today()
         yesterday = today - timedelta(days=1)
-        
+
         # Create entries for today
-        entry1 = SupplementEntry.objects.create(
+        SupplementEntry.objects.create(
             user=self.user,
             supplement=self.supplement,
             name='Vitamin C',
@@ -6375,9 +6609,9 @@ class SupplementEntryModelTests(TestCase):
             date=today,
             taken=False
         )
-        
+
         # Create entry for yesterday
-        entry2 = SupplementEntry.objects.create(
+        SupplementEntry.objects.create(
             user=self.user,
             supplement=self.supplement,
             name='Vitamin D',
@@ -6387,7 +6621,7 @@ class SupplementEntryModelTests(TestCase):
             date=yesterday,
             taken=False
         )
-        
+
         # Query today's entries
         today_entries = SupplementEntry.objects.filter(user=self.user, date=today)
         self.assertEqual(today_entries.count(), 1)
@@ -6396,17 +6630,18 @@ class SupplementEntryModelTests(TestCase):
 
 class SupplementAPITests(TestCase):
     """Tests for supplement API endpoints"""
-    
+
     def setUp(self):
         """Set up test user and supplements"""
-        self.user = User.objects.create_user(username='supplement_test_user', email='test@spotter.ai', password='testpass123')
+        self.user = User.objects.create_user(
+            username='supplement_test_user', email='test@spotter.ai', password='testpass123')
         self.client.login(username='supplement_test_user', password='testpass123')
-        
+
         # Create some test supplements
         SupplementDatabase.objects.create(name='Vitamin C', supplement_type='vitamin', dosage='1000', unit='mg')
         SupplementDatabase.objects.create(name='Vitamin D', supplement_type='vitamin', dosage='600', unit='IU')
         SupplementDatabase.objects.create(name='Calcium', supplement_type='mineral', dosage='1000', unit='mg')
-    
+
     def test_search_supplements_api(self):
         """Test the supplement search API"""
         response = self.client.get('/api/search_supplements/?q=vitamin')
@@ -6414,17 +6649,17 @@ class SupplementAPITests(TestCase):
         data = response.json()
         self.assertIn('results', data)
         self.assertGreater(len(data['results']), 0)
-    
+
     def test_search_supplements_requires_min_length(self):
         """Test that supplement search requires at least 2 characters"""
         response = self.client.get('/api/search_supplements/?q=v')
         data = response.json()
         self.assertEqual(len(data['results']), 0)
-    
+
     def test_supplement_entries_list_api(self):
         """Test getting supplement entries for a date"""
         from datetime import date
-        
+
         # Create an entry
         SupplementEntry.objects.create(
             user=self.user,
@@ -6435,17 +6670,17 @@ class SupplementAPITests(TestCase):
             date=date.today(),
             taken=False
         )
-        
+
         response = self.client.get('/api/supplement_entries/?date=' + str(date.today()))
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn('entries', data)
-    
+
     def test_supplement_entries_create_api(self):
         """Test creating a supplement entry via API"""
         from datetime import date
         import json
-        
+
         payload = {
             'name': 'Vitamin C',
             'supplement_type': 'vitamin',
@@ -6453,7 +6688,7 @@ class SupplementAPITests(TestCase):
             'unit': 'mg',
             'date': str(date.today())
         }
-        
+
         response = self.client.post(
             '/api/supplement_entries/',
             data=json.dumps(payload),
@@ -6465,12 +6700,11 @@ class SupplementAPITests(TestCase):
         self.assertIn('entry', data)
 
 
-
 # ===== ACTIVE WORKOUT MODULE TESTS =====
 
 class SetProgressModelTests(TestCase):
     """Tests for the SetProgress model"""
-    
+
     def setUp(self):
         """Create test user, workout, and exercise"""
         self.user = User.objects.create_user(username='testuser', password='testpass123')
@@ -6488,56 +6722,56 @@ class SetProgressModelTests(TestCase):
             reps=8,
             weight=185
         )
-    
+
     def test_setprogress_creation(self):
         """Test creating a SetProgress record"""
         from .models import SetProgress
-        
+
         progress = SetProgress.objects.create(
             exercise=self.exercise,
             set_number=1,
             completed=False
         )
-        
+
         self.assertEqual(progress.exercise, self.exercise)
         self.assertEqual(progress.set_number, 1)
         self.assertFalse(progress.completed)
-    
+
     def test_setprogress_unique_constraint(self):
         """Test that exercise + set_number must be unique"""
         from .models import SetProgress
         from django.db import IntegrityError
-        
+
         SetProgress.objects.create(
             exercise=self.exercise,
             set_number=1,
             completed=True
         )
-        
+
         with self.assertRaises(IntegrityError):
             SetProgress.objects.create(
                 exercise=self.exercise,
                 set_number=1,
                 completed=False
             )
-    
+
     def test_setprogress_ordering(self):
         """Test that SetProgress is ordered by set_number"""
         from .models import SetProgress
-        
+
         SetProgress.objects.create(exercise=self.exercise, set_number=3, completed=False)
         SetProgress.objects.create(exercise=self.exercise, set_number=1, completed=False)
         SetProgress.objects.create(exercise=self.exercise, set_number=2, completed=False)
-        
+
         progress_list = SetProgress.objects.filter(exercise=self.exercise)
         set_numbers = [p.set_number for p in progress_list]
-        
+
         self.assertEqual(set_numbers, [1, 2, 3])
 
 
 class SaveSetProgressAPITests(TestCase):
     """Tests for the save_set_progress API endpoint"""
-    
+
     def setUp(self):
         """Create test user, workout, and exercises"""
         self.client = Client()
@@ -6565,11 +6799,11 @@ class SaveSetProgressAPITests(TestCase):
             weight=225
         )
         self.client.login(username='testuser', password='testpass123')
-    
+
     def test_save_set_progress_creates_records(self):
         """Test saving set progress creates SetProgress records"""
         from .models import SetProgress
-        
+
         payload = {
             'set_data': [
                 {'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True},
@@ -6577,70 +6811,70 @@ class SaveSetProgressAPITests(TestCase):
                 {'exercise_id': self.exercise2.id, 'set_number': 1, 'completed': True},
             ]
         }
-        
+
         response = self.client.post(
             '/api/set_progress/save/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
         self.assertEqual(data['saved_count'], 3)
-        
+
         # Verify records were created
         ex1_set1 = SetProgress.objects.get(exercise=self.exercise1, set_number=1)
         self.assertTrue(ex1_set1.completed)
-        
+
         ex1_set2 = SetProgress.objects.get(exercise=self.exercise1, set_number=2)
         self.assertFalse(ex1_set2.completed)
-    
+
     def test_save_set_progress_updates_existing(self):
         """Test that saving updates existing SetProgress records"""
         from .models import SetProgress
-        
+
         SetProgress.objects.create(
             exercise=self.exercise1,
             set_number=1,
             completed=False
         )
-        
+
         payload = {
             'set_data': [
                 {'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True},
             ]
         }
-        
+
         response = self.client.post(
             '/api/set_progress/save/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
-        
+
         progress = SetProgress.objects.get(exercise=self.exercise1, set_number=1)
         self.assertTrue(progress.completed)
-    
+
     def test_save_set_progress_requires_login(self):
         """Test that endpoint requires authentication"""
         self.client.logout()
-        
+
         payload = {
             'set_data': [
                 {'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True},
             ]
         }
-        
+
         response = self.client.post(
             '/api/set_progress/save/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 302)
-    
+
     def test_save_set_progress_invalid_json(self):
         """Test error handling for invalid JSON"""
         response = self.client.post(
@@ -6648,21 +6882,21 @@ class SaveSetProgressAPITests(TestCase):
             data='invalid json',
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertFalse(data['success'])
-    
+
     def test_save_set_progress_empty_list(self):
         """Test error when set_data is empty"""
         payload = {'set_data': []}
-        
+
         response = self.client.post(
             '/api/set_progress/save/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertFalse(data['success'])
@@ -6670,7 +6904,7 @@ class SaveSetProgressAPITests(TestCase):
 
 class GetSetProgressAPITests(TestCase):
     """Tests for the get_set_progress API endpoint"""
-    
+
     def setUp(self):
         """Create test user, workout, exercises, and set progress"""
         self.client = Client()
@@ -6689,71 +6923,71 @@ class GetSetProgressAPITests(TestCase):
             reps=8,
             weight=185
         )
-        
+
         from .models import SetProgress
         SetProgress.objects.create(exercise=self.exercise, set_number=1, completed=True)
         SetProgress.objects.create(exercise=self.exercise, set_number=2, completed=False)
         SetProgress.objects.create(exercise=self.exercise, set_number=3, completed=True)
-        
+
         self.client.login(username='testuser', password='testpass123')
-    
+
     def test_get_set_progress_success(self):
         """Test retrieving set progress for a workout"""
         response = self.client.get(f'/api/set_progress/get/?workout_id={self.workout.id}')
-        
+
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
         self.assertIn('set_progress', data)
-        
+
         progress = data['set_progress']
         self.assertIn(str(self.exercise.id), progress)
-        
+
         exercise_progress = progress[str(self.exercise.id)]
         self.assertEqual(len(exercise_progress), 3)
         self.assertTrue(exercise_progress[0]['completed'])
         self.assertFalse(exercise_progress[1]['completed'])
         self.assertTrue(exercise_progress[2]['completed'])
-    
+
     def test_get_set_progress_requires_login(self):
         """Test that endpoint requires authentication"""
         self.client.logout()
-        
+
         response = self.client.get(f'/api/set_progress/get/?workout_id={self.workout.id}')
-        
+
         self.assertEqual(response.status_code, 302)
-    
+
     def test_get_set_progress_missing_workout_id(self):
         """Test error when workout_id is missing"""
         response = self.client.get('/api/set_progress/get/')
-        
+
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertFalse(data['success'])
-    
+
     def test_get_set_progress_invalid_workout(self):
         """Test error when workout doesn't exist"""
         response = self.client.get('/api/set_progress/get/?workout_id=99999')
-        
+
         self.assertEqual(response.status_code, 404)
         data = response.json()
         self.assertFalse(data['success'])
-    
+
     def test_get_set_progress_user_isolation(self):
         """Test that users can only access their own workout progress"""
-        other_user = User.objects.create_user(username='otheruser', password='testpass123')
-        
+        User.objects.create_user(username='otheruser', password='testpass123')
+
         self.client.logout()
         self.client.login(username='otheruser', password='testpass123')
-        
+
         response = self.client.get(f'/api/set_progress/get/?workout_id={self.workout.id}')
-        
+
         self.assertEqual(response.status_code, 404)
 
 
 class CompleteExercisesUITests(TestCase):
     """Tests for exercise completion UI updates"""
-    
+
     def setUp(self):
         """Create test user, workout, and exercises"""
         self.client = Client()
@@ -6784,49 +7018,49 @@ class CompleteExercisesUITests(TestCase):
             completed=False
         )
         self.client.login(username='testuser', password='testpass123')
-    
+
     def test_complete_exercises_by_ids_marks_completed(self):
         """Test that completing exercises updates database"""
         payload = {
             'exercise_ids': [self.exercise1.id, self.exercise2.id]
         }
-        
+
         response = self.client.post(
             '/api/exercises/complete_by_ids/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
         self.assertEqual(data['completed_count'], 2)
-        
+
         # Verify exercises are marked completed
         self.exercise1.refresh_from_db()
         self.exercise2.refresh_from_db()
         self.assertTrue(self.exercise1.completed)
         self.assertTrue(self.exercise2.completed)
-    
+
     def test_complete_exercises_partial(self):
         """Test completing only some exercises"""
         payload = {
             'exercise_ids': [self.exercise1.id]
         }
-        
+
         response = self.client.post(
             '/api/exercises/complete_by_ids/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
-        
+
         self.exercise1.refresh_from_db()
         self.exercise2.refresh_from_db()
         self.assertTrue(self.exercise1.completed)
         self.assertFalse(self.exercise2.completed)
-    
+
     def test_complete_exercises_user_isolation(self):
         """Test that users can only complete their own exercises"""
         other_user = User.objects.create_user(username='otheruser', password='testpass123')
@@ -6842,38 +7076,38 @@ class CompleteExercisesUITests(TestCase):
             muscle_group='arms',
             completed=False
         )
-        
+
         payload = {
             'exercise_ids': [other_exercise.id]
         }
-        
+
         response = self.client.post(
             '/api/exercises/complete_by_ids/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
-        
+
         # Exercise should NOT be marked completed
         other_exercise.refresh_from_db()
         self.assertFalse(other_exercise.completed)
-    
+
     def test_complete_exercises_idempotent(self):
         """Test that completing already completed exercises works"""
         self.exercise1.completed = True
         self.exercise1.save()
-        
+
         payload = {
             'exercise_ids': [self.exercise1.id]
         }
-        
+
         response = self.client.post(
             '/api/exercises/complete_by_ids/',
             data=json.dumps(payload),
             content_type='application/json'
         )
-        
+
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
@@ -6881,7 +7115,7 @@ class CompleteExercisesUITests(TestCase):
 
 class WorkoutStatusTagTests(TestCase):
     """Tests for workout status tag display"""
-    
+
     def setUp(self):
         """Create test user and workouts"""
         self.client = Client()
@@ -6901,28 +7135,28 @@ class WorkoutStatusTagTests(TestCase):
             date=timezone.now().date()
         )
         self.client.login(username='testuser', password='testpass123')
-    
+
     def test_planned_workout_status_display(self):
         """Test that planned workouts show planned status"""
         response = self.client.get('/train/')
-        
+
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        
+
         # Check that status tag appears in HTML
         self.assertIn('workout-status-tag', content)
         self.assertIn('planned', content)
-    
+
     def test_completed_workout_status_display(self):
         """Test that completed workouts show completed status"""
         response = self.client.get('/train/')
-        
+
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        
+
         self.assertIn('workout-status-tag', content)
         self.assertIn('Completed', content)
-    
+
     def test_workout_status_get_display(self):
         """Test that get_status_display works correctly"""
         self.assertEqual(self.planned_workout.get_status_display(), 'Planned')
@@ -6931,7 +7165,7 @@ class WorkoutStatusTagTests(TestCase):
 
 class ActiveWorkoutIntegrationTests(TestCase):
     """Integration tests for the complete active workout flow"""
-    
+
     def setUp(self):
         """Create test user, workout, and exercises"""
         self.client = Client()
@@ -6960,11 +7194,11 @@ class ActiveWorkoutIntegrationTests(TestCase):
             weight=225
         )
         self.client.login(username='testuser', password='testpass123')
-    
+
     def test_complete_workout_flow(self):
         """Test the complete workout flow: save progress -> complete -> update status"""
         from .models import SetProgress
-        
+
         # Step 1: Save set progress (simulate user marking sets)
         set_data = [
             {'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True},
@@ -6973,7 +7207,7 @@ class ActiveWorkoutIntegrationTests(TestCase):
             {'exercise_id': self.exercise2.id, 'set_number': 2, 'completed': True},
             {'exercise_id': self.exercise2.id, 'set_number': 3, 'completed': True},
         ]
-        
+
         save_response = self.client.post(
             '/api/set_progress/save/',
             data=json.dumps({'set_data': set_data}),
@@ -6981,7 +7215,7 @@ class ActiveWorkoutIntegrationTests(TestCase):
         )
         self.assertEqual(save_response.status_code, 200)
         self.assertEqual(SetProgress.objects.count(), 5)
-        
+
         # Step 2: Load set progress
         get_response = self.client.get(
             f'/api/set_progress/get/?workout_id={self.workout.id}'
@@ -6990,7 +7224,7 @@ class ActiveWorkoutIntegrationTests(TestCase):
         progress_data = get_response.json()
         self.assertTrue(progress_data['success'])
         self.assertEqual(len(progress_data['set_progress']), 2)
-        
+
         # Step 3: Mark exercises as completed
         complete_response = self.client.post(
             '/api/exercises/complete_by_ids/',
@@ -6998,29 +7232,28 @@ class ActiveWorkoutIntegrationTests(TestCase):
             content_type='application/json'
         )
         self.assertEqual(complete_response.status_code, 200)
-        
+
         # Step 4: Verify exercises are completed
         self.exercise1.refresh_from_db()
         self.exercise2.refresh_from_db()
         self.assertTrue(self.exercise1.completed)
         self.assertTrue(self.exercise2.completed)
-    
+
     def test_partial_completion_flow(self):
         """Test workout flow with partial set completion"""
-        from .models import SetProgress
-        
+
         # Save progress with some sets incomplete
         set_data = [
             {'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True},
             {'exercise_id': self.exercise1.id, 'set_number': 2, 'completed': False},
         ]
-        
+
         self.client.post(
             '/api/set_progress/save/',
             data=json.dumps({'set_data': set_data}),
             content_type='application/json'
         )
-        
+
         # Try to complete exercise (should fail because not all sets are done)
         # Only exercise1 with all sets marked should complete
         self.client.post(
@@ -7028,7 +7261,7 @@ class ActiveWorkoutIntegrationTests(TestCase):
             data=json.dumps({'exercise_ids': [self.exercise1.id]}),
             content_type='application/json'
         )
-        
+
         # Exercise should still be marked completed (API doesn't validate)
         # but in real usage, completeFullyFinishedExercises() checks this
         self.exercise1.refresh_from_db()
@@ -7055,7 +7288,6 @@ class EditFoodItemFatsTest(TestCase):
         )
 
     def test_edit_preserves_fats(self):
-        from .models import FoodItem
         response = self.client.post('/nutrition/add_food_item/', {
             'meal_id': self.meal.id,
             'item_id': self.item.id,
@@ -7071,7 +7303,6 @@ class EditFoodItemFatsTest(TestCase):
         self.assertEqual(self.item.fats, 11)
 
     def test_edit_updates_fats_to_new_value(self):
-        from .models import FoodItem
         self.client.post('/nutrition/add_food_item/', {
             'meal_id': self.meal.id,
             'item_id': self.item.id,
@@ -7085,3 +7316,128 @@ class EditFoodItemFatsTest(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.fats, 8)
         self.assertEqual(self.item.calories, 90)
+
+
+# ==================================================================================
+# Management Command Tests: populate_food_db and populate_supplements
+# ==================================================================================
+
+
+class PopulateFoodDbCommandTests(TestCase):
+    """Tests for the populate_food_db management command."""
+
+    def test_command_creates_food_items(self):
+        """Command creates food items in the database."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(FoodItem.objects.exists())
+
+    def test_command_creates_exactly_20_items(self):
+        """Command seeds exactly 20 distinct food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        system_meal = Meal.objects.get(name='Food Database', date='2000-01-01')
+        self.assertEqual(FoodItem.objects.filter(meal=system_meal).count(), 20)
+
+    def test_command_creates_system_user_and_meal(self):
+        """Command creates the system user and 'Food Database' meal."""
+        from django.contrib.auth.models import User
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(User.objects.filter(username='system@spotter.ai').exists())
+        self.assertTrue(Meal.objects.filter(name='Food Database').exists())
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        count_after_first = FoodItem.objects.count()
+        call_command('populate_food_db', stdout=out)
+        self.assertEqual(FoodItem.objects.count(), count_after_first)
+
+    def test_food_items_have_valid_nutrition_data(self):
+        """All seeded food items have non-negative calories and macro values."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        for item in FoodItem.objects.filter(meal__name='Food Database'):
+            self.assertGreaterEqual(item.calories, 0, f'{item.name} has negative calories')
+            self.assertGreaterEqual(item.protein, 0, f'{item.name} has negative protein')
+            self.assertGreaterEqual(item.carbs, 0, f'{item.name} has negative carbs')
+            self.assertGreaterEqual(item.fats, 0, f'{item.name} has negative fats')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created item."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Food database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        out2 = StringIO()
+        call_command('populate_food_db', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())
+
+
+class PopulateSupplementsCommandTests(TestCase):
+    """Tests for the populate_supplements management command."""
+
+    def test_command_creates_supplements(self):
+        """Command creates supplement records in the database."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertTrue(SupplementDatabase.objects.exists())
+
+    def test_command_creates_exactly_20_supplements(self):
+        """Command seeds exactly 20 distinct supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), 20)
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        count_after_first = SupplementDatabase.objects.count()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), count_after_first)
+
+    def test_supplements_have_valid_types(self):
+        """All seeded supplements use a recognised supplement_type choice."""
+        from .models import SupplementDatabase
+        valid_types = {t[0] for t in SupplementDatabase.TYPE_CHOICES}
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        for s in SupplementDatabase.objects.all():
+            self.assertIn(s.supplement_type, valid_types, f'{s.name} has invalid type')
+
+    def test_supplements_cover_all_types(self):
+        """Seeded data includes vitamins, minerals, herbs, proteins, and amino acids."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        types_present = set(SupplementDatabase.objects.values_list('supplement_type', flat=True))
+        for expected in ('vitamin', 'mineral', 'herb', 'protein', 'amino_acid'):
+            self.assertIn(expected, types_present, f'Missing supplement type: {expected}')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created supplement."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Supplement database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        out2 = StringIO()
+        call_command('populate_supplements', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())

@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/search_foods/', views.search_foods, name='search_foods'),
     path('api/save_food/', views.save_food_to_database, name='save_food_to_database'),
     path('api/all_foods/', views.get_all_foods, name='get_all_foods'),
+    path('api/food_units/', views.get_food_units, name='get_food_units'),
     # Exercise Database API endpoints
     path('api/exercises/types/', exercise_api.get_exercise_types, name='get_exercise_types'),
     path('api/exercises/muscle-groups/', exercise_api.get_muscle_groups, name='get_muscle_groups'),
@@ -27,7 +28,8 @@ urlpatterns = [
     path('api/supplements/', views.get_all_supplements, name='get_all_supplements'),
     path('api/search_supplements/', views.search_supplements, name='search_supplements'),
     path('api/supplement_entries/', views.supplement_entries, name='supplement_entries'),
-    path('api/supplement_entries/<int:entry_id>/toggle/', views.toggle_supplement_taken, name='toggle_supplement_taken'),
+    path('api/supplement_entries/<int:entry_id>/toggle/',
+         views.toggle_supplement_taken, name='toggle_supplement_taken'),
     path('user_get_started/', views.user_get_started, name='user_get_started'),
     path('get_started_profile/', views.get_started_profile, name='get_started_profile'),
     path('user_login/', views.user_login, name='user_login'),
@@ -54,6 +56,7 @@ urlpatterns = [
     path('nutrition/delete_food_group/', views.delete_food_group, name='delete_food_group'),
     path('nutrition/delete_meal/', views.delete_meal, name='delete_meal'),
     path('nutrition/add_food_item/', views.add_food_item, name='add_food_item'),
+    path('nutrition/toggle_food_group/', views.toggle_food_group, name='toggle_food_group'),
     path('nutrition/toggle_food_item/', views.toggle_food_item, name='toggle_food_item'),
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),
     path('nutrition/add_supplement_to_meal/', views.add_supplement_to_meal, name='add_supplement_to_meal'),
@@ -65,6 +68,10 @@ urlpatterns = [
     # Social login shortcuts
     path('login/google/', RedirectView.as_view(url='/accounts/google/login/', query_string=True), name='google_login'),
     path('login/apple/', RedirectView.as_view(url='/accounts/apple/login/', query_string=True), name='apple_login'),
-    path('login/facebook/', RedirectView.as_view(url='/accounts/facebook/login/', query_string=True), name='facebook_login'),
-    path('login/instagram/', RedirectView.as_view(url='/accounts/instagram/login/', query_string=True), name='instagram_login'),
+    path('login/facebook/',
+         RedirectView.as_view(url='/accounts/facebook/login/', query_string=True),
+         name='facebook_login'),
+    path('login/instagram/',
+         RedirectView.as_view(url='/accounts/instagram/login/', query_string=True),
+         name='instagram_login'),
 ]
