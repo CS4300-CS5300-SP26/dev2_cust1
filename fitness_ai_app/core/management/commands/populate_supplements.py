@@ -21,7 +21,7 @@ class Command(BaseCommand):
             ('Vitamin D', 'vitamin', '600', 'IU'),
             ('Vitamin E', 'vitamin', '15', 'mg'),
             ('Vitamin K', 'vitamin', '120', 'mcg'),
-            
+
             # Minerals
             ('Calcium', 'mineral', '1000', 'mg'),
             ('Iron', 'mineral', '18', 'mg'),
@@ -35,7 +35,7 @@ class Command(BaseCommand):
             ('Manganese', 'mineral', '2.3', 'mg'),
             ('Copper', 'mineral', '900', 'mcg'),
             ('Selenium', 'mineral', '55', 'mcg'),
-            
+
             # Herbal & Other
             ('Ashwagandha', 'herb', '500', 'mg'),
             ('Ginseng', 'herb', '400', 'mg'),
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             ('Ginger', 'herb', '500', 'mg'),
             ('Garlic', 'herb', '500', 'mg'),
             ('Green Tea Extract', 'herb', '250', 'mg'),
-            
+
             # Protein & Amino Acids
             ('Whey Protein', 'protein', '25', 'g'),
             ('Casein Protein', 'protein', '25', 'g'),
@@ -56,7 +56,7 @@ class Command(BaseCommand):
             ('L-Carnitine', 'amino_acid', '2', 'g'),
             ('Taurine', 'amino_acid', '1000', 'mg'),
         ]
-        
+
         created_count = 0
         for name, supp_type, dosage, unit in supplements:
             obj, created = SupplementDatabase.objects.get_or_create(
@@ -69,7 +69,7 @@ class Command(BaseCommand):
             )
             if created:
                 created_count += 1
-        
+
         self.stdout.write(
             self.style.SUCCESS(
                 f'Successfully created {created_count} supplements. '

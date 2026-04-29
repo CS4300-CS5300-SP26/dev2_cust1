@@ -3,7 +3,7 @@
 import uuid
 from datetime import timedelta
 
-from behave import given, when, then
+from behave import given, when
 from django.contrib.auth.models import User
 from django.utils import timezone
 

@@ -147,7 +147,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'intermediate',
                 'description': 'Compound pressing movement targeting chest, shoulders, and triceps',
-                'instructions': '1. Lie on bench with barbell at chest level\n2. Lower bar to chest\n3. Press bar up explosively\n4. Control descent and repeat',
+                'instructions': (
+                    '1. Lie on bench with barbell at chest level\n'
+                    '2. Lower bar to chest\n'
+                    '3. Press bar up explosively\n'
+                    '4. Control descent and repeat'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['chest'], muscles['triceps'], muscles['shoulders']],
@@ -162,7 +167,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'beginner',
                 'description': 'Isolated biceps strengthening exercise',
-                'instructions': '1. Stand with dumbbells at sides\n2. Curl weights up to shoulders\n3. Control descent\n4. Repeat',
+                'instructions': (
+                    '1. Stand with dumbbells at sides\n'
+                    '2. Curl weights up to shoulders\n'
+                    '3. Control descent\n'
+                    '4. Repeat'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['biceps']],
@@ -176,7 +186,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'advanced',
                 'description': 'Upper body pulling exercise for back and biceps',
-                'instructions': '1. Grab bar with hands shoulder-width apart\n2. Pull body up until chin over bar\n3. Lower with control\n4. Repeat',
+                'instructions': (
+                    '1. Grab bar with hands shoulder-width apart\n'
+                    '2. Pull body up until chin over bar\n'
+                    '3. Lower with control\n'
+                    '4. Repeat'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['lats'], muscles['biceps']],
@@ -190,7 +205,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'intermediate',
                 'description': 'Upper body pressing exercise for triceps',
-                'instructions': '1. Support yourself on parallel bars\n2. Lower body by bending elbows\n3. Push back up to start\n4. Repeat',
+                'instructions': (
+                    '1. Support yourself on parallel bars\n'
+                    '2. Lower body by bending elbows\n'
+                    '3. Push back up to start\n'
+                    '4. Repeat'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['triceps']],
@@ -199,14 +219,19 @@ class Command(BaseCommand):
                 'default_sets': 3,
                 'default_reps': 8,
             },
-            
+
             # STRENGTH - Lower Body
             {
                 'name': 'Barbell Back Squat',
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'advanced',
                 'description': 'Compound leg exercise targeting quads, hamstrings, and glutes',
-                'instructions': '1. Position barbell across shoulders\n2. Lower body by bending knees\n3. Keep chest up and weight in heels\n4. Return to standing position',
+                'instructions': (
+                    '1. Position barbell across shoulders\n'
+                    '2. Lower body by bending knees\n'
+                    '3. Keep chest up and weight in heels\n'
+                    '4. Return to standing position'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['lower_body']],
                 'primary_muscles': [muscles['quadriceps'], muscles['glutes'], muscles['hamstrings']],
@@ -221,7 +246,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'intermediate',
                 'description': 'Single-leg exercise for quads and glutes',
-                'instructions': '1. Hold dumbbells at sides\n2. Step forward and lower hips\n3. Front knee reaches 90 degrees\n4. Return and alternate legs',
+                'instructions': (
+                    '1. Hold dumbbells at sides\n'
+                    '2. Step forward and lower hips\n'
+                    '3. Front knee reaches 90 degrees\n'
+                    '4. Return and alternate legs'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['lower_body']],
                 'primary_muscles': [muscles['quadriceps'], muscles['glutes']],
@@ -235,7 +265,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'intermediate',
                 'description': 'Hip hinge movement targeting hamstrings and glutes',
-                'instructions': '1. Stand with feet hip-width apart holding barbell\n2. Push hips back while keeping legs straight\n3. Feel hamstring stretch\n4. Return to standing',
+                'instructions': (
+                    '1. Stand with feet hip-width apart holding barbell\n'
+                    '2. Push hips back while keeping legs straight\n'
+                    '3. Feel hamstring stretch\n'
+                    '4. Return to standing'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['lower_body']],
                 'primary_muscles': [muscles['hamstrings'], muscles['glutes']],
@@ -251,7 +286,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'advanced',
                 'description': 'Full-body compound movement with emphasis on posterior chain',
-                'instructions': '1. Stand with feet under barbell\n2. Grip with hands just outside legs\n3. Pull bar from ground to hip height\n4. Lower with control',
+                'instructions': (
+                    '1. Stand with feet under barbell\n'
+                    '2. Grip with hands just outside legs\n'
+                    '3. Pull bar from ground to hip height\n'
+                    '4. Lower with control'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['full_body']],
                 'primary_muscles': [muscles['glutes'], muscles['hamstrings'], muscles['lower back']],
@@ -266,7 +306,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['strength'],
                 'difficulty': 'beginner',
                 'description': 'Isometric core exercise for abdominal strength',
-                'instructions': '1. Support body on forearms and toes\n2. Keep body in straight line\n3. Engage core throughout\n4. Hold for time',
+                'instructions': (
+                    '1. Support body on forearms and toes\n'
+                    '2. Keep body in straight line\n'
+                    '3. Engage core throughout\n'
+                    '4. Hold for time'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['core']],
                 'primary_muscles': [muscles['abs'], muscles['transverse abdominis']],
@@ -282,7 +327,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['cardio'],
                 'difficulty': 'intermediate',
                 'description': 'Steady-state cardiovascular exercise',
-                'instructions': '1. Warm up with light jogging\n2. Run at moderate pace for duration\n3. Cool down with walking\n4. Stretch afterwards',
+                'instructions': (
+                    '1. Warm up with light jogging\n'
+                    '2. Run at moderate pace for duration\n'
+                    '3. Cool down with walking\n'
+                    '4. Stretch afterwards'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['full_body'], muscle_groups['lower_body']],
                 'primary_muscles': [muscles['quadriceps'], muscles['hamstrings'], muscles['calves']],
@@ -297,7 +347,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['cardio'],
                 'difficulty': 'beginner',
                 'description': 'Low-impact cardiovascular exercise',
-                'instructions': '1. Set appropriate seat height\n2. Pedal at steady cadence\n3. Maintain moderate intensity\n4. Cool down after',
+                'instructions': (
+                    '1. Set appropriate seat height\n'
+                    '2. Pedal at steady cadence\n'
+                    '3. Maintain moderate intensity\n'
+                    '4. Cool down after'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['lower_body'], muscle_groups['full_body']],
                 'primary_muscles': [muscles['quadriceps'], muscles['calves'], muscles['glutes']],
@@ -310,7 +365,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['cardio'],
                 'difficulty': 'intermediate',
                 'description': 'Full-body cardio exercise with upper body emphasis',
-                'instructions': '1. Sit with feet secured\n2. Drive with legs while pulling handle\n3. Extend arms at finish\n4. Reverse motion smoothly',
+                'instructions': (
+                    '1. Sit with feet secured\n'
+                    '2. Drive with legs while pulling handle\n'
+                    '3. Extend arms at finish\n'
+                    '4. Reverse motion smoothly'
+                ),
                 'location': 'gym',
                 'muscle_groups': [muscle_groups['full_body']],
                 'primary_muscles': [muscles['lats'], muscles['hamstrings'], muscles['glutes']],
@@ -325,7 +385,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['endurance'],
                 'difficulty': 'advanced',
                 'description': 'Alternating high and low intensity intervals for endurance building',
-                'instructions': '1. Warm up thoroughly\n2. Perform 30 sec high intensity\n3. Rest 30 sec low intensity\n4. Repeat 8-10 rounds',
+                'instructions': (
+                    '1. Warm up thoroughly\n'
+                    '2. Perform 30 sec high intensity\n'
+                    '3. Rest 30 sec low intensity\n'
+                    '4. Repeat 8-10 rounds'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['full_body']],
                 'primary_muscles': [muscles['quadriceps'], muscles['hamstrings'], muscles['glutes']],
@@ -339,7 +404,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['endurance'],
                 'difficulty': 'beginner',
                 'description': 'Upper body endurance exercise using body weight',
-                'instructions': '1. Position hands under shoulders\n2. Lower body until chest near floor\n3. Push back to start\n4. Repeat for reps/time',
+                'instructions': (
+                    '1. Position hands under shoulders\n'
+                    '2. Lower body until chest near floor\n'
+                    '3. Push back to start\n'
+                    '4. Repeat for reps/time'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['chest'], muscles['triceps'], muscles['shoulders']],
@@ -355,7 +425,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['flexibility'],
                 'difficulty': 'beginner',
                 'description': 'Mind-body practice improving flexibility and balance',
-                'instructions': '1. Follow instructor or video\n2. Hold poses with proper alignment\n3. Focus on breathing\n4. Cool down with savasana',
+                'instructions': (
+                    '1. Follow instructor or video\n'
+                    '2. Hold poses with proper alignment\n'
+                    '3. Focus on breathing\n'
+                    '4. Cool down with savasana'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['full_body']],
                 'primary_muscles': [muscles['hamstrings'], muscles['hip flexors']],
@@ -368,7 +443,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['flexibility'],
                 'difficulty': 'beginner',
                 'description': 'Self-myofascial release for muscle recovery and flexibility',
-                'instructions': '1. Position foam roller under muscle\n2. Roll slowly over tender points\n3. Pause on tight spots for 30 sec\n4. Work entire muscle group',
+                'instructions': (
+                    '1. Position foam roller under muscle\n'
+                    '2. Roll slowly over tender points\n'
+                    '3. Pause on tight spots for 30 sec\n'
+                    '4. Work entire muscle group'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['full_body']],
                 'primary_muscles': [muscles['hamstrings'], muscles['quadriceps'], muscles['lats']],
@@ -383,7 +463,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['rehab'],
                 'difficulty': 'beginner',
                 'description': 'Gentle shoulder exercises for injury recovery',
-                'instructions': '1. Start with light resistance band\n2. Perform slow, controlled movements\n3. Focus on form over weight\n4. Avoid pain',
+                'instructions': (
+                    '1. Start with light resistance band\n'
+                    '2. Perform slow, controlled movements\n'
+                    '3. Focus on form over weight\n'
+                    '4. Avoid pain'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['upper_body']],
                 'primary_muscles': [muscles['shoulders']],
@@ -397,7 +482,12 @@ class Command(BaseCommand):
                 'exercise_type': exercise_types['rehab'],
                 'difficulty': 'beginner',
                 'description': 'Controlled exercises for knee injury recovery',
-                'instructions': '1. Perform isometric holds\n2. Slow range of motion\n3. Build strength gradually\n4. Follow PT protocol',
+                'instructions': (
+                    '1. Perform isometric holds\n'
+                    '2. Slow range of motion\n'
+                    '3. Build strength gradually\n'
+                    '4. Follow PT protocol'
+                ),
                 'location': 'both',
                 'muscle_groups': [muscle_groups['lower_body']],
                 'primary_muscles': [muscles['quadriceps']],
