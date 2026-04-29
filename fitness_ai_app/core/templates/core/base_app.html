@@ -76,9 +76,9 @@
 <div id="ach-toast" style="
   display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
   background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(246,125,38,0.4);
-  border-radius:14px;padding:12px 18px;display:flex;align-items:center;gap:12px;
+  border-radius:14px;padding:12px 18px;align-items:center;gap:12px;
   box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:9999;max-width:320px;width:90%;
-  animation:ach-slide-in 0.3s ease;pointer-events:none;
+  pointer-events:none;
 " aria-live="polite">
   <span id="ach-toast-emoji" style="font-size:1.4rem;">🏆</span>
   <div style="flex:1;min-width:0;">
@@ -112,9 +112,17 @@
     if (!toast) return;
     document.getElementById('ach-toast-emoji').textContent = achievement.emoji || '🏆';
     document.getElementById('ach-toast-title').textContent = achievement.title || '';
+    // Reset animation by toggling display
+    toast.style.display = 'none';
+    // Force reflow so the animation replays
+    void toast.offsetWidth;
     toast.style.display = 'flex';
-    // Hide after 4.5s
-    setTimeout(function() { toast.style.display = 'none'; }, 4500);
+    toast.style.animation = 'none';
+    void toast.offsetWidth;
+    toast.style.animation = 'ach-slide-in 0.3s ease';
+    // Auto-hide after 10s
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(function() { toast.style.display = 'none'; }, 10000);
   }
 
   // Main check function. Accepts optional preloaded data to skip the fetch.
