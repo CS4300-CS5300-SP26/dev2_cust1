@@ -289,7 +289,7 @@
                         <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
                         <input type="number" name="food_calories" id="foodCaloriesInput" placeholder="Calories" required min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
                             <input type="number" name="protein" id="foodProteinInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
@@ -302,6 +302,24 @@
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
                             <input type="number" name="fats" id="foodFatsInput" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                <input type="text" id="foodServingsInput" name="serving_size" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                <select id="foodUnitSelect" name="serving_unit" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                    <option value="serving">serving</option>
+                                    <option value="grams">grams</option>
+                                    <option value="cups">cups</option>
+                                    <option value="ounces">ounces</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="servingInputError" style="color:#e74c3c;font-size:11px;margin-top:4px;display:none;"></div>
                     </div>
                     <button type="submit" id="addFoodItemBtn" style="width:100%;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
                 </form>
@@ -392,10 +410,25 @@
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Calories</label>
                             <input type="number" id="mealFoodCaloriesInput" placeholder="Calories" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
-                        <div class="meal-macro-grid" style="margin-bottom:12px;">
+                        <div class="meal-macro-grid" style="margin-bottom:8px;">
                             <input type="number" id="mealFoodProteinInput" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                             <input type="number" id="mealFoodCarbsInput" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                             <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                <input type="text" id="mealFoodServingsInput" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                <select id="mealFoodUnitSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                    <option value="serving">serving</option>
+                                    <option value="grams">grams</option>
+                                    <option value="cups">cups</option>
+                                    <option value="ounces">ounces</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="meal-action-row">
                             <button type="button" id="mealAddItemBtn" style="flex:1;padding:10px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:14px;">Add Food Item</button>
@@ -535,7 +568,7 @@
                                 <span class="food-name">{{ item.name }}</span>
                                 <span class="food-calories">{{ item.calories }}</span>
                                 <div style="display:flex;gap:10px;align-items:center;margin-left:auto;">
-                                    <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
+                                    <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}', '{{ item.serving_size }}', '{{ item.serving_unit|escapejs }}')">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M12 20h9"></path>
                                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
@@ -603,7 +636,7 @@
                                     <span class="food-name">{{ item.name }}</span>
                                     <span class="food-calories">{{ item.calories }}</span>
                                     <div style="display:flex;gap:10px;align-items:center;margin-left:auto;">
-                                        <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}')">
+                                        <button type="button" class="edit-item-btn" title="Edit item" onclick="editFoodItem('{{ item.id }}', '{{ meal.id }}', '{{ item.name|escapejs }}', '{{ item.calories }}', '{{ item.protein }}', '{{ item.carbs }}', '{{ item.fats }}', '{{ item.serving_size }}', '{{ item.serving_unit|escapejs }}')">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M12 20h9"></path>
                                                 <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"></path>
@@ -683,6 +716,21 @@
                                     <input type="number" name="protein" class="food-protein-input" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                     <input type="number" name="carbs" class="food-carbs-input" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                                     <input type="number" name="fats" class="food-fats-input" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                                    <div>
+                                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Number of Servings</label>
+                                        <input type="text" name="serving_size" class="food-serving-input" placeholder="e.g. 1, 0.5, 1/2" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Unit</label>
+                                        <select name="serving_unit" class="food-unit-select" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:#1a1a1a;color:white;font-size:12px;box-sizing:border-box;">
+                                        <option value="serving">serving</option>
+                                        <option value="grams">grams</option>
+                                        <option value="cups">cups</option>
+                                        <option value="ounces">ounces</option>
+                                    </select>
+                                    </div>
                                 </div>
                                 <button type="submit" style="width:100%;padding:8px;background-color:var(--accent);border:none;border-radius:6px;color:white;font-weight:600;cursor:pointer;font-size:12px;">Add Food Item</button>
                             </form>
@@ -1042,7 +1090,7 @@
                     .then(data => {
                         if (data.results && data.results.length > 0) {
                             resultsDiv.innerHTML = data.results.map(function(item) {
-                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
+                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" data-unit="${item.serving_unit || 'serving'}" data-size="${item.serving_size || 1}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
                                     <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
                                     <div style="font-size:11px;color:#888;margin-top:2px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
                                 </div>`;
@@ -1058,6 +1106,26 @@
                                     form.querySelector('.food-protein-input').value = this.dataset.protein;
                                     form.querySelector('.food-carbs-input').value = this.dataset.carbs;
                                     form.querySelector('.food-fats-input').value = this.dataset.fats;
+                                    const unitSel = form.querySelector('.food-unit-select');
+                                    const servingIn = form.querySelector('.food-serving-input');
+                                    const unit = this.dataset.unit || 'serving';
+                                    const size = parseFloat(this.dataset.size) || 1;
+                                    if (servingIn) servingIn.value = size;
+                                    if (unitSel) {
+                                        let found = false;
+                                        for (const opt of unitSel.options) { if (opt.value === unit) { found = true; break; } }
+                                        if (!found) { const o = document.createElement('option'); o.value = unit; o.textContent = unit; unitSel.appendChild(o); }
+                                        unitSel.dataset.prevUnit = unit;
+                                        unitSel.value = unit;
+                                    }
+                                    // Store nutrition anchor for live scaling
+                                    form.dataset.nutritionBase = JSON.stringify(buildNutritionBase(
+                                        parseInt(this.dataset.calories) || 0,
+                                        parseInt(this.dataset.protein)  || 0,
+                                        parseInt(this.dataset.carbs)    || 0,
+                                        parseInt(this.dataset.fats)     || 0,
+                                        size, unit
+                                    ));
                                     resultsDiv.style.display = 'none';
                                 });
                                 
@@ -1080,9 +1148,9 @@
             }, 300);
         });
         
-        // Hide results when clicking outside or when leaving the input field
+        // Hide results when clicking outside or when leaving the input field — defer so click fires first
         input.addEventListener('blur', function() {
-            resultsDiv.style.display = 'none';
+            setTimeout(() => { resultsDiv.style.display = 'none'; }, 150);
         });
         
         // Also hide when clicking on other form inputs
@@ -1639,6 +1707,12 @@
         document.getElementById('addSupplementBtn').textContent = 'Add Supplement';
         document.getElementById('foodItemId').value = '';
         document.getElementById('supplementMealSupplementId').value = '';
+        document.getElementById('foodServingsInput').value = '1';
+        const _unitSelReset = document.getElementById('foodUnitSelect');
+        _unitSelReset.value = 'serving';
+        _unitSelReset.dataset.prevUnit = 'serving';
+        document.getElementById('servingInputError').style.display = 'none';
+        modalNutritionBase = null;
         resetMealFlow();
     }
 
@@ -1655,7 +1729,7 @@
         currentModalMealName = mealName || '';
     }
     
-    function editFoodItem(itemId, mealId, name, calories, protein, carbs, fats) {
+    function editFoodItem(itemId, mealId, name, calories, protein, carbs, fats, servingSize, servingUnit) {
         document.getElementById('foodMealId').value = mealId;
         document.getElementById('foodItemId').value = itemId;
         document.getElementById('foodNameInput').value = name;
@@ -1663,6 +1737,8 @@
         document.getElementById('foodProteinInput').value = protein;
         document.getElementById('foodCarbsInput').value = carbs;
         document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('foodServingsInput').value = servingSize || '1';
+        setUnitDropdown('foodUnitSelect', servingUnit || 'serving');
         document.getElementById('addFoodItemBtn').textContent = 'Save Changes';
         addItemModal.style.display = 'flex';
         showFoodForm();
@@ -1752,6 +1828,11 @@
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
+        const mealServings = document.getElementById('mealFoodServingsInput');
+        if (mealServings) mealServings.value = '1';
+        const mealUnit = document.getElementById('mealFoodUnitSelect');
+        if (mealUnit) mealUnit.value = 'serving';
+        mealNutritionBase = null;
         currentModalGroupId = null;
         currentModalGroupName = null;
     }
@@ -1803,11 +1884,20 @@
             const proteinInput = document.getElementById('mealFoodProteinInput');
             const carbsInput = document.getElementById('mealFoodCarbsInput');
             const fatsInput = document.getElementById('mealFoodFatsInput');
+            const servingsInput = document.getElementById('mealFoodServingsInput');
+            const unitSelect = document.getElementById('mealFoodUnitSelect');
             const name = nameInput.value.trim();
             const calories = calInput.value.trim();
             if (!name || !calories) {
                 status.style.color = '#e74c3c';
                 status.textContent = 'Name and calories are required.';
+                return;
+            }
+            const servingVal = servingsInput ? servingsInput.value.trim() : '1';
+            const servingErr = validateServingSize(servingVal);
+            if (servingErr) {
+                status.style.color = '#e74c3c';
+                status.textContent = servingErr;
                 return;
             }
             const body = new URLSearchParams();
@@ -1817,6 +1907,8 @@
             body.append('protein', proteinInput.value || '0');
             body.append('carbs', carbsInput.value || '0');
             body.append('fats', fatsInput.value || '0');
+            body.append('serving_size', servingVal);
+            body.append('serving_unit', unitSelect ? unitSelect.value : 'serving');
             if (currentModalGroupId) body.append('group_id', currentModalGroupId);
             fetch("{% url 'add_food_item_ajax' %}", {
                 method: 'POST',
@@ -1864,7 +1956,7 @@
                 .then(data => {
                     if (data.results && data.results.length > 0) {
                         results.innerHTML = data.results.map(food => `
-                            <div class="meal-search-result" style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;" data-name="${food.name.replace(/"/g,'&quot;')}" data-cal="${food.calories}" data-p="${food.protein||0}" data-c="${food.carbs||0}" data-f="${food.fats||0}">
+                            <div class="meal-search-result" style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;" data-name="${food.name.replace(/"/g,'&quot;')}" data-cal="${food.calories}" data-p="${food.protein||0}" data-c="${food.carbs||0}" data-f="${food.fats||0}" data-unit="${(food.serving_unit||'serving').replace(/"/g,'&quot;')}" data-size="${food.serving_size||1}">
                                 <div style="color:white;font-weight:600;">${food.name}</div>
                                 <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P:${food.protein||0}g C:${food.carbs||0}g F:${food.fats||0}g</div>
                             </div>
@@ -1872,11 +1964,20 @@
                         results.querySelectorAll('.meal-search-result').forEach(el => {
                             el.addEventListener('mousedown', function(e) {
                                 e.preventDefault();
+                                const cal = parseFloat(this.dataset.cal) || 0;
+                                const p = parseFloat(this.dataset.p) || 0;
+                                const c = parseFloat(this.dataset.c) || 0;
+                                const f = parseFloat(this.dataset.f) || 0;
+                                const size = parseFloat(this.dataset.size) || 1;
+                                const unit = this.dataset.unit || 'serving';
                                 document.getElementById('mealFoodNameInput').value = this.dataset.name;
-                                document.getElementById('mealFoodCaloriesInput').value = this.dataset.cal;
-                                document.getElementById('mealFoodProteinInput').value = this.dataset.p;
-                                document.getElementById('mealFoodCarbsInput').value = this.dataset.c;
-                                document.getElementById('mealFoodFatsInput').value = this.dataset.f;
+                                document.getElementById('mealFoodCaloriesInput').value = cal;
+                                document.getElementById('mealFoodProteinInput').value = p;
+                                document.getElementById('mealFoodCarbsInput').value = c;
+                                document.getElementById('mealFoodFatsInput').value = f;
+                                document.getElementById('mealFoodServingsInput').value = size;
+                                setUnitDropdown('mealFoodUnitSelect', unit);
+                                mealNutritionBase = buildNutritionBase(cal, p, c, f, size, unit);
                                 results.style.display = 'none';
                             });
                         });
@@ -1908,7 +2009,7 @@
                 .then(data => {
                     if (data.results && data.results.length > 0) {
                         foodSearchResults.innerHTML = data.results.map(food => `
-                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectFoodResult(${food.id}, '${food.name}', ${food.calories}, ${food.protein || 0}, ${food.carbs || 0}, ${food.fats || 0})">
+                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectFoodResult(${food.id}, '${food.name.replace(/'/g, "\\'")}', ${food.calories}, ${food.protein || 0}, ${food.carbs || 0}, ${food.fats || 0}, '${(food.serving_unit || 'serving').replace(/'/g, "\\'")}', ${food.serving_size || 1})">
                                 <div style="color:white;font-weight:600;">${food.name}</div>
                                 <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
                             </div>
@@ -1921,19 +2022,25 @@
                 });
         });
         
-        // Delay hiding so a click on a result item fires before the dropdown disappears
+        // Close dropdown when leaving food input — defer so click fires first
         foodNameInput.addEventListener('blur', function() {
             setTimeout(() => { foodSearchResults.style.display = 'none'; }, 150);
         });
     }
     
-    function selectFoodResult(id, name, calories, protein, carbs, fats) {
+    function selectFoodResult(id, name, calories, protein, carbs, fats, servingUnit, servingSize) {
+        const size = parseFloat(servingSize) || 1;
+        const unit = servingUnit || 'serving';
         document.getElementById('foodNameInput').value = name;
         document.getElementById('foodCaloriesInput').value = calories;
         document.getElementById('foodProteinInput').value = protein;
         document.getElementById('foodCarbsInput').value = carbs;
         document.getElementById('foodFatsInput').value = fats;
+        document.getElementById('foodServingsInput').value = size;
+        setUnitDropdown('foodUnitSelect', unit);
         document.getElementById('foodSearchResults').style.display = 'none';
+        // Store nutrition base for live unit/serving conversion
+        modalNutritionBase = buildNutritionBase(calories, protein, carbs, fats, size, unit);
     }
     
     // Supplement search functionality
@@ -1974,5 +2081,335 @@
         document.getElementById('supplementUnitInput').value = unit;
         document.getElementById('supplementSearchResults').style.display = 'none';
     }
+
+    // ==================== MACRO UNIT CONVERSION ====================
+
+    const GRAMS_PER_UNIT = {
+        'grams': 1, 'g': 1,
+        'ounces': 28.3495, 'oz': 28.3495,
+        'cups': 240, 'cup': 240,
+        'tablespoons': 15, 'tablespoon': 15, 'tbsp': 15,
+        'teaspoons': 5, 'teaspoon': 5, 'tsp': 5,
+        'pounds': 453.592, 'pound': 453.592, 'lbs': 453.592, 'lb': 453.592,
+        'kilograms': 1000, 'kilogram': 1000, 'kg': 1000,
+        'milligrams': 0.001, 'milligram': 0.001, 'mg': 0.001,
+    };
+
+    // Per-gram nutrition anchor, set whenever a food is selected from search.
+    let modalNutritionBase = null;
+    let mealNutritionBase = null;
+
+    /**
+     * Builds a nutrition anchor from the stored serving data.
+     * Returns null when the unit is not measurable (e.g. "serving").
+     */
+    function buildNutritionBase(calories, protein, carbs, fats, servingSize, servingUnit) {
+        const unit = (servingUnit || '').toLowerCase().trim();
+        const gramsPerUnit = GRAMS_PER_UNIT[unit] || null;
+        const size = parseFloat(servingSize) || 1;
+        const totalGrams = gramsPerUnit ? size * gramsPerUnit : null;
+        return { calories, protein, carbs, fats, servingSize: size, servingUnit: unit, totalGrams };
+    }
+
+    function applyNutritionFromBase(base, currentServings, currentUnit, calEl, protEl, carbEl, fatEl) {
+        if (!base) return;
+        const n = parseServingSize(String(currentServings));
+        if (isNaN(n) || n <= 0) return;
+
+        const unit = (currentUnit || '').toLowerCase().trim();
+        const gramsPerUnit = GRAMS_PER_UNIT[unit] || null;
+
+        let scale;
+        if (gramsPerUnit && base.totalGrams) {
+            // Both units are measurable (grams, cups, oz, …) → scale by gram ratio
+            scale = (n * gramsPerUnit) / base.totalGrams;
+        } else if (!gramsPerUnit && !base.totalGrams) {
+            // Both units are non-measurable (e.g. "serving") → scale by serving count
+            scale = n / base.servingSize;
+        } else if (unit === base.servingUnit) {
+            // Same unit regardless of measurability → scale by serving count
+            scale = n / base.servingSize;
+        } else {
+            // Incompatible (measurable ↔ non-measurable) — leave values alone
+            return;
+        }
+
+        calEl.value  = Math.round(base.calories  * scale);
+        protEl.value = Math.round(base.protein   * scale);
+        carbEl.value = Math.round(base.carbs     * scale);
+        fatEl.value  = Math.round(base.fats      * scale);
+    }
+
+    // Wire the main modal food form
+    (function setupModalConversion() {
+        const servingsIn = document.getElementById('foodServingsInput');
+        const unitSel    = document.getElementById('foodUnitSelect');
+        const calIn      = document.getElementById('foodCaloriesInput');
+        const protIn     = document.getElementById('foodProteinInput');
+        const carbIn     = document.getElementById('foodCarbsInput');
+        const fatIn      = document.getElementById('foodFatsInput');
+
+        // Initialise prevUnit tracking on the element itself so setUnitDropdown can update it too
+        unitSel.dataset.prevUnit = unitSel.value;
+        // Capture the value just before the user opens the dropdown
+        unitSel.addEventListener('mousedown', function() {
+            this.dataset.prevUnit = this.value;
+        });
+
+        unitSel.addEventListener('change', function() {
+            const prevUnit = unitSel.dataset.prevUnit || unitSel.value;
+            const newUnit  = unitSel.value;
+
+            // If no anchor yet, build one from whatever is currently in the form.
+            if (!modalNutritionBase) {
+                const n = parseServingSize(servingsIn.value);
+                if (!isNaN(n) && n > 0) {
+                    modalNutritionBase = buildNutritionBase(
+                        parseInt(calIn.value)  || 0,
+                        parseInt(protIn.value) || 0,
+                        parseInt(carbIn.value) || 0,
+                        parseInt(fatIn.value)  || 0,
+                        n, prevUnit
+                    );
+                }
+            }
+            applyNutritionFromBase(modalNutritionBase, servingsIn.value, newUnit, calIn, protIn, carbIn, fatIn);
+            unitSel.dataset.prevUnit = newUnit;
+        });
+
+        servingsIn.addEventListener('input', function() {
+            applyNutritionFromBase(modalNutritionBase, servingsIn.value, unitSel.value, calIn, protIn, carbIn, fatIn);
+        });
+
+        // Manually editing a macro clears the anchor so the values aren't overwritten
+        [calIn, protIn, carbIn, fatIn].forEach(el => {
+            el.addEventListener('input', () => { modalNutritionBase = null; });
+        });
+        document.getElementById('foodNameInput').addEventListener('input', () => { modalNutritionBase = null; });
+    })();
+
+    // Wire the meal batch-add form
+    (function setupMealConversion() {
+        const servingsIn = document.getElementById('mealFoodServingsInput');
+        const unitSel    = document.getElementById('mealFoodUnitSelect');
+        const calIn      = document.getElementById('mealFoodCaloriesInput');
+        const protIn     = document.getElementById('mealFoodProteinInput');
+        const carbIn     = document.getElementById('mealFoodCarbsInput');
+        const fatIn      = document.getElementById('mealFoodFatsInput');
+        if (!servingsIn || !unitSel) return;
+
+        unitSel.dataset.prevUnit = unitSel.value;
+        unitSel.addEventListener('mousedown', function() {
+            this.dataset.prevUnit = this.value;
+        });
+
+        unitSel.addEventListener('change', function() {
+            const prevUnit = unitSel.dataset.prevUnit || unitSel.value;
+            const newUnit  = unitSel.value;
+
+            if (!mealNutritionBase) {
+                const n = parseServingSize(servingsIn.value);
+                if (!isNaN(n) && n > 0) {
+                    mealNutritionBase = buildNutritionBase(
+                        parseInt(calIn.value)  || 0,
+                        parseInt(protIn.value) || 0,
+                        parseInt(carbIn.value) || 0,
+                        parseInt(fatIn.value)  || 0,
+                        n, prevUnit
+                    );
+                }
+            }
+            applyNutritionFromBase(mealNutritionBase, servingsIn.value, newUnit, calIn, protIn, carbIn, fatIn);
+            unitSel.dataset.prevUnit = newUnit;
+        });
+
+        servingsIn.addEventListener('input', function() {
+            applyNutritionFromBase(mealNutritionBase, servingsIn.value, unitSel.value, calIn, protIn, carbIn, fatIn);
+        });
+
+        [calIn, protIn, carbIn, fatIn].forEach(el => {
+            if (el) el.addEventListener('input', () => { mealNutritionBase = null; });
+        });
+        const nameIn = document.getElementById('mealFoodNameInput');
+        if (nameIn) nameIn.addEventListener('input', () => { mealNutritionBase = null; });
+    })();
+
+    // ==================== SERVING SIZE HELPERS ====================
+
+    function parseServingSize(val) {
+        val = (val || '').trim();
+        if (val.includes('/')) {
+            const parts = val.split('/');
+            if (parts.length !== 2) return NaN;
+            const num = parseFloat(parts[0].trim());
+            const den = parseFloat(parts[1].trim());
+            if (isNaN(num) || isNaN(den) || den === 0) return NaN;
+            return num / den;
+        }
+        return parseFloat(val);
+    }
+
+    // Returns an error string if invalid, or null if valid.
+    function validateServingSize(val) {
+        const n = parseServingSize(val);
+        if (isNaN(n) || n <= 0) return 'Enter a positive number, decimal, or fraction (e.g. 1, 0.5, 1/2).';
+        if (n > 1000) return 'Serving size cannot exceed 1000.';
+        return null;
+    }
+
+    // Sets a <select> to the given unit value, adding the option if not present.
+    function setUnitDropdown(selectId, unit) {
+        const sel = document.getElementById(selectId);
+        if (!sel || !unit) return;
+        // Record current value as prevUnit BEFORE changing it
+        sel.dataset.prevUnit = sel.value;
+        let found = false;
+        for (const opt of sel.options) {
+            if (opt.value === unit) { found = true; break; }
+        }
+        if (!found) {
+            const opt = document.createElement('option');
+            opt.value = unit;
+            opt.textContent = unit;
+            sel.appendChild(opt);
+        }
+        sel.value = unit;
+    }
+
+    // Populates all unit dropdowns with units from the food database API.
+    function loadFoodUnits() {
+        fetch('/api/food_units/')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.units) return;
+                const selects = ['foodUnitSelect', 'mealFoodUnitSelect'];
+                selects.forEach(id => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    const existing = new Set(Array.from(sel.options).map(o => o.value));
+                    data.units.forEach(unit => {
+                        if (!existing.has(unit)) {
+                            const opt = document.createElement('option');
+                            opt.value = unit;
+                            opt.textContent = unit;
+                            sel.appendChild(opt);
+                        }
+                    });
+                });
+                // Also populate inline meal card unit selects
+                document.querySelectorAll('.food-unit-select').forEach(sel => {
+                    const existing = new Set(Array.from(sel.options).map(o => o.value));
+                    data.units.forEach(unit => {
+                        if (!existing.has(unit)) {
+                            const opt = document.createElement('option');
+                            opt.value = unit;
+                            opt.textContent = unit;
+                            sel.appendChild(opt);
+                        }
+                    });
+                });
+            })
+            .catch(() => {});
+    }
+
+    loadFoodUnits();
+
+    // Validate serving size on main food form submit and convert fractions to decimals.
+    document.getElementById('foodItemForm').addEventListener('submit', function(e) {
+        const servingsInput = document.getElementById('foodServingsInput');
+        const errorEl = document.getElementById('servingInputError');
+        const val = servingsInput.value.trim();
+        const err = validateServingSize(val);
+        if (err) {
+            e.preventDefault();
+            errorEl.textContent = err;
+            errorEl.style.display = 'block';
+            servingsInput.focus();
+            return;
+        }
+        errorEl.style.display = 'none';
+        // Convert fraction to decimal string for the backend.
+        const n = parseServingSize(val);
+        servingsInput.value = n.toFixed(4).replace(/\.?0+$/, '') || '1';
+    });
+
+    // Live validation feedback on the servings input.
+    document.getElementById('foodServingsInput').addEventListener('input', function() {
+        const errorEl = document.getElementById('servingInputError');
+        const err = validateServingSize(this.value);
+        if (err && this.value.trim() !== '') {
+            errorEl.textContent = err;
+            errorEl.style.display = 'block';
+        } else {
+            errorEl.style.display = 'none';
+        }
+    });
+
+    // Wire up live macro conversion + validation for inline meal card food forms.
+    document.querySelectorAll('.food-form').forEach(function(form) {
+        const servingIn = form.querySelector('.food-serving-input');
+        const unitSel   = form.querySelector('.food-unit-select');
+        const calIn     = form.querySelector('.food-calories-input');
+        const protIn    = form.querySelector('.food-protein-input');
+        const carbIn    = form.querySelector('.food-carbs-input');
+        const fatIn     = form.querySelector('.food-fats-input');
+
+        function getBase() {
+            try { return form.dataset.nutritionBase ? JSON.parse(form.dataset.nutritionBase) : null; }
+            catch(e) { return null; }
+        }
+        function clearBase() { form.dataset.nutritionBase = ''; }
+
+        if (unitSel) {
+            unitSel.dataset.prevUnit = unitSel.value;
+            unitSel.addEventListener('mousedown', function() { this.dataset.prevUnit = this.value; });
+            unitSel.addEventListener('change', function() {
+                const prevUnit = unitSel.dataset.prevUnit || unitSel.value;
+                const newUnit  = unitSel.value;
+                let base = getBase();
+                if (!base) {
+                    const n = parseServingSize(servingIn ? servingIn.value : '1');
+                    if (!isNaN(n) && n > 0) {
+                        base = buildNutritionBase(
+                            parseInt(calIn  ? calIn.value  : 0) || 0,
+                            parseInt(protIn ? protIn.value : 0) || 0,
+                            parseInt(carbIn ? carbIn.value : 0) || 0,
+                            parseInt(fatIn  ? fatIn.value  : 0) || 0,
+                            n, prevUnit
+                        );
+                        form.dataset.nutritionBase = JSON.stringify(base);
+                    }
+                }
+                applyNutritionFromBase(base, servingIn ? servingIn.value : '1', newUnit, calIn, protIn, carbIn, fatIn);
+                unitSel.dataset.prevUnit = newUnit;
+            });
+        }
+
+        if (servingIn) {
+            servingIn.addEventListener('input', function() {
+                applyNutritionFromBase(getBase(), servingIn.value, unitSel ? unitSel.value : 'serving', calIn, protIn, carbIn, fatIn);
+            });
+        }
+
+        if (calIn)  calIn.addEventListener('input',  clearBase);
+        if (protIn) protIn.addEventListener('input', clearBase);
+        if (carbIn) carbIn.addEventListener('input', clearBase);
+        if (fatIn)  fatIn.addEventListener('input',  clearBase);
+
+        form.addEventListener('submit', function(e) {
+            if (!servingIn) return;
+            const val = servingIn.value.trim();
+            const err = validateServingSize(val);
+            if (err) {
+                e.preventDefault();
+                alert(err);
+                servingIn.focus();
+                return;
+            }
+            const n = parseServingSize(val);
+            servingIn.value = n.toFixed(4).replace(/\.?0+$/, '') || '1';
+        });
+    });
+
 </script>
 {% endblock %}
