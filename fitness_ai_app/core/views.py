@@ -22,6 +22,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncWeek
 from django.urls import reverse
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
@@ -323,10 +324,10 @@ def _build_planner_action_response_multi_day(normalized_workouts, normalized_nut
     """Return UI metadata for the AI planner action button, supporting multi-day plans."""
     has_workouts = len(normalized_workouts) > 0
     has_nutrition = len(normalized_nutrition) > 0
-    
+
     if not has_workouts and not has_nutrition:
         return None
-    
+
     if has_workouts and has_nutrition:
         button_label = 'Add both exercises and nutritions'
         action_type = 'both'
@@ -336,9 +337,9 @@ def _build_planner_action_response_multi_day(normalized_workouts, normalized_nut
     else:
         button_label = 'Add nutritions'
         action_type = 'nutritions'
-    
+
     payload = {}
-    
+
     # Include ALL workouts as array if multiple, or single object if one
     if has_workouts:
         if len(normalized_workouts) == 1:
@@ -358,7 +359,7 @@ def _build_planner_action_response_multi_day(normalized_workouts, normalized_nut
                 }
                 for wk in normalized_workouts
             ]
-    
+
     # Include ALL nutrition as array if multiple, or single object if one
     if has_nutrition:
         if len(normalized_nutrition) == 1:
@@ -376,7 +377,7 @@ def _build_planner_action_response_multi_day(normalized_workouts, normalized_nut
                 }
                 for nt in normalized_nutrition
             ]
-    
+
     return {
         'type': action_type,
         'button_label': button_label,
@@ -451,32 +452,32 @@ def _extract_ai_planner_action(reply, user):
     # Handle both single-plan (dict) and multi-day (array) formats
     workout_plans_raw = raw_payload.get('workout_plan')
     nutrition_plans_raw = raw_payload.get('nutrition_plan')
-    
+
     # Convert to arrays for uniform processing
     if isinstance(workout_plans_raw, dict):
         workout_plans_raw = [workout_plans_raw]
     elif not isinstance(workout_plans_raw, list):
         workout_plans_raw = []
-    
+
     if isinstance(nutrition_plans_raw, dict):
         nutrition_plans_raw = [nutrition_plans_raw]
     elif not isinstance(nutrition_plans_raw, list):
         nutrition_plans_raw = []
-    
+
     # Normalize ALL plans for button response (not just first one)
     normalized_workouts = []
     normalized_nutrition = []
-    
+
     for raw_wk in workout_plans_raw:
         normalized = _normalize_ai_workout_plan(raw_wk, user)
         if normalized:
             normalized_workouts.append(normalized)
-    
+
     for raw_nt in nutrition_plans_raw:
         normalized = _normalize_ai_nutrition_plan(raw_nt)
         if normalized:
             normalized_nutrition.append(normalized)
-    
+
     planner_action = _build_planner_action_response_multi_day(normalized_workouts, normalized_nutrition)
     if not planner_action:
         return cleaned_reply, None
@@ -612,22 +613,22 @@ def _get_week_train_context(user, days_ahead=7):
     today = date.today()
     end_date = today + timedelta(days=days_ahead - 1)
     workouts = Workout.objects.filter(
-        user=user, 
-        date__gte=today, 
+        user=user,
+        date__gte=today,
         date__lte=end_date
     ).prefetch_related('exercises').order_by('date', 'created_at')
-    
+
     if not workouts:
         return 'Train Plan (Next 7 days): None planned'
-    
+
     lines = ['Train Plan (Next 7 days):']
     current_date = None
-    
+
     for workout in workouts:
         if workout.date != current_date:
             current_date = workout.date
             lines.append(f'  {current_date.strftime("%a, %b %d")}:')
-        
+
         exercises = workout.exercises.all()
         if not exercises:
             lines.append(f'    - {workout.name}: (no exercises)')
@@ -637,7 +638,7 @@ def _get_week_train_context(user, days_ahead=7):
                 status = '✓' if ex.completed else '○'
                 weight_str = f' @ {ex.weight}lb' if ex.weight else ''
                 lines.append(f'      • {ex.name} ({ex.sets}x{ex.reps}{weight_str}){status}')
-    
+
     return '\n'.join(lines)
 
 
@@ -646,18 +647,18 @@ def _get_week_nutrition_context(user, days_ahead=7):
     today = date.today()
     end_date = today + timedelta(days=days_ahead - 1)
     meals = Meal.objects.filter(
-        user=user, 
-        date__gte=today, 
+        user=user,
+        date__gte=today,
         date__lte=end_date
     ).prefetch_related('items').order_by('date', 'created_at')
-    
+
     if not meals:
         return 'Nutrition Plan (Next 7 days): None planned'
-    
+
     lines = ['Nutrition Plan (Next 7 days):']
     current_date = None
     day_totals = {}
-    
+
     for meal in meals:
         if meal.date != current_date:
             if current_date is not None and current_date in day_totals:
@@ -669,7 +670,7 @@ def _get_week_nutrition_context(user, days_ahead=7):
             current_date = meal.date
             lines.append(f'  {current_date.strftime("%a, %b %d")}:')
             day_totals[current_date] = {'cals': 0, 'protein': 0, 'carbs': 0, 'fats': 0}
-        
+
         items = meal.items.all()
         if not items:
             lines.append(f'    - {meal.name}: (no items)')
@@ -678,7 +679,7 @@ def _get_week_nutrition_context(user, days_ahead=7):
             meal_protein = 0
             meal_carbs = 0
             meal_fats = 0
-            
+
             for item in items:
                 status = '✓' if item.completed else '○'
                 lines.append(
@@ -689,12 +690,12 @@ def _get_week_nutrition_context(user, days_ahead=7):
                 meal_protein += item.protein
                 meal_carbs += item.carbs
                 meal_fats += item.fats
-            
+
             day_totals[current_date]['cals'] += meal_cals
             day_totals[current_date]['protein'] += meal_protein
             day_totals[current_date]['carbs'] += meal_carbs
             day_totals[current_date]['fats'] += meal_fats
-    
+
     # Add final day total
     if current_date is not None and current_date in day_totals:
         totals = day_totals[current_date]
@@ -702,7 +703,7 @@ def _get_week_nutrition_context(user, days_ahead=7):
             f'    DAY TOTAL: {totals["cals"]} cal, {totals["protein"]}g P, '
             f'{totals["carbs"]}g C, {totals["fats"]}g F'
         )
-    
+
     return '\n'.join(lines)
 
 
@@ -1006,22 +1007,22 @@ def api_chat_stream(request):
                 messages=ai_messages,
                 stream=True,
             )
-            
+
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     token = chunk.choices[0].delta.content
                     full_reply += token
                     # Send token as SSE event
                     yield f"data: {json.dumps({'token': token})}\n\n"
-            
+
             # After streaming completes, extract planner action and save conversation
             cleaned_reply, planner_action = _extract_ai_planner_action(full_reply, request.user)
             _save_chat_conversation_state(conversation, messages_for_storage, cleaned_reply)
-            
+
             # If we cleaned the reply (removed payload), send the cleaned version to frontend
             if cleaned_reply != full_reply:
                 yield f"data: {json.dumps({'type': 'replace_text', 'text': cleaned_reply})}\n\n"
-            
+
             # Send metadata at end
             metadata = {
                 "type": "done",
@@ -1029,9 +1030,9 @@ def api_chat_stream(request):
             }
             if planner_action:
                 metadata['planner_action'] = planner_action
-            
+
             yield f"data: {json.dumps(metadata)}\n\n"
-            
+
         except Exception as e:
             error_data = {"type": "error", "error": str(e)}
             yield f"data: {json.dumps(error_data)}\n\n"
@@ -1062,18 +1063,18 @@ def api_chat_apply_plan(request):
     # Support both single plans and multiple plans (arrays for multi-day)
     raw_workout_plans = raw_payload.get('workout_plan')
     raw_nutrition_plans = raw_payload.get('nutrition_plan')
-    
+
     # Convert single plans to arrays for uniform processing
     if isinstance(raw_workout_plans, dict):
         raw_workout_plans = [raw_workout_plans]
     elif not isinstance(raw_workout_plans, list):
         raw_workout_plans = []
-    
+
     if isinstance(raw_nutrition_plans, dict):
         raw_nutrition_plans = [raw_nutrition_plans]
     elif not isinstance(raw_nutrition_plans, list):
         raw_nutrition_plans = []
-    
+
     if not raw_workout_plans and not raw_nutrition_plans:
         return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
 
@@ -1089,7 +1090,7 @@ def api_chat_apply_plan(request):
             workout_plan = _normalize_ai_workout_plan(raw_workout, request.user)
             if not workout_plan:
                 continue
-                
+
             workout = Workout.objects.create(
                 user=request.user,
                 name=workout_plan['workout_name'],
@@ -1116,7 +1117,7 @@ def api_chat_apply_plan(request):
             nutrition_plan = _normalize_ai_nutrition_plan(raw_nutrition)
             if not nutrition_plan:
                 continue
-                
+
             nutrition_date = nutrition_plan['date']
             for meal_data in nutrition_plan['meals']:
                 meal = Meal.objects.create(
@@ -1295,7 +1296,7 @@ def get_started_profile(request):
         user = request.user
         user.first_name = request.POST.get('name', user.first_name)
         user.save()
-        
+
         # Update or create user profile with fitness metrics
         from core.models import UserProfile
         profile, created = UserProfile.objects.get_or_create(user=user)
@@ -1303,7 +1304,7 @@ def get_started_profile(request):
         max_height_cm = 272
         min_weight_kg = 36
         max_weight_kg = 635
-        
+
         # Save calorie goal
         calorie_goal = request.POST.get('calorie_goal', '').strip()
         if calorie_goal:
@@ -1311,7 +1312,7 @@ def get_started_profile(request):
                 profile.calorie_goal = int(calorie_goal)
             except (ValueError, TypeError):
                 pass
-        
+
         # Save height (supports unit selection)
         height_unit = request.POST.get('height_unit', 'imperial').strip().lower()
         if height_unit == 'metric':
@@ -1345,7 +1346,7 @@ def get_started_profile(request):
                             profile.height = parsed_height_cm
                     except (ValueError, TypeError):
                         pass
-        
+
         # Save weight (supports unit selection)
         weight_unit = request.POST.get('weight_unit', 'lbs').strip().lower()
         if weight_unit == 'kg':
@@ -1376,7 +1377,7 @@ def get_started_profile(request):
                             profile.weight = round(parsed_weight_kg, 2)
                     except (ValueError, TypeError):
                         pass
-        
+
         # Save age
         age = request.POST.get('age', '').strip()
         if age:
@@ -1384,45 +1385,45 @@ def get_started_profile(request):
                 profile.age = int(age)
             except (ValueError, TypeError):
                 pass
-        
+
         # Save primary goal
         primary_goal = request.POST.get('primary_goal', '').strip()
         if primary_goal:
             profile.primary_goal = primary_goal
-        
+
         # Save experience level
         experience_level = request.POST.get('experience_level', '').strip()
         if experience_level:
             profile.experience_level = experience_level
-        
+
         # Save dietary preference
         dietary_preference = request.POST.get('dietary_preference', '').strip()
         if dietary_preference:
             profile.dietary_preference = dietary_preference
-        
+
         # Save home gym status
         has_home_gym = request.POST.get('has_home_gym', '').strip()
         if has_home_gym:
             profile.has_home_gym = has_home_gym == 'yes'
-        
+
         # Save home equipment (multiple selections)
         home_equipment = request.POST.getlist('home_equipment')
         profile.home_equipment = [eq for eq in home_equipment if eq]
-        
+
         # Save bio
         bio = request.POST.get('bio', '').strip()
         if bio:
             profile.bio = bio
         else:
             profile.bio = None
-        
+
         # Mark onboarding as completed
         profile.onboarding_completed = True
         profile.save()
-        
+
         messages.success(request, 'Profile updated successfully!')
         return redirect('home_dash')
-    
+
     # Handle GET request with skip parameter
     if request.GET.get('skip') == 'true':
         from core.models import UserProfile
@@ -1430,16 +1431,16 @@ def get_started_profile(request):
         profile.onboarding_completed = True
         profile.save()
         return redirect('home_dash')
-    
+
     # GET request - pass profile data to template
     from core.models import UserProfile
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     height_feet, height_inches = _height_cm_to_us(profile.height)
     weight_lbs = _weight_kg_to_lbs(profile.weight)
-    
+
     # Show skip button on first-time onboarding (any user who hasn't completed it yet)
     is_first_time_onboarding = not profile.onboarding_completed
-    
+
     return render(request, 'profile_dir/get_started_profile.html', {
         'active_tab': 'profile',
         'profile': profile,
@@ -1503,16 +1504,16 @@ def forgot_password(request):
         if form.is_valid():
             email = form.cleaned_data['email']
             start_time = time.time()
-            
+
             # Case-insensitive lookup on both email and username fields
             user = User.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).first()
-            
+
             if user:
                 try:
                     # Create password reset token
                     reset = PasswordReset.objects.create(user=user)
                     reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
-                    
+
                     # Send reset email
                     html_message = f"""
                     <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
@@ -1524,7 +1525,7 @@ def forgot_password(request):
                         <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
                     </div>
                     """
-                    
+
                     send_mail(
                         'Reset your Spotter.ai password',
                         f'Click this link to reset your password: {reset_url}',
@@ -1535,13 +1536,13 @@ def forgot_password(request):
                     )
                 except Exception as e:
                     logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
-            
+
             # Random delay between 0.5 and 3 seconds to prevent timing attacks
             elapsed = time.time() - start_time
             target_delay = random.uniform(0.5, 2.0)
             if elapsed < target_delay:
                 time.sleep(target_delay - elapsed)
-            
+
             messages.success(request, 'If an account exists with that email, you will receive a password reset link.')
             return redirect('user_login')
     else:
@@ -1579,10 +1580,10 @@ def reset_password(request, token):
             user = reset.user
             user.set_password(password)
             user.save()
-            
+
             reset.used = True
             reset.save()
-            
+
             messages.success(request, 'Your password has been reset. You can now log in.')
             return redirect('user_login')
     else:
@@ -1606,21 +1607,21 @@ def home_dash(request):
             return redirect('get_started_profile')
     except:
         pass
-    
+
     # Check for discard action from profile
     if request.GET.get('discard') == 'true':
         messages.info(request, 'Changes discarded. Nothing was saved.')
-    
+
     today = date.today()
     total_calories = FoodItem.objects.filter(
         meal__user=request.user,
         meal__date=today,
         completed=True
     ).aggregate(total=Sum('calories'))['total'] or 0
-    
+
     # Get calorie goal from user profile or use default
     calorie_goal = get_user_calorie_goal(request.user)
-    
+
     calories_percentage = (total_calories / calorie_goal) * 100 if calorie_goal > 0 else 0
     workout_goal = 5
     completed_exercises = Exercise.objects.filter(
@@ -1660,7 +1661,7 @@ def home_dash(request):
             streak_date -= timedelta(days=1)
             continue
         break
-    
+
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
@@ -1939,7 +1940,7 @@ def nutrition_page(request):
 
     # Get calorie goal from user profile or use default
     calorie_goal = get_user_calorie_goal(request.user)
-    
+
     calories_percentage = min(
         round(total_calories / calorie_goal * 100, 1) if calorie_goal else 0,
         100,
@@ -1947,7 +1948,7 @@ def nutrition_page(request):
 
     prev_date = (selected_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (selected_date + timedelta(days=1)).strftime('%Y-%m-%d')
-    
+
     # Get supplements for the selected date
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
@@ -1974,17 +1975,17 @@ def nutrition_page(request):
 def add_meal(request):
     date_param = request.POST.get('date')
     meal_name = request.POST.get('meal_name', '').strip()
-    
+
     if not date_param:
         messages.error(request, 'Date is required.')
         return redirect(reverse('nutrition_page'))
-    
+
     try:
         meal_date = datetime.strptime(date_param, '%Y-%m-%d').date()
     except ValueError:
         messages.error(request, 'Invalid date format.')
         return redirect(reverse('nutrition_page'))
-    
+
     # If no meal name provided, auto-generate based on time of day
     if not meal_name:
         current_hour = datetime.now().hour
@@ -1994,12 +1995,12 @@ def add_meal(request):
             meal_name = 'Lunch'
         else:
             meal_name = 'Dinner'
-        
+
         # Check if this meal already exists for today, if so add a number
         existing_meals = Meal.objects.filter(user=request.user, date=meal_date, name=meal_name).count()
         if existing_meals > 0:
             meal_name = f'{meal_name} {existing_meals + 1}'
-    
+
     Meal.objects.create(user=request.user, name=meal_name, date=meal_date)
     messages.success(request, f'Meal "{meal_name}" added successfully.')
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
@@ -2013,31 +2014,31 @@ def add_food_item(request):
     food_calories = request.POST.get('food_calories', '0')
     item_id = request.POST.get('item_id')  # For editing
     date_param = request.POST.get('date')
-    
+
     if not meal_id or not food_name or not food_calories:
         messages.error(request, 'All fields are required.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
-    
+
     try:
         calories = int(food_calories)
     except ValueError:
         messages.error(request, 'Calories must be a number.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}")
-    
+
     # Optional macro fields
     protein = request.POST.get('protein', '0')
     carbs = request.POST.get('carbs', '0')
     fats = request.POST.get('fats', '0')
-    
+
     try:
         protein = int(protein) if protein else 0
         carbs = int(carbs) if carbs else 0
         fats = int(fats) if fats else 0
     except ValueError:
         protein = carbs = fats = 0
-    
+
     # Check if this is an update or create
     if item_id:
         try:
@@ -2125,11 +2126,11 @@ def create_food_group_ajax(request):
 def toggle_food_item(request):
     item_id = request.POST.get('item_id')
     date_param = request.POST.get('date')
-    
+
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.completed = not food_item.completed
     food_item.save()
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -2138,11 +2139,11 @@ def toggle_food_item(request):
 def delete_food_item(request):
     item_id = request.POST.get('item_id')
     date_param = request.POST.get('date')
-    
+
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
     food_item.delete()
     messages.success(request, 'Food item deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -2177,11 +2178,11 @@ def delete_food_group(request):
 def delete_meal(request):
     meal_id = request.POST.get('meal_id')
     date_param = request.POST.get('date')
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
     meal.delete()
     messages.success(request, 'Meal deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -2196,20 +2197,20 @@ def add_supplement_to_meal(request):
     supplement_id = request.POST.get('supplement_id')
     meal_supplement_id = request.POST.get('meal_supplement_id')  # For editing
     date_param = request.POST.get('date')
-    
+
     if not meal_id or not supplement_name:
         messages.error(request, 'Meal and supplement name are required.')
         return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-    
+
     meal = get_object_or_404(Meal, id=meal_id, user=request.user)
-    
+
     supplement_obj = None
     if supplement_id:
         try:
             supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
         except SupplementDatabase.DoesNotExist:
             pass
-    
+
     # Check if this is an update or create
     if meal_supplement_id:
         try:
@@ -2233,7 +2234,7 @@ def add_supplement_to_meal(request):
             unit=unit
         )
         messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
@@ -2242,11 +2243,11 @@ def add_supplement_to_meal(request):
 def toggle_meal_supplement(request):
     supplement_id = request.POST.get('supplement_id')
     date_param = request.POST.get('date')
-    
+
     supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
     supplement.taken = not supplement.taken
     supplement.save()
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
 
@@ -2255,17 +2256,307 @@ def toggle_meal_supplement(request):
 def delete_meal_supplement(request):
     supplement_id = request.POST.get('supplement_id')
     date_param = request.POST.get('date')
-    
+
     supplement = get_object_or_404(MealSupplement, id=supplement_id, meal__user=request.user)
     supplement.delete()
     messages.success(request, 'Supplement deleted.')
-    
+
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+def compute_achievements_challenges(user):
+    """
+    Compute achievement and challenge state for a user from the real database.
+    Shared by social_page (template render) and achievements_progress_api (JSON endpoint).
+    Returns a dict with achievements, challenges, and summary stats.
+    """
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # Monday
+    week_end = week_start + timedelta(days=6)  # Sunday
+    calorie_goal = get_user_calorie_goal(user)
+
+    # Completed exercises: count by workout date
+    exercise_by_date = dict(
+        Exercise.objects.filter(workout__user=user, completed=True)
+        .values('workout__date')
+        .annotate(count=Count('id'))
+        .values_list('workout__date', 'count')
+    )
+    total_exercises = sum(exercise_by_date.values())
+
+    # Completed workouts
+    completed_workouts_qs = Workout.objects.filter(user=user, status='completed')
+    total_workouts = completed_workouts_qs.count()
+    workout_dates = set(completed_workouts_qs.values_list('date', flat=True))
+
+    # Meals with at least one food item logged
+    meal_dates = set(
+        Meal.objects.filter(user=user, items__isnull=False)
+        .values_list('date', flat=True)
+        .distinct()
+    )
+    meals_this_week_days = len([d for d in meal_dates if week_start <= d <= week_end])
+
+    # Calorie totals by date (only completed food items)
+    calorie_by_date = dict(
+        FoodItem.objects.filter(meal__user=user, completed=True)
+        .values('meal__date')
+        .annotate(total=Sum('calories'))
+        .values_list('meal__date', 'total')
+    )
+    calorie_goal_days = {d for d, cal in calorie_by_date.items() if cal >= calorie_goal}
+
+    # Days with non-zero macros logged (completed items with any macro > 0)
+    macro_days = set(
+        FoodItem.objects.filter(meal__user=user, completed=True)
+        .filter(Q(protein__gt=0) | Q(carbs__gt=0) | Q(fats__gt=0))
+        .values_list('meal__date', flat=True)
+        .distinct()
+    )
+
+    # Activity streak (workout or meal days only)
+    all_activity_dates = workout_dates | meal_dates
+    activity_streak = 0
+    for i in range(400):
+        if (today - timedelta(days=i)) in all_activity_dates:
+            activity_streak += 1
+        else:
+            break
+    distinct_active_days = len(all_activity_dates)
+
+    # Week Warrior: most workouts in any single week
+    weekly_workout_counts = list(
+        completed_workouts_qs
+        .annotate(week=TruncWeek('date'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('count', flat=True)
+    )
+    max_weekly_workouts = max(weekly_workout_counts, default=0)
+    week_warrior_unlocked = max_weekly_workouts >= 5
+
+    # Weekly challenge data
+    exercises_this_week = sum(
+        v for d, v in exercise_by_date.items() if week_start <= d <= week_end
+    )
+    workouts_this_week = completed_workouts_qs.filter(
+        date__range=(week_start, week_end)
+    ).count()
+    calorie_goal_days_this_week = len(
+        [d for d in calorie_goal_days if week_start <= d <= week_end]
+    )
+    workout_dates_this_week = set(
+        completed_workouts_qs.filter(date__range=(week_start, week_end)).values_list('date', flat=True)
+    )
+    meal_dates_this_week = {d for d in meal_dates if week_start <= d <= week_end}
+    fuel_gains_days = len(workout_dates_this_week & meal_dates_this_week)
+
+    achievements = [
+        {
+            'id': 'first_rep',
+            'emoji': '🏋️',
+            'title': 'First Rep',
+            'desc': 'Logged your very first exercise',
+            'earned': total_exercises >= 1,
+            'progress': min(total_exercises, 1),
+            'goal': 1,
+            'rarity': 'common',
+        },
+        {
+            'id': 'nutrition_nerd',
+            'emoji': '🍎',
+            'title': 'Nutrition Nerd',
+            'desc': 'Logged meals on 7 different days',
+            'earned': len(meal_dates) >= 7,
+            'progress': min(len(meal_dates), 7),
+            'goal': 7,
+            'rarity': 'common',
+        },
+        {
+            'id': 'iron_will',
+            'emoji': '💪',
+            'title': 'Iron Will',
+            'desc': 'Completed 50 exercises total',
+            'earned': total_exercises >= 50,
+            'progress': min(total_exercises, 50),
+            'goal': 50,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'week_warrior',
+            'emoji': '🗓️',
+            'title': 'Week Warrior',
+            'desc': '5 workouts in a single week',
+            'earned': week_warrior_unlocked,
+            'progress': 5 if week_warrior_unlocked else min(max_weekly_workouts, 5),
+            'goal': 5,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'calorie_king',
+            'emoji': '🎯',
+            'title': 'Calorie King',
+            'desc': 'Hit your calorie goal on 5 different days',
+            'earned': len(calorie_goal_days) >= 5,
+            'progress': min(len(calorie_goal_days), 5),
+            'goal': 5,
+            'rarity': 'common',
+        },
+        {
+            'id': 'macro_master',
+            'emoji': '🥗',
+            'title': 'Macro Master',
+            'desc': 'Tracked macros on 10 different days',
+            'earned': len(macro_days) >= 10,
+            'progress': min(len(macro_days), 10),
+            'goal': 10,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'gym_rat',
+            'emoji': '🏟️',
+            'title': 'Gym Rat',
+            'desc': 'Completed 10 workouts total',
+            'earned': total_workouts >= 10,
+            'progress': min(total_workouts, 10),
+            'goal': 10,
+            'rarity': 'common',
+        },
+        {
+            'id': 'centurion',
+            'emoji': '🏆',
+            'title': 'Centurion',
+            'desc': 'Completed 100 exercises total',
+            'earned': total_exercises >= 100,
+            'progress': min(total_exercises, 100),
+            'goal': 100,
+            'rarity': 'epic',
+        },
+        {
+            'id': 'streak_legend',
+            'emoji': '⚡',
+            'title': 'Streak Legend',
+            'desc': 'Stayed active 7 days in a row',
+            'earned': activity_streak >= 7,
+            'progress': min(activity_streak, 7),
+            'goal': 7,
+            'rarity': 'rare',
+        },
+        {
+            'id': 'dedicated',
+            'emoji': '🔥',
+            'title': 'Dedicated',
+            'desc': 'Logged activity on 30 different days',
+            'earned': distinct_active_days >= 30,
+            'progress': min(distinct_active_days, 30),
+            'goal': 30,
+            'rarity': 'epic',
+        },
+    ]
+    achievements.sort(key=lambda a: (not a['earned'], -(a['progress'] / a['goal'])))
+
+    earned_ids = [a['id'] for a in achievements if a['earned']]
+
+    challenges = [
+        {
+            'id': 'workout_3x',
+            'emoji': '🏋️',
+            'title': 'Workout 3× This Week',
+            'desc': 'Complete 3 workouts between Monday and Sunday',
+            'progress': min(workouts_this_week, 3),
+            'goal': 3,
+            'completed': workouts_this_week >= 3,
+        },
+        {
+            'id': 'log_meals',
+            'emoji': '🍽️',
+            'title': 'Log Meals 5 Days This Week',
+            'desc': 'Track your nutrition on 5 different days',
+            'progress': min(meals_this_week_days, 5),
+            'goal': 5,
+            'completed': meals_this_week_days >= 5,
+        },
+        {
+            'id': 'exercises_20',
+            'emoji': '💥',
+            'title': 'Complete 20 Exercises This Week',
+            'desc': 'Finish 20 exercises across all workouts',
+            'progress': min(exercises_this_week, 20),
+            'goal': 20,
+            'completed': exercises_this_week >= 20,
+        },
+        {
+            'id': 'calorie_goal_3',
+            'emoji': '🎯',
+            'title': 'Hit Calorie Goal 3 Days',
+            'desc': 'Reach your calorie target on 3 days this week',
+            'progress': min(calorie_goal_days_this_week, 3),
+            'goal': 3,
+            'completed': calorie_goal_days_this_week >= 3,
+        },
+        {
+            'id': 'fuel_gains',
+            'emoji': '⚡',
+            'title': 'Fuel Your Gains',
+            'desc': 'Log food on the same day as a workout, 3 times this week',
+            'progress': min(fuel_gains_days, 3),
+            'goal': 3,
+            'completed': fuel_gains_days >= 3,
+        },
+    ]
+
+    return {
+        'achievements': achievements,
+        'challenges': challenges,
+        'earned_ids': earned_ids,
+        'earned_count': len(earned_ids),
+        'challenges_completed': sum(1 for c in challenges if c['completed']),
+        'activity_streak': activity_streak,
+        'distinct_active_days': distinct_active_days,
+        'total_exercises': total_exercises,
+        'total_workouts': total_workouts,
+        'week_start': week_start,
+        'week_end': week_end,
+    }
 
 
 @login_required
 def social_page(request):
-    return render(request, 'socal_dir/social_page.html', {'active_tab': 'social'})
+    data = compute_achievements_challenges(request.user)
+    return render(request, 'socal_dir/social_page.html', {
+        'active_tab': 'social',
+        'total_exercises': data['total_exercises'],
+        'total_workouts': data['total_workouts'],
+        'distinct_active_days': data['distinct_active_days'],
+        'activity_streak': data['activity_streak'],
+        'streak_to_legend': max(0, 7 - data['activity_streak']),
+        'earned_count': data['earned_count'],
+        'achievements': data['achievements'],
+        'earned_ids_json': json.dumps(data['earned_ids']),
+        'challenges': data['challenges'],
+        'challenges_completed': data['challenges_completed'],
+        'week_start': data['week_start'],
+        'week_end': data['week_end'],
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def achievements_progress_api(request):
+    """JSON endpoint returning current achievement and challenge state from the real DB."""
+    data = compute_achievements_challenges(request.user)
+    return JsonResponse({
+        'earned_ids': data['earned_ids'],
+        'achievements': data['achievements'],
+        'challenges': data['challenges'],
+        'stats': {
+            'activity_streak': data['activity_streak'],
+            'distinct_active_days': data['distinct_active_days'],
+            'total_exercises': data['total_exercises'],
+            'total_workouts': data['total_workouts'],
+            'challenges_completed': data['challenges_completed'],
+        },
+    })
 
 
 @login_required
@@ -2274,7 +2565,7 @@ def search_foods(request):
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
-    
+
     # Search for food items matching the query (case-insensitive)
     food_items = (
         FoodItem.objects
@@ -2282,7 +2573,7 @@ def search_foods(request):
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')[:20]
     )
-    
+
     # Deduplicate by name (keep entry with best macro data)
     seen_names = {}
     for item in food_items:
@@ -2295,7 +2586,7 @@ def search_foods(request):
             new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
             if new_score > existing_score:
                 seen_names[name_lower] = item
-    
+
     results = list(seen_names.values())
     return JsonResponse({'results': results})
 
@@ -2309,7 +2600,7 @@ def get_all_foods(request):
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')
     )
-    
+
     # Deduplicate by name (keep entry with best macro data)
     seen_names = {}
     for item in food_items:
@@ -2322,7 +2613,7 @@ def get_all_foods(request):
             new_score = (item['protein'] or 0) + (item['carbs'] or 0) + (item['fats'] or 0)
             if new_score > existing_score:
                 seen_names[name_lower] = item
-    
+
     # Sort by name alphabetically
     results = sorted(seen_names.values(), key=lambda x: x['name'].lower())
     return JsonResponse({'foods': results, 'count': len(results)})
@@ -2344,17 +2635,17 @@ def save_food_to_database(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    
+
     food_id = data.get('id')
     name = data.get('name', '').strip()
     calories = data.get('calories', 0)
     protein = data.get('protein', 0)
     carbs = data.get('carbs', 0)
     fats = data.get('fats', 0)
-    
+
     if not name:
         return JsonResponse({'error': 'Food name is required'}, status=400)
-    
+
     try:
         calories = int(calories) if calories else 0
         protein = int(protein) if protein else 0
@@ -2362,7 +2653,7 @@ def save_food_to_database(request):
         fats = int(fats) if fats else 0
     except ValueError:
         return JsonResponse({'error': 'Invalid numeric values'}, status=400)
-    
+
     # Get or create a system meal for storing database foods
     from django.contrib.auth.models import User
     system_user, _ = User.objects.get_or_create(
@@ -2374,7 +2665,7 @@ def save_food_to_database(request):
         name='Food Database',
         date=date(2000, 1, 1)
     )
-    
+
     if food_id:
         # Update existing food
         try:
@@ -2399,7 +2690,7 @@ def save_food_to_database(request):
             })
         except FoodItem.DoesNotExist:
             pass  # Fall through to create new
-    
+
     # Create new food item in database
     food_item = FoodItem.objects.create(
         meal=system_meal,
@@ -2410,7 +2701,7 @@ def save_food_to_database(request):
         fats=fats,
         completed=False
     )
-    
+
     return JsonResponse({
         'success': True,
         'message': f'Added "{name}" to database',
@@ -2435,7 +2726,7 @@ def get_all_supplements(request):
         .values('id', 'name', 'supplement_type', 'dosage', 'unit')
         .order_by('name')
     )
-    
+
     return JsonResponse({'supplements': list(supplements)})
 
 
@@ -2447,14 +2738,14 @@ def search_supplements(request):
     query = request.GET.get('q', '').strip()
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
-    
+
     supplements = (
         SupplementDatabase.objects
         .filter(name__icontains=query)
         .values('id', 'name', 'supplement_type', 'dosage', 'unit')
         .order_by('name')[:20]
     )
-    
+
     results = list(supplements)
     return JsonResponse({'results': results})
 
@@ -2473,42 +2764,42 @@ def supplement_entries(request):
                 entry_date = date.today()
         else:
             entry_date = date.today()
-        
+
         entries = SupplementEntry.objects.filter(
             user=request.user,
             date=entry_date
         ).values('id', 'name', 'supplement_type', 'dosage', 'unit', 'taken')
-        
+
         return JsonResponse({'entries': list(entries)})
-    
+
     elif request.method == 'POST':
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-        
+
         name = data.get('name', '').strip()
         supplement_type = data.get('supplement_type', 'other')
         dosage = data.get('dosage', '1')
         unit = data.get('unit', 'serving')
         entry_date = data.get('date', str(date.today()))
         supplement_id = data.get('supplement_id')
-        
+
         if not name:
             return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
-        
+
         try:
             entry_date = datetime.strptime(entry_date, '%Y-%m-%d').date()
         except ValueError:
             entry_date = date.today()
-        
+
         supplement_obj = None
         if supplement_id:
             try:
                 supplement_obj = SupplementDatabase.objects.get(id=supplement_id)
             except SupplementDatabase.DoesNotExist:
                 pass
-        
+
         entry = SupplementEntry.objects.create(
             user=request.user,
             supplement=supplement_obj,
@@ -2519,7 +2810,7 @@ def supplement_entries(request):
             date=entry_date,
             taken=False
         )
-        
+
         return JsonResponse({
             'success': True,
             'entry': {
@@ -2542,24 +2833,36 @@ def complete_workout(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     workout_id = data.get('workout_id')
-    
+
     if not workout_id:
         return JsonResponse({'success': False, 'error': 'workout_id is required'}, status=400)
-    
+
     try:
         workout = Workout.objects.get(id=workout_id, user=request.user)
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-    
+
     workout.status = 'completed'
     workout.save()
-    
+
+
+    progress = compute_achievements_challenges(request.user)
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
         'status': workout.status,
+        'achievement_progress': {
+            'earned_ids': progress['earned_ids'],
+            'challenges': progress['challenges'],
+            'stats': {
+                'activity_streak': progress['activity_streak'],
+                'total_workouts': progress['total_workouts'],
+                'total_exercises': progress['total_exercises'],
+            },
+        },
     })
 
 
@@ -2572,16 +2875,16 @@ def toggle_supplement_taken(request, entry_id):
         entry = SupplementEntry.objects.get(id=entry_id, user=request.user)
     except SupplementEntry.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Entry not found'}, status=404)
-    
+
     try:
         data = json.loads(request.body)
         taken = data.get('taken', not entry.taken)
     except json.JSONDecodeError:
         taken = not entry.taken
-    
+
     entry.taken = taken
     entry.save()
-    
+
     return JsonResponse({
         'success': True,
         'taken': entry.taken,
@@ -2597,26 +2900,26 @@ def save_workout_time(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     workout_id = data.get('workout_id')
     total_seconds = data.get('total_seconds')
-    
+
     if not workout_id or total_seconds is None:
         return JsonResponse({'success': False, 'error': 'workout_id and total_seconds are required'}, status=400)
-    
+
     try:
         total_seconds = int(total_seconds)
     except (TypeError, ValueError):
         return JsonResponse({'success': False, 'error': 'total_seconds must be an integer'}, status=400)
-    
+
     try:
         workout = Workout.objects.get(id=workout_id, user=request.user)
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-    
+
     workout.total_duration_seconds = total_seconds
     workout.save()
-    
+
     return JsonResponse({
         'success': True,
         'workout_id': workout.id,
@@ -2633,12 +2936,12 @@ def complete_exercises_by_ids(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     exercise_ids = data.get('exercise_ids', [])
-    
+
     if not exercise_ids or not isinstance(exercise_ids, list):
         return JsonResponse({'success': False, 'error': 'exercise_ids must be a non-empty list'}, status=400)
-    
+
     try:
         exercises = Exercise.objects.filter(id__in=exercise_ids, workout__user=request.user)
         completed_count = 0
@@ -2647,7 +2950,7 @@ def complete_exercises_by_ids(request):
                 exercise.completed = True
                 exercise.save()
                 completed_count += 1
-        
+
         return JsonResponse({
             'success': True,
             'completed_count': completed_count,
@@ -2666,35 +2969,35 @@ def save_set_progress(request):
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
-    
+
     set_data = data.get('set_data', [])  # List of {exercise_id, set_number, completed}
     timer_seconds = data.get('timer_seconds', 0)
     workout_id = data.get('workout_id')
-    
+
     if not set_data or not isinstance(set_data, list):
         return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
-    
+
     try:
         from django.db.models import Q
-        
+
         saved_count = 0
         for item in set_data:
             exercise_id = item.get('exercise_id')
             set_number = item.get('set_number')
             completed = item.get('completed', False)
-            
+
             if not exercise_id or not set_number:
                 continue
-            
+
             # Verify user owns this exercise
             exercise = Exercise.objects.filter(
-                id=exercise_id, 
+                id=exercise_id,
                 workout__user=request.user
             ).first()
-            
+
             if not exercise:
                 continue
-            
+
             # Create or update set progress
             from core.models import SetProgress
             progress, created = SetProgress.objects.update_or_create(
@@ -2703,7 +3006,7 @@ def save_set_progress(request):
                 defaults={'completed': completed}
             )
             saved_count += 1
-        
+
         # Save timer seconds to workout if provided
         if workout_id and timer_seconds >= 0:
             workout = Workout.objects.filter(
@@ -2713,7 +3016,7 @@ def save_set_progress(request):
             if workout:
                 workout.current_session_seconds = timer_seconds
                 workout.save(update_fields=['current_session_seconds'])
-        
+
         return JsonResponse({
             'success': True,
             'saved_count': saved_count,
@@ -2728,27 +3031,27 @@ def save_set_progress(request):
 def get_set_progress(request):
     """Get set completion status for a workout's exercises."""
     workout_id = request.GET.get('workout_id')
-    
+
     if not workout_id:
         return JsonResponse({'success': False, 'error': 'workout_id required'}, status=400)
-    
+
     try:
         from core.models import SetProgress
-        
+
         # Verify user owns this workout
         workout = Workout.objects.filter(
             id=workout_id,
             user=request.user
         ).first()
-        
+
         if not workout:
             return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
-        
+
         # Get all set progress for this workout's exercises
         progress = SetProgress.objects.filter(
             exercise__workout=workout
         ).values('exercise_id', 'set_number', 'completed')
-        
+
         set_progress_dict = {}
         for item in progress:
             exercise_id = item['exercise_id']
@@ -2758,7 +3061,7 @@ def get_set_progress(request):
                 'set_number': item['set_number'],
                 'completed': item['completed']
             })
-        
+
         return JsonResponse({
             'success': True,
             'set_progress': set_progress_dict,

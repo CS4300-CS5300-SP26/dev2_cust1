@@ -7441,3 +7441,560 @@ class PopulateSupplementsCommandTests(TestCase):
         out2 = StringIO()
         call_command('populate_supplements', stdout=out2)
         self.assertIn('Already exists', out2.getvalue())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Achievement & Challenge Tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+from datetime import date, timedelta
+from .models import Workout, Exercise, Meal, FoodItem
+from .views import compute_achievements_challenges
+
+
+class ComputeAchievementsChallengesTests(TestCase):
+    """Unit tests for the compute_achievements_challenges helper function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='ach@test.com', email='ach@test.com', password='Test1234!'
+        )
+
+    def _make_workout(self, status='completed', days_ago=0):
+        d = date.today() - timedelta(days=days_ago)
+        return Workout.objects.create(
+            user=self.user, name='W', goal='strength', status=status, date=d
+        )
+
+    def _make_exercise(self, workout, completed=True):
+        return Exercise.objects.create(
+            workout=workout, name='E', sets=3, reps=10, completed=completed
+        )
+
+    def _make_meal_with_food(self, days_ago=0, calories=500, protein=20, carbs=50, fats=10, completed=True):
+        d = date.today() - timedelta(days=days_ago)
+        meal = Meal.objects.create(user=self.user, name='M', date=d)
+        FoodItem.objects.create(
+            meal=meal, name='F', calories=calories,
+            protein=protein, carbs=carbs, fats=fats, completed=completed
+        )
+        return meal
+
+    # ── Return shape ──────────────────────────────────────────────────────────
+
+    def test_returns_required_keys(self):
+        data = compute_achievements_challenges(self.user)
+        for key in ('achievements', 'challenges', 'earned_ids', 'earned_count',
+                    'challenges_completed', 'activity_streak', 'distinct_active_days',
+                    'total_exercises', 'total_workouts', 'week_start', 'week_end'):
+            self.assertIn(key, data, f"Missing key: {key}")
+
+    def test_empty_user_has_no_earned_achievements(self):
+        data = compute_achievements_challenges(self.user)
+        self.assertEqual(data['earned_ids'], [])
+        self.assertEqual(data['earned_count'], 0)
+
+    def test_empty_user_has_zero_streak(self):
+        data = compute_achievements_challenges(self.user)
+        self.assertEqual(data['activity_streak'], 0)
+
+    # ── Individual achievement thresholds ─────────────────────────────────────
+
+    def test_first_rep_earned_after_one_completed_exercise(self):
+        w = self._make_workout()
+        self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('first_rep', data['earned_ids'])
+
+    def test_first_rep_not_earned_without_completed_exercise(self):
+        w = self._make_workout()
+        self._make_exercise(w, completed=False)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('first_rep', data['earned_ids'])
+
+    def test_nutrition_nerd_earned_after_7_meal_days(self):
+        for i in range(7):
+            self._make_meal_with_food(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('nutrition_nerd', data['earned_ids'])
+
+    def test_nutrition_nerd_not_earned_with_6_meal_days(self):
+        for i in range(6):
+            self._make_meal_with_food(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('nutrition_nerd', data['earned_ids'])
+
+    def test_gym_rat_earned_after_10_completed_workouts(self):
+        for i in range(10):
+            w = self._make_workout(days_ago=i)
+            self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('gym_rat', data['earned_ids'])
+
+    def test_gym_rat_not_earned_with_9_workouts(self):
+        for i in range(9):
+            self._make_workout(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('gym_rat', data['earned_ids'])
+
+    def test_gym_rat_requires_completed_status(self):
+        for i in range(10):
+            self._make_workout(status='planned', days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('gym_rat', data['earned_ids'])
+
+    def test_iron_will_earned_after_50_exercises(self):
+        w = self._make_workout()
+        for _ in range(50):
+            self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('iron_will', data['earned_ids'])
+
+    def test_centurion_earned_after_100_exercises(self):
+        w = self._make_workout()
+        for _ in range(100):
+            self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('centurion', data['earned_ids'])
+
+    def test_calorie_king_earned_after_hitting_goal_5_days(self):
+        # Default calorie goal is 2400; log 2500 cal completed on 5 days
+        for i in range(5):
+            self._make_meal_with_food(days_ago=i, calories=2500)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('calorie_king', data['earned_ids'])
+
+    def test_calorie_king_not_earned_without_completed_items(self):
+        # Food not marked completed — shouldn't count
+        for i in range(5):
+            self._make_meal_with_food(days_ago=i, calories=2500, completed=False)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('calorie_king', data['earned_ids'])
+
+    def test_macro_master_earned_after_10_days_with_macros(self):
+        for i in range(10):
+            self._make_meal_with_food(days_ago=i, protein=30, carbs=50, fats=10)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('macro_master', data['earned_ids'])
+
+    def test_macro_master_not_earned_with_zero_macros(self):
+        # Calories but no macros
+        for i in range(10):
+            self._make_meal_with_food(days_ago=i, protein=0, carbs=0, fats=0)
+        data = compute_achievements_challenges(self.user)
+        self.assertNotIn('macro_master', data['earned_ids'])
+
+    def test_streak_legend_earned_after_7_consecutive_days(self):
+        for i in range(7):
+            self._make_meal_with_food(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('streak_legend', data['earned_ids'])
+        self.assertEqual(data['activity_streak'], 7)
+
+    def test_streak_broken_by_gap(self):
+        # Days 0 and 2 (gap on day 1) — streak from today = 1
+        self._make_meal_with_food(days_ago=0)
+        self._make_meal_with_food(days_ago=2)
+        data = compute_achievements_challenges(self.user)
+        self.assertEqual(data['activity_streak'], 1)
+
+    def test_week_warrior_earned_after_5_workouts_in_one_week(self):
+        # Use the current calendar week (Mon–Sun) to avoid cross-week boundary issues
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        for i in range(5):
+            d = monday + timedelta(days=i)
+            Workout.objects.create(
+                user=self.user, name=f'W{i}', goal='strength',
+                status='completed', date=d
+            )
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('week_warrior', data['earned_ids'])
+
+    def test_dedicated_earned_after_30_distinct_activity_days(self):
+        for i in range(30):
+            self._make_meal_with_food(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        self.assertIn('dedicated', data['earned_ids'])
+
+    # ── Achievement sorting ───────────────────────────────────────────────────
+
+    def test_earned_achievements_appear_before_unearned(self):
+        w = self._make_workout()
+        self._make_exercise(w)  # earns first_rep
+        data = compute_achievements_challenges(self.user)
+        achievements = data['achievements']
+        earned_indices = [i for i, a in enumerate(achievements) if a['earned']]
+        unearned_indices = [i for i, a in enumerate(achievements) if not a['earned']]
+        if earned_indices and unearned_indices:
+            self.assertLess(max(earned_indices), min(unearned_indices))
+
+    def test_progress_percentage_tracked(self):
+        w = self._make_workout()
+        for _ in range(5):
+            self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        iron = next(a for a in data['achievements'] if a['id'] == 'iron_will')
+        self.assertEqual(iron['progress'], 5)
+        self.assertEqual(iron['goal'], 50)
+
+    # ── Weekly challenges ─────────────────────────────────────────────────────
+
+    def test_workout_3x_challenge_counts_only_this_week(self):
+        # Old workout (8 days ago — last week)
+        self._make_workout(days_ago=8)
+        # This week workouts
+        self._make_workout(days_ago=0)
+        self._make_workout(days_ago=1)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'workout_3x')
+        self.assertEqual(challenge['progress'], 2)
+        self.assertFalse(challenge['completed'])
+
+    def test_workout_3x_challenge_completes_at_3(self):
+        for i in range(3):
+            self._make_workout(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'workout_3x')
+        self.assertTrue(challenge['completed'])
+
+    def test_log_meals_challenge_counts_distinct_days(self):
+        # Two meals on same day only count as one
+        d = date.today()
+        meal1 = Meal.objects.create(user=self.user, name='Breakfast', date=d)
+        meal2 = Meal.objects.create(user=self.user, name='Lunch', date=d)
+        FoodItem.objects.create(meal=meal1, name='Oats', calories=300)
+        FoodItem.objects.create(meal=meal2, name='Rice', calories=400)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'log_meals')
+        self.assertEqual(challenge['progress'], 1)
+
+    def test_exercises_20_challenge_counts_completed_exercises_this_week(self):
+        w = self._make_workout(days_ago=0)
+        for _ in range(20):
+            self._make_exercise(w)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'exercises_20')
+        self.assertTrue(challenge['completed'])
+        self.assertEqual(challenge['progress'], 20)
+
+    def test_fuel_gains_requires_both_workout_and_meal_same_day(self):
+        # Workout today but no meal — should not count
+        self._make_workout(days_ago=0)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'fuel_gains')
+        self.assertEqual(challenge['progress'], 0)
+
+    def test_fuel_gains_counts_when_workout_and_meal_on_same_day(self):
+        self._make_workout(days_ago=0)
+        self._make_meal_with_food(days_ago=0)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'fuel_gains')
+        self.assertEqual(challenge['progress'], 1)
+
+    def test_fuel_gains_meal_without_workout_does_not_count(self):
+        # Meal but no workout on same day
+        self._make_meal_with_food(days_ago=0)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'fuel_gains')
+        self.assertEqual(challenge['progress'], 0)
+
+    def test_fuel_gains_completes_at_3_days(self):
+        for i in range(3):
+            self._make_workout(days_ago=i)
+            self._make_meal_with_food(days_ago=i)
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'fuel_gains')
+        self.assertTrue(challenge['completed'])
+
+    def test_calorie_goal_challenge_counts_days_hitting_goal_this_week(self):
+        self._make_meal_with_food(days_ago=0, calories=2500)  # hits 2400 default goal
+        self._make_meal_with_food(days_ago=1, calories=2500)
+        self._make_meal_with_food(days_ago=7, calories=2500)  # last week — shouldn't count
+        data = compute_achievements_challenges(self.user)
+        challenge = next(c for c in data['challenges'] if c['id'] == 'calorie_goal_3')
+        self.assertEqual(challenge['progress'], 2)
+
+
+class AchievementsProgressAPITests(TestCase):
+    """Tests for the /api/achievements/progress/ JSON endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='apiuser@test.com', email='apiuser@test.com', password='Test1234!'
+        )
+
+    def _make_workout(self, days_ago=0):
+        d = date.today() - timedelta(days=days_ago)
+        return Workout.objects.create(
+            user=self.user, name='W', goal='strength', status='completed', date=d
+        )
+
+    def _make_exercise(self, workout):
+        return Exercise.objects.create(
+            workout=workout, name='E', sets=3, reps=10, completed=True
+        )
+
+    def test_requires_authentication(self):
+        response = self.client.get('/api/achievements/progress/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('user_login', response.url)
+
+    def test_returns_200_for_authenticated_user(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_returns_json_content_type(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        self.assertEqual(response['Content-Type'], 'application/json')
+
+    def test_response_has_required_keys(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        self.assertIn('earned_ids', data)
+        self.assertIn('achievements', data)
+        self.assertIn('challenges', data)
+        self.assertIn('stats', data)
+
+    def test_achievements_list_has_correct_fields(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        ach = data['achievements'][0]
+        for field in ('id', 'emoji', 'title', 'desc', 'earned', 'progress', 'goal', 'rarity'):
+            self.assertIn(field, ach, f"Achievement missing field: {field}")
+
+    def test_challenges_list_has_correct_fields(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        ch = data['challenges'][0]
+        for field in ('id', 'emoji', 'title', 'desc', 'progress', 'goal', 'completed'):
+            self.assertIn(field, ch, f"Challenge missing field: {field}")
+
+    def test_stats_has_required_keys(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        for key in ('activity_streak', 'distinct_active_days', 'total_exercises',
+                    'total_workouts', 'challenges_completed'):
+            self.assertIn(key, data['stats'], f"Stats missing key: {key}")
+
+    def test_post_method_not_allowed(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.post('/api/achievements/progress/', {})
+        self.assertEqual(response.status_code, 405)
+
+    def test_earned_ids_empty_for_new_user(self):
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        self.assertEqual(data['earned_ids'], [])
+
+    def test_first_rep_appears_in_earned_ids_after_exercise(self):
+        w = self._make_workout()
+        self._make_exercise(w)
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        self.assertIn('first_rep', data['earned_ids'])
+
+    def test_total_workouts_reflects_db(self):
+        for i in range(3):
+            self._make_workout(days_ago=i)
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        self.assertEqual(data['stats']['total_workouts'], 3)
+
+    def test_user_isolation(self):
+        """Achievements from another user must not appear in response."""
+        other = User.objects.create_user(
+            username='other@test.com', email='other@test.com', password='Test1234!'
+        )
+        other_workout = Workout.objects.create(
+            user=other, name='W', goal='strength', status='completed', date=date.today()
+        )
+        for _ in range(10):
+            Exercise.objects.create(
+                workout=other_workout, name='E', sets=3, reps=10, completed=True
+            )
+        self.client.login(username='apiuser@test.com', password='Test1234!')
+        response = self.client.get('/api/achievements/progress/')
+        data = json.loads(response.content)
+        self.assertEqual(data['stats']['total_exercises'], 0)
+        self.assertEqual(data['earned_ids'], [])
+
+
+class CompleteWorkoutAchievementProgressTests(TestCase):
+    """Tests that complete_workout response includes live achievement_progress."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='cwuser@test.com', email='cwuser@test.com', password='Test1234!'
+        )
+        self.client.login(username='cwuser@test.com', password='Test1234!')
+        self.workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned',
+            date=date.today()
+        )
+
+    def _complete_workout(self, workout_id):
+        return self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({'workout_id': workout_id}),
+            content_type='application/json'
+        )
+
+    def test_response_includes_achievement_progress_key(self):
+        response = self._complete_workout(self.workout.id)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertIn('achievement_progress', data)
+
+    def test_achievement_progress_has_earned_ids(self):
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        self.assertIn('earned_ids', data['achievement_progress'])
+
+    def test_achievement_progress_has_challenges(self):
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        self.assertIn('challenges', data['achievement_progress'])
+        self.assertIsInstance(data['achievement_progress']['challenges'], list)
+
+    def test_achievement_progress_has_stats(self):
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        stats = data['achievement_progress']['stats']
+        self.assertIn('activity_streak', stats)
+        self.assertIn('total_workouts', stats)
+        self.assertIn('total_exercises', stats)
+
+    def test_workout_3x_challenge_increments_on_completion(self):
+        # Start with 0 completed workouts this week
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        challenges = {c['id']: c for c in data['achievement_progress']['challenges']}
+        self.assertEqual(challenges['workout_3x']['progress'], 1)
+
+    def test_first_rep_earned_when_workout_has_completed_exercise(self):
+        Exercise.objects.create(
+            workout=self.workout, name='Squat', sets=3, reps=5, completed=True
+        )
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        self.assertIn('first_rep', data['achievement_progress']['earned_ids'])
+
+    def test_total_workouts_increments_in_stats(self):
+        # Complete another workout first
+        w2 = Workout.objects.create(
+            user=self.user, name='W2', goal='strength', status='completed',
+            date=date.today() - timedelta(days=1)
+        )
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        self.assertEqual(data['achievement_progress']['stats']['total_workouts'], 2)
+
+    def test_achievement_progress_reflects_real_db_state(self):
+        """Progress data must come from DB, not a cached/mocked value."""
+        # Create 9 other workouts (not via API) and then complete the 10th via API
+        for i in range(1, 10):
+            Workout.objects.create(
+                user=self.user, name=f'W{i}', goal='strength', status='completed',
+                date=date.today() - timedelta(days=i)
+            )
+        response = self._complete_workout(self.workout.id)
+        data = json.loads(response.content)
+        # Now should have 10 workouts — gym_rat should be earned
+        self.assertIn('gym_rat', data['achievement_progress']['earned_ids'])
+
+
+class SocialPageAchievementContextTests(TestCase):
+    """Tests that social_page view passes correct context for achievements."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='socialach@test.com', email='socialach@test.com', password='Test1234!'
+        )
+        self.client.login(username='socialach@test.com', password='Test1234!')
+
+    def test_social_page_context_has_achievement_keys(self):
+        response = self.client.get('/social/')
+        self.assertEqual(response.status_code, 200)
+        for key in ('achievements', 'challenges', 'earned_ids_json', 'earned_count',
+                    'challenges_completed', 'activity_streak', 'total_exercises',
+                    'total_workouts', 'distinct_active_days'):
+            self.assertIn(key, response.context, f"Context missing key: {key}")
+
+    def test_earned_ids_json_is_valid_json_list(self):
+        response = self.client.get('/social/')
+        earned_json = response.context['earned_ids_json']
+        parsed = json.loads(earned_json)
+        self.assertIsInstance(parsed, list)
+
+    def test_achievements_reflect_real_db_data(self):
+        workout = Workout.objects.create(
+            user=self.user, name='W', goal='strength', status='completed',
+            date=date.today()
+        )
+        Exercise.objects.create(workout=workout, name='E', sets=3, reps=10, completed=True)
+        response = self.client.get('/social/')
+        earned_ids = json.loads(response.context['earned_ids_json'])
+        self.assertIn('first_rep', earned_ids)
+
+    def test_challenges_reflect_real_db_data(self):
+        Workout.objects.create(
+            user=self.user, name='W', goal='strength', status='completed',
+            date=date.today()
+        )
+        response = self.client.get('/social/')
+        challenges = response.context['challenges']
+        workout_ch = next(c for c in challenges if c['id'] == 'workout_3x')
+        self.assertEqual(workout_ch['progress'], 1)
+
+    def test_earned_count_matches_earned_ids_length(self):
+        response = self.client.get('/social/')
+        earned_ids = json.loads(response.context['earned_ids_json'])
+        self.assertEqual(response.context['earned_count'], len(earned_ids))
+
+    def test_activity_streak_counts_workout_days(self):
+        Workout.objects.create(
+            user=self.user, name='W', goal='strength', status='completed',
+            date=date.today()
+        )
+        response = self.client.get('/social/')
+        self.assertGreaterEqual(response.context['activity_streak'], 1)
+
+    def test_achievements_list_has_ten_entries(self):
+        response = self.client.get('/social/')
+        self.assertEqual(len(response.context['achievements']), 10)
+
+    def test_challenges_list_has_five_entries(self):
+        response = self.client.get('/social/')
+        self.assertEqual(len(response.context['challenges']), 5)
+
+    def test_no_supplement_references_in_achievements(self):
+        """Supplement-based achievements must not exist (anti-gaming guard)."""
+        response = self.client.get('/social/')
+        for ach in response.context['achievements']:
+            self.assertNotIn('supplement', ach['id'].lower())
+            self.assertNotIn('supplement', ach['title'].lower())
+
+    def test_user_isolation_on_social_page(self):
+        other = User.objects.create_user(
+            username='other2@test.com', email='other2@test.com', password='Test1234!'
+        )
+        other_workout = Workout.objects.create(
+            user=other, name='W', goal='strength', status='completed', date=date.today()
+        )
+        for _ in range(50):
+            Exercise.objects.create(
+                workout=other_workout, name='E', sets=3, reps=10, completed=True
+            )
+        response = self.client.get('/social/')
+        self.assertEqual(response.context['total_exercises'], 0)
+        self.assertEqual(json.loads(response.context['earned_ids_json']), [])

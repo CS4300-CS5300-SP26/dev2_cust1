@@ -2044,6 +2044,15 @@
                             workout_id: activeWorkoutId,
                         })
                     })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Pass fresh achievement data directly — no extra API fetch needed
+                        if (data.achievement_progress && typeof window.checkAchievements === 'function') {
+                            // Reset throttle so the preloaded data is always processed
+                            sessionStorage.removeItem('spotter_ach_check_ts_{{ request.user.pk }}');
+                            window.checkAchievements(data.achievement_progress);
+                        }
+                    })
                     .catch(error => console.error('Error marking workout as completed:', error));
                     
                     break;
