@@ -559,7 +559,17 @@
                             {% for group in meal.food_groups.all %}
                             <div class="food-group-section" style="margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
                                 <div class="food-group-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.06);">
-                                    <span style="font-weight:600;font-size:13px;color:var(--accent);">🍴 {{ group.name }}</span>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <form method="POST" action="{% url 'toggle_food_group' %}" style="display:flex;align-items:center;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="group_id" value="{{ group.id }}">
+                                            <input type="hidden" name="date" value="{{ date_string }}">
+                                            <button type="submit" class="checkbox {% if group.all_completed %}checked{% endif %}" style="width:18px;height:18px;" title="Mark all items in this meal as {% if group.all_completed %}incomplete{% else %}complete{% endif %}">
+                                                {% if group.all_completed %}<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polyline points="20 6 9 17 4 12"></polyline></svg>{% endif %}
+                                            </button>
+                                        </form>
+                                        <span style="font-weight:600;font-size:13px;color:var(--accent);">🍴 {{ group.name }}</span>
+                                    </div>
                                     <div style="display:flex;gap:6px;align-items:center;">
                                         <button type="button" class="meal-edit-btn" onclick="openAddItemModalInGroup('{{ meal.id }}', '{{ meal.name|escapejs }}', '{{ group.id }}', '{{ group.name|escapejs }}')" title="Add item to group" style="width:24px;height:24px;">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1911,9 +1921,9 @@
                 });
         });
         
-        // Close dropdown when leaving food input
+        // Delay hiding so a click on a result item fires before the dropdown disappears
         foodNameInput.addEventListener('blur', function() {
-            foodSearchResults.style.display = 'none';
+            setTimeout(() => { foodSearchResults.style.display = 'none'; }, 150);
         });
     }
     

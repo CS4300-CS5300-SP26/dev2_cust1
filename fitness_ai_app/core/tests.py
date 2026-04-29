@@ -6846,3 +6846,132 @@ class EditFoodItemFatsTest(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.fats, 8)
         self.assertEqual(self.item.calories, 90)
+
+
+###########################################################################################################################################################################
+# Management Command Tests: populate_food_db and populate_supplements
+###########################################################################################################################################################################
+
+from io import StringIO
+from django.core.management import call_command
+from .models import FoodItem, Meal
+
+
+class PopulateFoodDbCommandTests(TestCase):
+    """Tests for the populate_food_db management command."""
+
+    def test_command_creates_food_items(self):
+        """Command creates food items in the database."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(FoodItem.objects.exists())
+
+    def test_command_creates_exactly_20_items(self):
+        """Command seeds exactly 20 distinct food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        system_meal = Meal.objects.get(name='Food Database', date='2000-01-01')
+        self.assertEqual(FoodItem.objects.filter(meal=system_meal).count(), 20)
+
+    def test_command_creates_system_user_and_meal(self):
+        """Command creates the system user and 'Food Database' meal."""
+        from django.contrib.auth.models import User
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        self.assertTrue(User.objects.filter(username='system@spotter.ai').exists())
+        self.assertTrue(Meal.objects.filter(name='Food Database').exists())
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate food items."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        count_after_first = FoodItem.objects.count()
+        call_command('populate_food_db', stdout=out)
+        self.assertEqual(FoodItem.objects.count(), count_after_first)
+
+    def test_food_items_have_valid_nutrition_data(self):
+        """All seeded food items have non-negative calories and macro values."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        for item in FoodItem.objects.filter(meal__name='Food Database'):
+            self.assertGreaterEqual(item.calories, 0, f'{item.name} has negative calories')
+            self.assertGreaterEqual(item.protein, 0, f'{item.name} has negative protein')
+            self.assertGreaterEqual(item.carbs, 0, f'{item.name} has negative carbs')
+            self.assertGreaterEqual(item.fats, 0, f'{item.name} has negative fats')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created item."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Food database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_food_db', stdout=out)
+        out2 = StringIO()
+        call_command('populate_food_db', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())
+
+
+class PopulateSupplementsCommandTests(TestCase):
+    """Tests for the populate_supplements management command."""
+
+    def test_command_creates_supplements(self):
+        """Command creates supplement records in the database."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertTrue(SupplementDatabase.objects.exists())
+
+    def test_command_creates_exactly_20_supplements(self):
+        """Command seeds exactly 20 distinct supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), 20)
+
+    def test_command_is_idempotent(self):
+        """Running the command twice does not create duplicate supplements."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        count_after_first = SupplementDatabase.objects.count()
+        call_command('populate_supplements', stdout=out)
+        self.assertEqual(SupplementDatabase.objects.count(), count_after_first)
+
+    def test_supplements_have_valid_types(self):
+        """All seeded supplements use a recognised supplement_type choice."""
+        from .models import SupplementDatabase
+        valid_types = {t[0] for t in SupplementDatabase.TYPE_CHOICES}
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        for s in SupplementDatabase.objects.all():
+            self.assertIn(s.supplement_type, valid_types, f'{s.name} has invalid type')
+
+    def test_supplements_cover_all_types(self):
+        """Seeded data includes vitamins, minerals, herbs, proteins, and amino acids."""
+        from .models import SupplementDatabase
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        types_present = set(SupplementDatabase.objects.values_list('supplement_type', flat=True))
+        for expected in ('vitamin', 'mineral', 'herb', 'protein', 'amino_acid'):
+            self.assertIn(expected, types_present, f'Missing supplement type: {expected}')
+
+    def test_command_output_reports_created_items(self):
+        """Command stdout reports each created supplement."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        output = out.getvalue()
+        self.assertIn('✓ Created', output)
+        self.assertIn('Supplement database population complete', output)
+
+    def test_command_output_reports_existing_items_on_second_run(self):
+        """Command stdout reports 'Already exists' on second run."""
+        out = StringIO()
+        call_command('populate_supplements', stdout=out)
+        out2 = StringIO()
+        call_command('populate_supplements', stdout=out2)
+        self.assertIn('Already exists', out2.getvalue())
