@@ -1,0 +1,33 @@
+{
+  // ── Python linting (legacy API — works with Python extension < 2023.x) ──────
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.flake8Path": "flake8",
+  "python.linting.pylintPath": "pylint",
+  "python.linting.lintOnSave": true,
+
+  // ── Python formatting (legacy API) ──────────────────────────────────────────
+  "python.formatting.provider": "autopep8",
+  "python.formatting.autopep8Args": ["--max-line-length", "120", "--aggressive"],
+
+  // ── Python linting/formatting (modern API — works with Python extension >= 2023.x) ─
+  // Requires extensions: ms-python.flake8, ms-python.pylint, ms-python.autopep8
+  "flake8.enabled": true,
+  "pylint.enabled": true,
+
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+
+  // ── Editor defaults ──────────────────────────────────────────────────────────
+  "editor.rulers": [120],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4
+}
