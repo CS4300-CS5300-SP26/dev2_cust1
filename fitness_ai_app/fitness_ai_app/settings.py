@@ -207,9 +207,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # django-allauth settings
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False  # Require POST + CSRF token (prevents login-CSRF attacks)
 SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False  # Require explicit user consent before auto-linking
 SOCIALACCOUNT_ADAPTER = 'core.adapter.AutoSocialAdapter'
 LOGIN_REDIRECT_URL = '/home_dash/'
 ACCOUNT_LOGIN_METHODS = {'email'}
