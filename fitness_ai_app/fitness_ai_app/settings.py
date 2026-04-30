@@ -55,7 +55,8 @@ if not SECRET_KEY or 'insecure' in SECRET_KEY.lower():
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DEBUG', True)
+# DEBUG defaults to False (production-safe) — must be explicitly enabled for development
+DEBUG = env_bool('DEBUG', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver,.ondigitalocean.app')
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
