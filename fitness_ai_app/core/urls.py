@@ -45,6 +45,7 @@ urlpatterns = [
     path('api/workout/save_time/', views.save_workout_time, name='save_workout_time'),
     path('api/workout/complete/', views.complete_workout, name='complete_workout'),
     path('api/achievements/progress/', views.achievements_progress_api, name='achievements_progress_api'),
+    path('api/river/feed/', views.river_feed_api, name='river_feed_api'),
     path('api/exercises/complete_by_ids/', views.complete_exercises_by_ids, name='complete_exercises_by_ids'),
     path('api/set_progress/save/', views.save_set_progress, name='save_set_progress'),
     path('api/set_progress/get/', views.get_set_progress, name='get_set_progress'),

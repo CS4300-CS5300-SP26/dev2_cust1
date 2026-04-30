@@ -20,6 +20,7 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncWeek
 from django.urls import reverse
+from django.utils import timezone
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
 from .models import (
@@ -41,6 +42,7 @@ from .models import (
     UserInjury,
     AIChatConversation,
     AIChatMessage,
+    RiverEvent,
 )
 
 
@@ -53,6 +55,70 @@ def get_user_calorie_goal(user, default=2400):
         return profile.calorie_goal or default
     except UserProfile.DoesNotExist:
         return default
+
+
+# Rarity for each achievement id — used when emitting river events
+_ACHIEVEMENT_RARITY = {
+    'first_rep': 'common',
+    'nutrition_nerd': 'common',
+    'gym_rat': 'common',
+    'calorie_king': 'common',
+    'iron_will': 'rare',
+    'week_warrior': 'rare',
+    'macro_master': 'rare',
+    'streak_legend': 'rare',
+    'centurion': 'epic',
+    'dedicated': 'epic',
+}
+
+
+def emit_river_event(user, event_type, title, detail='', rarity='common'):
+    """Record a real user action as a RiverEvent for the live feed."""
+    RiverEvent.objects.create(
+        user=user,
+        event_type=event_type,
+        title=title,
+        detail=detail,
+        rarity=rarity,
+    )
+
+
+def _emit_achievement_challenge_diffs(user, progress_before):
+    """
+    Compute current achievements/challenges and emit river events for anything
+    newly earned or completed since progress_before was captured.
+    Returns the freshly-computed progress dict so callers can reuse it.
+    """
+    username = user.username or user.email.split('@')[0]
+    earned_before = set(progress_before['earned_ids'])
+    challenges_done_before = {c['id'] for c in progress_before['challenges'] if c['completed']}
+
+    progress = compute_achievements_challenges(user)
+
+    newly_earned = set(progress['earned_ids']) - earned_before
+    if newly_earned:
+        achievement_lookup = {a['id']: a for a in progress['achievements']}
+        for ach_id in sorted(newly_earned):
+            ach = achievement_lookup.get(ach_id, {})
+            emit_river_event(
+                user=user, event_type='fitness_achievement',
+                title=f'{username} unlocked "{ach.get("title", ach_id)}"',
+                detail=ach.get('desc', 'Achievement unlocked!'),
+                rarity=_ACHIEVEMENT_RARITY.get(ach_id, 'common'),
+            )
+
+    challenges_done_now = {c['id'] for c in progress['challenges'] if c['completed']}
+    challenge_lookup = {c['id']: c for c in progress['challenges']}
+    for ch_id in sorted(challenges_done_now - challenges_done_before):
+        ch = challenge_lookup.get(ch_id, {})
+        emit_river_event(
+            user=user, event_type='challenge_complete',
+            title=f'{username} completed "{ch.get("title", ch_id)}"',
+            detail=ch.get('desc', 'Weekly challenge done!'),
+            rarity='rare',
+        )
+
+    return progress
 
 
 def get_default_workout_goal(user):
@@ -1048,7 +1114,20 @@ def add_workout(request):
         messages.error(request, 'Invalid date format.')
         return redirect(reverse('train_page'))
 
+    progress_before = compute_achievements_challenges(request.user) if status == 'completed' else None
+
     Workout.objects.create(user=request.user, name=workout_name, goal=goal, status=status, date=workout_date)
+
+    if status == 'completed':
+        username = request.user.username or request.user.email.split('@')[0]
+        emit_river_event(
+            user=request.user, event_type='workout_complete',
+            title=f'{username} completed a workout',
+            detail=f'{workout_name} — keep the streak alive!',
+            rarity='common',
+        )
+        _emit_achievement_challenge_diffs(request.user, progress_before)
+
     return redirect(f"{reverse('train_page')}?date={date_param}")
 
 
@@ -1118,6 +1197,8 @@ def add_exercise(request):
         messages.error(request, validation_error)
         return redirect(base_redirect_url)
 
+    progress_before = compute_achievements_challenges(request.user) if status == 'completed' else None
+
     Exercise.objects.create(
         workout=workout,
         name=exercise_name,
@@ -1127,6 +1208,10 @@ def add_exercise(request):
         weight=weight_value,
         completed=(status == 'completed'),
     )
+
+    if progress_before is not None:
+        _emit_achievement_challenge_diffs(request.user, progress_before)
+
     return redirect(base_redirect_url)
 
 
@@ -1156,6 +1241,9 @@ def edit_exercise(request):
         messages.error(request, validation_error)
         return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
+    was_completed = exercise.completed
+    progress_before = compute_achievements_challenges(request.user) if not was_completed and status == 'completed' else None
+
     exercise.name = exercise_name
     exercise.muscle_group = muscle_group
     exercise.sets = sets_value
@@ -1163,6 +1251,9 @@ def edit_exercise(request):
     exercise.weight = weight_value
     exercise.completed = (status == 'completed')
     exercise.save()
+
+    if progress_before is not None:
+        _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return redirect(f"{reverse('train_page')}?date={date_param}")
 
@@ -1174,8 +1265,14 @@ def toggle_exercise(request):
     date_param = request.POST.get('date')
 
     exercise = get_object_or_404(Exercise, id=exercise_id, workout__user=request.user)
+    becoming_completed = not exercise.completed
+    progress_before = compute_achievements_challenges(request.user) if becoming_completed else None
+
     exercise.completed = not exercise.completed
     exercise.save()
+
+    if progress_before is not None:
+        _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
@@ -1363,6 +1460,7 @@ def add_food_item(request):
         except FoodItem.DoesNotExist:
             messages.error(request, 'Food item not found.')
     else:
+        progress_before = compute_achievements_challenges(request.user)
         FoodItem.objects.create(
             meal=meal,
             name=food_name,
@@ -1374,6 +1472,7 @@ def add_food_item(request):
             serving_unit=serving_unit,
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
+        _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
@@ -1412,11 +1511,13 @@ def add_food_item_ajax(request):
     if group_id:
         group = get_object_or_404(FoodGroup, id=group_id, meal__user=request.user)
 
+    progress_before = compute_achievements_challenges(request.user)
     item = FoodItem.objects.create(
         meal=meal, name=food_name, calories=calories,
         protein=protein, carbs=carbs, fats=fats, group=group,
         serving_size=serving_size, serving_unit=serving_unit,
     )
+    _emit_achievement_challenge_diffs(request.user, progress_before)
     return JsonResponse({
         'item_id': item.id,
         'name': item.name,
@@ -1446,8 +1547,14 @@ def toggle_food_item(request):
     date_param = request.POST.get('date')
 
     food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    becoming_completed = not food_item.completed
+    progress_before = compute_achievements_challenges(request.user) if becoming_completed else None
+
     food_item.completed = not food_item.completed
     food_item.save()
+
+    if progress_before is not None:
+        _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
@@ -1462,7 +1569,11 @@ def toggle_food_group(request):
     items = group.grouped_items.all()
     # If every item in the group is already completed, uncheck all; otherwise check all.
     all_completed = items.exists() and not items.filter(completed=False).exists()
+    progress_before = compute_achievements_challenges(request.user) if not all_completed else None
     items.update(completed=not all_completed)
+
+    if progress_before is not None:
+        _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
@@ -1878,6 +1989,42 @@ def achievements_progress_api(request):
 
 
 @login_required
+@require_http_methods(["GET"])
+def river_feed_api(request):
+    """Return recent real RiverEvents for the live feed widget.
+
+    Supports ?since=<epoch_ms> for incremental polling — only events strictly
+    newer than that timestamp are returned.
+    """
+    qs = RiverEvent.objects.select_related('user').filter(
+        created_at__gte=timezone.now() - timedelta(hours=24)
+    )
+    since_ms = request.GET.get('since')
+    if since_ms:
+        try:
+            since_dt = datetime.fromtimestamp(int(since_ms) / 1000, tz=timezone.utc)
+            qs = qs.filter(created_at__gt=since_dt)
+        except (ValueError, TypeError, OSError):
+            pass
+
+    events = qs.order_by('-created_at')[:50]
+    return JsonResponse({
+        'events': [
+            {
+                'id': ev.id,
+                'event_type': ev.event_type,
+                'username': ev.user.username or ev.user.email.split('@')[0],
+                'title': ev.title,
+                'detail': ev.detail,
+                'rarity': ev.rarity,
+                'created_at_ms': int(ev.created_at.timestamp() * 1000),
+            }
+            for ev in events
+        ]
+    })
+
+
+@login_required
 def search_foods(request):
     """Search existing FoodItems by name and return unique results with nutritional data."""
     query = request.GET.get('q', '').strip()
@@ -2163,10 +2310,19 @@ def complete_workout(request):
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
 
+    username = request.user.username or request.user.email.split('@')[0]
+    progress_before = compute_achievements_challenges(request.user)
+
     workout.status = 'completed'
     workout.save()
 
-    progress = compute_achievements_challenges(request.user)
+    emit_river_event(
+        user=request.user, event_type='workout_complete',
+        title=f'{username} completed a workout',
+        detail=f'{workout.name} — keep the streak alive!',
+        rarity='common',
+    )
+    progress = _emit_achievement_challenge_diffs(request.user, progress_before)
 
     return JsonResponse({
         'success': True,
@@ -2262,12 +2418,16 @@ def complete_exercises_by_ids(request):
 
     try:
         exercises = Exercise.objects.filter(id__in=exercise_ids, workout__user=request.user)
+        progress_before = compute_achievements_challenges(request.user)
         completed_count = 0
         for exercise in exercises:
             if not exercise.completed:
                 exercise.completed = True
                 exercise.save()
                 completed_count += 1
+
+        if completed_count > 0:
+            _emit_achievement_challenge_diffs(request.user, progress_before)
 
         return JsonResponse({
             'success': True,

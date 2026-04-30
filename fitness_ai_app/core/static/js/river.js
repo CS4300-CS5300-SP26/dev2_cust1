@@ -575,13 +575,58 @@
   }
 
   function startMockGenerator() {
-    if (generatorTimeout) return;
-    seedEvents();
-    scheduleGeneratorTick();
+    // Mock events disabled — river is driven by real user activity via /api/river/feed/
+    // if (generatorTimeout) return;
+    // seedEvents();
+    // scheduleGeneratorTick();
   }
 
   function stopMockGenerator() {
     if (generatorTimeout) { clearTimeout(generatorTimeout); generatorTimeout = null; }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REAL EVENT POLLING — pulls from /api/river/feed/ every 30 s
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Start looking back 5 minutes so the first load shows very recent activity
+  // without flooding the river with a full 24-hour backlog.
+  var lastRealEventMs = Date.now() - (5 * 60 * 1000);
+  var realPollInterval = null;
+
+  function rarityToTier(rarity) {
+    var map = { common: 'bronze', uncommon: 'silver', rare: 'gold', epic: 'platinum', legendary: 'platinum', mythic: 'diamond' };
+    return map[rarity] || 'bronze';
+  }
+
+  function fetchRealEvents() {
+    fetch('/api/river/feed/?since=' + lastRealEventMs, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.events)) return;
+        var maxMs = lastRealEventMs;
+        // Events arrive newest-first; reverse so older ones flow in first
+        var evs = data.events.slice().reverse();
+        evs.forEach(function (ev) {
+          if (ev.created_at_ms > maxMs) maxMs = ev.created_at_ms;
+          pushRiverEvent({
+            eventType: ev.event_type,
+            actorUsername: ev.username,
+            actorAvatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(ev.username),
+            actorTier: rarityToTier(ev.rarity),
+            title: ev.title,
+            detail: ev.detail,
+            rarity: ev.rarity,
+          });
+        });
+        lastRealEventMs = maxMs;
+      })
+      .catch(function () { /* silently ignore network errors */ });
+  }
+
+  function startRealEventPoll() {
+    fetchRealEvents();
+    realPollInterval = setInterval(fetchRealEvents, 5000);
   }
 
   function setSpeed(speed) {
@@ -1246,6 +1291,7 @@
     setupDragHandle();
 
     startMockGenerator();
+    startRealEventPoll();
     startPositionLoop();
   }
 

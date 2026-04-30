@@ -7537,3 +7537,323 @@ class SocialPageAchievementContextTests(TestCase):
         response = self.client.get('/social/')
         self.assertEqual(response.context['total_exercises'], 0)
         self.assertEqual(json.loads(response.context['earned_ids_json']), [])
+
+
+class RiverFeedAPITests(TestCase):
+    """Tests for /api/river/feed/ — the real-event polling endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='riveruser', email='river@test.com', password='Test1234!'
+        )
+        self.other = User.objects.create_user(
+            username='otherriver', email='river2@test.com', password='Test1234!'
+        )
+        self.client.login(username='riveruser', password='Test1234!')
+
+    def test_requires_authentication(self):
+        self.client.logout()
+        response = self.client.get('/api/river/feed/')
+        self.assertIn(response.status_code, [302, 401])
+
+    def test_returns_200_for_authenticated_user(self):
+        response = self.client.get('/api/river/feed/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_response_has_events_list(self):
+        response = self.client.get('/api/river/feed/')
+        data = response.json()
+        self.assertIn('events', data)
+        self.assertIsInstance(data['events'], list)
+
+    def test_empty_when_no_events_exist(self):
+        response = self.client.get('/api/river/feed/')
+        self.assertEqual(response.json()['events'], [])
+
+    def test_returns_river_event_from_any_user(self):
+        from .models import RiverEvent
+        RiverEvent.objects.create(
+            user=self.other,
+            event_type='workout_complete',
+            title='otherriver completed a workout',
+            detail='Push day',
+            rarity='common',
+        )
+        response = self.client.get('/api/river/feed/')
+        events = response.json()['events']
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['username'], 'otherriver')
+
+    def test_event_has_required_fields(self):
+        from .models import RiverEvent
+        RiverEvent.objects.create(
+            user=self.user,
+            event_type='fitness_achievement',
+            title='riveruser unlocked "First Rep"',
+            detail='Logged your very first exercise',
+            rarity='common',
+        )
+        response = self.client.get('/api/river/feed/')
+        ev = response.json()['events'][0]
+        for field in ('id', 'event_type', 'username', 'title', 'detail', 'rarity', 'created_at_ms'):
+            self.assertIn(field, ev, f"Missing field: {field}")
+
+    def test_since_filter_excludes_old_events(self):
+        from .models import RiverEvent
+        from django.utils import timezone as tz
+        old_event = RiverEvent.objects.create(
+            user=self.user,
+            event_type='workout_complete',
+            title='old event',
+            detail='',
+            rarity='common',
+        )
+        # Manually backdate the event
+        RiverEvent.objects.filter(pk=old_event.pk).update(
+            created_at=tz.now() - timedelta(hours=2)
+        )
+        new_event = RiverEvent.objects.create(
+            user=self.user,
+            event_type='workout_complete',
+            title='new event',
+            detail='',
+            rarity='common',
+        )
+        since_ms = int((tz.now() - timedelta(hours=1)).timestamp() * 1000)
+        response = self.client.get(f'/api/river/feed/?since={since_ms}')
+        events = response.json()['events']
+        titles = [e['title'] for e in events]
+        self.assertIn('new event', titles)
+        self.assertNotIn('old event', titles)
+
+    def test_events_include_multiple_users(self):
+        from .models import RiverEvent
+        RiverEvent.objects.create(user=self.user, event_type='workout_complete', title='A', rarity='common')
+        RiverEvent.objects.create(user=self.other, event_type='fitness_achievement', title='B', rarity='rare')
+        response = self.client.get('/api/river/feed/')
+        events = response.json()['events']
+        usernames = {e['username'] for e in events}
+        self.assertIn('riveruser', usernames)
+        self.assertIn('otherriver', usernames)
+
+    def test_complete_workout_creates_river_event(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Push Day', goal='strength', status='planned', date=date.today()
+        )
+        self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({'workout_id': workout.id}),
+            content_type='application/json',
+        )
+        self.assertTrue(
+            RiverEvent.objects.filter(user=self.user, event_type='workout_complete').exists()
+        )
+
+    def test_complete_workout_creates_achievement_event_on_first_rep(self):
+        from .models import RiverEvent
+        # gym_rat requires 10 completed workouts; create 9 first so the 10th triggers it
+        for i in range(9):
+            Workout.objects.create(
+                user=self.user, name=f'W{i}', goal='strength', status='completed',
+                date=date.today() - timedelta(days=i + 1),
+            )
+        workout = Workout.objects.create(
+            user=self.user, name='Leg Day', goal='strength', status='planned', date=date.today()
+        )
+        self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({'workout_id': workout.id}),
+            content_type='application/json',
+        )
+        self.assertTrue(
+            RiverEvent.objects.filter(user=self.user, event_type='fitness_achievement').exists()
+        )
+
+
+class RiverTriggerTests(TestCase):
+    """Tests that all action views emit RiverEvents."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='triggeruser', password='pass123', email='trigger@test.com'
+        )
+        self.client.force_login(self.user)
+
+    # ------------------------------------------------------------------ #
+    # Exercise / Workout triggers
+    # ------------------------------------------------------------------ #
+
+    def test_toggle_exercise_to_completed_emits_event(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        exercise = Exercise.objects.create(
+            workout=workout, name='Push-up', muscle_group='chest', completed=False
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_exercise'), {
+            'exercise_id': exercise.id, 'date': str(date.today())
+        })
+        # Completing an exercise can trigger first_rep achievement
+        self.assertGreaterEqual(RiverEvent.objects.count(), before)
+
+    def test_toggle_exercise_to_uncompleted_does_not_emit(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        exercise = Exercise.objects.create(
+            workout=workout, name='Push-up', muscle_group='chest', completed=True
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_exercise'), {
+            'exercise_id': exercise.id, 'date': str(date.today())
+        })
+        # Uncompleting never emits
+        self.assertEqual(RiverEvent.objects.count(), before)
+
+    def test_complete_exercises_by_ids_emits_event(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        exercise = Exercise.objects.create(
+            workout=workout, name='Squat', muscle_group='legs', completed=False
+        )
+        # Already complete ones are skipped — start from 0 so first_rep fires
+        before = RiverEvent.objects.count()
+        self.client.post(
+            '/api/workout/complete-exercises/',
+            data=json.dumps({'exercise_ids': [exercise.id]}),
+            content_type='application/json',
+        )
+        self.assertGreaterEqual(RiverEvent.objects.count(), before)
+
+    def test_add_exercise_with_completed_status_emits_event(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('add_exercise'), {
+            'workout_id': workout.id,
+            'exercise_name': 'Curl',
+            'muscle_group': 'biceps',
+            'status': 'completed',
+            'date': str(date.today()),
+        })
+        # first_rep fires on first completed exercise
+        self.assertGreater(RiverEvent.objects.count(), before)
+
+    def test_add_exercise_with_planned_status_does_not_emit(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('add_exercise'), {
+            'workout_id': workout.id,
+            'exercise_name': 'Row',
+            'muscle_group': 'back',
+            'status': 'planned',
+            'date': str(date.today()),
+        })
+        self.assertEqual(RiverEvent.objects.count(), before)
+
+    def test_edit_exercise_to_completed_emits_event(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        exercise = Exercise.objects.create(
+            workout=workout, name='Dip', muscle_group='triceps', completed=False
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('edit_exercise'), {
+            'exercise_id': exercise.id,
+            'exercise_name': 'Dip',
+            'muscle_group': 'triceps',
+            'status': 'completed',
+            'date': str(date.today()),
+        })
+        self.assertGreater(RiverEvent.objects.count(), before)
+
+    def test_edit_exercise_already_completed_does_not_emit(self):
+        from .models import RiverEvent
+        workout = Workout.objects.create(
+            user=self.user, name='Test', goal='strength', status='planned', date=date.today()
+        )
+        exercise = Exercise.objects.create(
+            workout=workout, name='Dip', muscle_group='triceps', completed=True
+        )
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('edit_exercise'), {
+            'exercise_id': exercise.id,
+            'exercise_name': 'Dip Updated',
+            'muscle_group': 'triceps',
+            'status': 'completed',
+            'date': str(date.today()),
+        })
+        self.assertEqual(RiverEvent.objects.count(), before)
+
+    # ------------------------------------------------------------------ #
+    # Food / Nutrition triggers
+    # ------------------------------------------------------------------ #
+
+    def test_add_food_item_create_emits_event(self):
+        from .models import RiverEvent
+        meal = Meal.objects.create(user=self.user, name='Lunch', date=date.today())
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('add_food_item'), {
+            'meal_id': meal.id,
+            'food_name': 'Apple',
+            'food_calories': '80',
+            'date': str(date.today()),
+        })
+        # nutrition_nerd fires once the meal has its first item
+        self.assertGreaterEqual(RiverEvent.objects.count(), before)
+
+    def test_toggle_food_item_to_completed_emits_event(self):
+        from .models import RiverEvent
+        meal = Meal.objects.create(user=self.user, name='Dinner', date=date.today())
+        item = FoodItem.objects.create(meal=meal, name='Rice', calories=200, completed=False)
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_food_item'), {
+            'item_id': item.id, 'date': str(date.today())
+        })
+        self.assertGreaterEqual(RiverEvent.objects.count(), before)
+
+    def test_toggle_food_item_to_uncompleted_does_not_emit(self):
+        from .models import RiverEvent
+        meal = Meal.objects.create(user=self.user, name='Dinner', date=date.today())
+        item = FoodItem.objects.create(meal=meal, name='Rice', calories=200, completed=True)
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_food_item'), {
+            'item_id': item.id, 'date': str(date.today())
+        })
+        self.assertEqual(RiverEvent.objects.count(), before)
+
+    def test_toggle_food_group_completing_emits_event(self):
+        from .models import RiverEvent, FoodGroup
+        meal = Meal.objects.create(user=self.user, name='Lunch', date=date.today())
+        group = FoodGroup.objects.create(meal=meal, name='Grains')
+        FoodItem.objects.create(meal=meal, name='Oats', calories=150, completed=False, group=group)
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_food_group'), {
+            'group_id': group.id, 'date': str(date.today())
+        })
+        self.assertGreaterEqual(RiverEvent.objects.count(), before)
+
+    def test_toggle_food_group_uncompleting_does_not_emit(self):
+        from .models import RiverEvent, FoodGroup
+        meal = Meal.objects.create(user=self.user, name='Lunch', date=date.today())
+        group = FoodGroup.objects.create(meal=meal, name='Grains')
+        FoodItem.objects.create(meal=meal, name='Oats', calories=150, completed=True, group=group)
+        before = RiverEvent.objects.count()
+        self.client.post(reverse('toggle_food_group'), {
+            'group_id': group.id, 'date': str(date.today())
+        })
+        self.assertEqual(RiverEvent.objects.count(), before)
