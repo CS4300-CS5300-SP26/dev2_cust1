@@ -2,14 +2,18 @@ import json
 import os
 import time
 import random
-import logging
-from datetime import datetime, date, timedelta
+import re
 
-from django.http import JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, StreamingHttpResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from openai import OpenAI
+import logging
+import smtplib
+from datetime import datetime, date, timedelta
+
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -39,6 +43,9 @@ from .models import (
     Muscle,
     Equipment,
     TrainingExercise,
+    SavedFood,
+    SavedSupplement,
+    SavedMeal,
     UserInjury,
     AIChatConversation,
     AIChatMessage,
@@ -175,6 +182,388 @@ def _weight_kg_to_lbs(weight_kg):
     return round(float(weight_kg) * 2.20462, 2)
 
 
+def _parse_serving_size(raw):
+    """Parse a serving size string (whole number, decimal, or fraction like '1/2') into a float clamped to (0, 1000]."""
+    raw = (raw or '1').strip()
+    try:
+        if '/' in raw:
+            num, den = raw.split('/', 1)
+            result = float(num) / float(den)
+        else:
+            result = float(raw)
+    except (ValueError, ZeroDivisionError):
+        result = 1.0
+    return max(0.01, min(result, 1000))
+
+
+def _choice_labels(choices):
+    """Return a comma-separated list of display labels for model choices."""
+    return ', '.join(label for _, label in choices)
+
+
+def _build_profile_option_catalog():
+    """List profile fields and selectable options shown on get_started_profile."""
+    return (
+        '- Profile fields and selectable options:\n'
+        f'  - Primary Fitness Goal: {_choice_labels(UserProfile.PRIMARY_GOAL_CHOICES)}\n'
+        f'  - Experience Level: {_choice_labels(UserProfile.EXPERIENCE_LEVEL_CHOICES)}\n'
+        f'  - Dietary Preference: {_choice_labels(UserProfile.DIETARY_PREFERENCE_CHOICES)}\n'
+        '  - Fitness at Home?: Yes, No\n'
+        f'  - Available Home Equipment: {_choice_labels(UserProfile.HOME_EQUIPMENT_CHOICES)}\n'
+        '  - Height input range: 4-9 ft (plus 0-11 in) or 122-272 cm\n'
+        '  - Weight input range: 80-1400 lb or 36-635 kg\n'
+        '  - Age input range: 13-120 years\n'
+        '  - Daily Calorie Goal input range: 1000-5000 kcal (blank uses default 2400)'
+    )
+
+
+def _clean_ai_text(value, max_length):
+    """Normalize arbitrary AI payload strings to bounded plain text."""
+    if not isinstance(value, str):
+        return ''
+    normalized = ' '.join(value.split())
+    if len(normalized) > max_length:
+        return normalized[:max_length].rstrip()
+    return normalized
+
+
+def _coerce_non_negative_int(value):
+    """Parse non-negative integers used by generated planner payloads."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _normalize_planner_date(raw_date):
+    """Convert planner payload dates to a safe date value."""
+    if isinstance(raw_date, str):
+        try:
+            return datetime.strptime(raw_date.strip(), '%Y-%m-%d').date()
+        except ValueError:
+            return date.today()
+    return date.today()
+
+
+def _infer_muscle_group_from_name(exercise_name):
+    """Best-effort mapping from free-text exercise names to allowed groups."""
+    lowered_name = (exercise_name or '').lower()
+    keyword_map = {
+        'arms': ('curl', 'tricep', 'bicep', 'forearm', 'hammer curl', 'skull crusher'),
+        'chest': ('bench', 'chest', 'push-up', 'pushup', 'pec', 'fly', 'dip'),
+        'back': ('row', 'lat', 'pull-up', 'pullup', 'deadlift', 'back', 'pulldown'),
+        'shoulders': ('shoulder', 'press', 'lateral raise', 'rear delt', 'overhead'),
+        'legs': ('squat', 'lunge', 'leg', 'hamstring', 'glute', 'calf', 'hip thrust'),
+        'core': ('plank', 'core', 'ab', 'crunch', 'sit-up', 'russian twist'),
+    }
+    for muscle_group, keywords in keyword_map.items():
+        if any(keyword in lowered_name for keyword in keywords):
+            return muscle_group
+    return 'core'
+
+
+def _normalize_ai_workout_plan(raw_workout_plan, user):
+    """Validate and normalize AI-generated workout plans for persistence."""
+    if not isinstance(raw_workout_plan, dict):
+        return None
+
+    raw_exercises = raw_workout_plan.get('exercises')
+    if not isinstance(raw_exercises, list):
+        return None
+
+    valid_muscle_groups = {value for value, _ in Exercise.MUSCLE_GROUP_CHOICES}
+    normalized_exercises = []
+    for raw_exercise in raw_exercises:
+        if not isinstance(raw_exercise, dict):
+            continue
+
+        name = _clean_ai_text(raw_exercise.get('name'), 200)
+        if not name:
+            continue
+
+        raw_muscle_group = _clean_ai_text(raw_exercise.get('muscle_group'), 20).lower()
+        muscle_group = (
+            raw_muscle_group if raw_muscle_group in valid_muscle_groups
+            else _infer_muscle_group_from_name(name)
+        )
+
+        sets = _coerce_non_negative_int(raw_exercise.get('sets'))
+        reps = _coerce_non_negative_int(raw_exercise.get('reps'))
+        weight = _coerce_non_negative_int(raw_exercise.get('weight'))
+
+        normalized_exercises.append({
+            'name': name,
+            'muscle_group': muscle_group,
+            'sets': sets,
+            'reps': reps,
+            'weight': weight,
+        })
+
+    if not normalized_exercises:
+        return None
+
+    valid_goals = {value for value, _ in Workout.GOAL_CHOICES}
+    goal_candidate = _clean_ai_text(raw_workout_plan.get('goal'), 30).lower()
+    default_goal = get_default_workout_goal(user) or 'general_health'
+    workout_goal = goal_candidate if goal_candidate in valid_goals else default_goal
+
+    workout_name = _clean_ai_text(raw_workout_plan.get('workout_name'), 100) or 'AI Workout Plan'
+    workout_date = _normalize_planner_date(raw_workout_plan.get('date'))
+
+    return {
+        'workout_name': workout_name,
+        'goal': workout_goal,
+        'date': workout_date,
+        'exercises': normalized_exercises,
+    }
+
+
+def _normalize_ai_nutrition_plan(raw_nutrition_plan):
+    """Validate and normalize AI-generated nutrition/supplement plans."""
+    if not isinstance(raw_nutrition_plan, dict):
+        return None
+
+    raw_meals = raw_nutrition_plan.get('meals')
+    meals = []
+    if isinstance(raw_meals, list):
+        for meal_index, raw_meal in enumerate(raw_meals, start=1):
+            if not isinstance(raw_meal, dict):
+                continue
+
+            meal_name = _clean_ai_text(raw_meal.get('name'), 100) or f'Meal {meal_index}'
+            raw_items = raw_meal.get('items')
+            if not isinstance(raw_items, list):
+                continue
+
+            items = []
+            for raw_item in raw_items:
+                if not isinstance(raw_item, dict):
+                    continue
+
+                item_name = _clean_ai_text(raw_item.get('name'), 200)
+                if not item_name:
+                    continue
+
+                calories = _coerce_non_negative_int(raw_item.get('calories'))
+                if calories is None:
+                    calories = 0
+
+                protein = _coerce_non_negative_int(raw_item.get('protein'))
+                carbs = _coerce_non_negative_int(raw_item.get('carbs'))
+                fats = _coerce_non_negative_int(raw_item.get('fats'))
+
+                items.append({
+                    'name': item_name,
+                    'calories': calories,
+                    'protein': protein if protein is not None else 0,
+                    'carbs': carbs if carbs is not None else 0,
+                    'fats': fats if fats is not None else 0,
+                })
+
+            if items:
+                meals.append({'name': meal_name, 'items': items})
+
+    valid_supplement_types = {value for value, _ in SupplementDatabase.TYPE_CHOICES}
+    raw_supplements = raw_nutrition_plan.get('supplements')
+    supplements = []
+    if isinstance(raw_supplements, list):
+        for raw_supplement in raw_supplements:
+            if not isinstance(raw_supplement, dict):
+                continue
+
+            supplement_name = _clean_ai_text(raw_supplement.get('name'), 200)
+            if not supplement_name:
+                continue
+
+            supplement_type = _clean_ai_text(raw_supplement.get('supplement_type'), 20).lower()
+            if supplement_type not in valid_supplement_types:
+                supplement_type = 'other'
+
+            dosage = _clean_ai_text(raw_supplement.get('dosage'), 100) or '1'
+            unit = _clean_ai_text(raw_supplement.get('unit'), 50) or 'serving'
+            supplements.append({
+                'name': supplement_name,
+                'supplement_type': supplement_type,
+                'dosage': dosage,
+                'unit': unit,
+            })
+
+    if not meals and not supplements:
+        return None
+
+    return {
+        'date': _normalize_planner_date(raw_nutrition_plan.get('date')),
+        'meals': meals,
+        'supplements': supplements,
+    }
+
+
+def _build_planner_action_response_multi_day(normalized_workouts, normalized_nutrition):
+    """Return UI metadata for the AI planner action button, supporting multi-day plans."""
+    has_workouts = len(normalized_workouts) > 0
+    has_nutrition = len(normalized_nutrition) > 0
+
+    if not has_workouts and not has_nutrition:
+        return None
+
+    if has_workouts and has_nutrition:
+        button_label = 'Add both exercises and nutritions'
+        action_type = 'both'
+    elif has_workouts:
+        button_label = 'Add exercises'
+        action_type = 'exercises'
+    else:
+        button_label = 'Add nutritions'
+        action_type = 'nutritions'
+
+    payload = {}
+
+    # Include ALL workouts as array if multiple, or single object if one
+    if has_workouts:
+        if len(normalized_workouts) == 1:
+            payload['workout_plan'] = {
+                'workout_name': normalized_workouts[0]['workout_name'],
+                'goal': normalized_workouts[0]['goal'],
+                'date': normalized_workouts[0]['date'].isoformat(),
+                'exercises': normalized_workouts[0]['exercises'],
+            }
+        else:
+            payload['workout_plan'] = [
+                {
+                    'workout_name': wk['workout_name'],
+                    'goal': wk['goal'],
+                    'date': wk['date'].isoformat(),
+                    'exercises': wk['exercises'],
+                }
+                for wk in normalized_workouts
+            ]
+
+    # Include ALL nutrition as array if multiple, or single object if one
+    if has_nutrition:
+        if len(normalized_nutrition) == 1:
+            payload['nutrition_plan'] = {
+                'date': normalized_nutrition[0]['date'].isoformat(),
+                'meals': normalized_nutrition[0]['meals'],
+                'supplements': normalized_nutrition[0]['supplements'],
+            }
+        else:
+            payload['nutrition_plan'] = [
+                {
+                    'date': nt['date'].isoformat(),
+                    'meals': nt['meals'],
+                    'supplements': nt['supplements'],
+                }
+                for nt in normalized_nutrition
+            ]
+
+    return {
+        'type': action_type,
+        'button_label': button_label,
+        'payload': payload,
+    }
+
+
+def _build_planner_action_response(workout_plan, nutrition_plan):
+    """Return UI metadata for the AI planner action button."""
+    if workout_plan and nutrition_plan:
+        button_label = 'Add both exercises and nutritions'
+        action_type = 'both'
+    elif workout_plan:
+        button_label = 'Add exercises'
+        action_type = 'exercises'
+    elif nutrition_plan:
+        button_label = 'Add nutritions'
+        action_type = 'nutritions'
+    else:
+        return None
+
+    payload = {}
+    if workout_plan:
+        payload['workout_plan'] = {
+            'workout_name': workout_plan['workout_name'],
+            'goal': workout_plan['goal'],
+            'date': workout_plan['date'].isoformat(),
+            'exercises': workout_plan['exercises'],
+        }
+    if nutrition_plan:
+        payload['nutrition_plan'] = {
+            'date': nutrition_plan['date'].isoformat(),
+            'meals': nutrition_plan['meals'],
+            'supplements': nutrition_plan['supplements'],
+        }
+
+    return {
+        'type': action_type,
+        'button_label': button_label,
+        'payload': payload,
+    }
+
+
+def _extract_ai_planner_action(reply, user):
+    """Extract optional planner payload tag from AI text and normalize it."""
+    if not isinstance(reply, str):
+        return '', None
+
+    payload_match = re.search(
+        r'<planner_payload>\s*([\{\[].*?[\}\]])\s*</planner_payload>',
+        reply,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not payload_match:
+        return reply.strip(), None
+
+    cleaned_reply = re.sub(
+        r'<planner_payload>\s*[\{\[].*?[\}\]]\s*</planner_payload>',
+        '',
+        reply,
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+
+    try:
+        raw_payload = json.loads(payload_match.group(1))
+    except json.JSONDecodeError:
+        return cleaned_reply, None
+
+    if not isinstance(raw_payload, dict):
+        return cleaned_reply, None
+
+    # Handle both single-plan (dict) and multi-day (array) formats
+    workout_plans_raw = raw_payload.get('workout_plan')
+    nutrition_plans_raw = raw_payload.get('nutrition_plan')
+
+    # Convert to arrays for uniform processing
+    if isinstance(workout_plans_raw, dict):
+        workout_plans_raw = [workout_plans_raw]
+    elif not isinstance(workout_plans_raw, list):
+        workout_plans_raw = []
+
+    if isinstance(nutrition_plans_raw, dict):
+        nutrition_plans_raw = [nutrition_plans_raw]
+    elif not isinstance(nutrition_plans_raw, list):
+        nutrition_plans_raw = []
+
+    # Normalize ALL plans for button response (not just first one)
+    normalized_workouts = []
+    normalized_nutrition = []
+
+    for raw_wk in workout_plans_raw:
+        normalized = _normalize_ai_workout_plan(raw_wk, user)
+        if normalized:
+            normalized_workouts.append(normalized)
+
+    for raw_nt in nutrition_plans_raw:
+        normalized = _normalize_ai_nutrition_plan(raw_nt)
+        if normalized:
+            normalized_nutrition.append(normalized)
+
+    planner_action = _build_planner_action_response_multi_day(normalized_workouts, normalized_nutrition)
+    if not planner_action:
+        return cleaned_reply, None
+
+    return cleaned_reply, planner_action
+
+
 def _infer_muscle_group_from_training_exercise(training_exercise):
     """Map a TrainingExercise to legacy Exercise muscle groups."""
     keyword_map = {
@@ -298,12 +687,152 @@ def _save_chat_conversation_state(conversation, normalized_messages, reply):
     conversation.save()
 
 
+def _get_week_train_context(user, days_ahead=7):
+    """Build context showing workouts and exercises for the next N days (default 7)."""
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead - 1)
+    workouts = Workout.objects.filter(
+        user=user,
+        date__gte=today,
+        date__lte=end_date
+    ).prefetch_related('exercises').order_by('date', 'created_at')
+
+    if not workouts:
+        return 'Train Plan (Next 7 days): None planned'
+
+    lines = ['Train Plan (Next 7 days):']
+    current_date = None
+
+    for workout in workouts:
+        if workout.date != current_date:
+            current_date = workout.date
+            lines.append(f'  {current_date.strftime("%a, %b %d")}:')
+
+        exercises = workout.exercises.all()
+        if not exercises:
+            lines.append(f'    - {workout.name}: (no exercises)')
+        else:
+            lines.append(f'    - {workout.name} ({workout.get_goal_display()}):')
+            for ex in exercises:
+                status = '✓' if ex.completed else '○'
+                weight_str = f' @ {ex.weight}lb' if ex.weight else ''
+                lines.append(f'      • {ex.name} ({ex.sets}x{ex.reps}{weight_str}){status}')
+
+    return '\n'.join(lines)
+
+
+def _get_week_nutrition_context(user, days_ahead=7):
+    """Build context showing meals and food items for the next N days (default 7)."""
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead - 1)
+    meals = Meal.objects.filter(
+        user=user,
+        date__gte=today,
+        date__lte=end_date
+    ).prefetch_related('items').order_by('date', 'created_at')
+
+    if not meals:
+        return 'Nutrition Plan (Next 7 days): None planned'
+
+    lines = ['Nutrition Plan (Next 7 days):']
+    current_date = None
+    day_totals = {}
+
+    for meal in meals:
+        if meal.date != current_date:
+            if current_date is not None and current_date in day_totals:
+                totals = day_totals[current_date]
+                lines.append(
+                    f'    DAY TOTAL: {totals["cals"]} cal, {totals["protein"]}g P, '
+                    f'{totals["carbs"]}g C, {totals["fats"]}g F'
+                )
+            current_date = meal.date
+            lines.append(f'  {current_date.strftime("%a, %b %d")}:')
+            day_totals[current_date] = {'cals': 0, 'protein': 0, 'carbs': 0, 'fats': 0}
+
+        items = meal.items.all()
+        if not items:
+            lines.append(f'    - {meal.name}: (no items)')
+        else:
+            meal_cals = 0
+            meal_protein = 0
+            meal_carbs = 0
+            meal_fats = 0
+
+            for item in items:
+                status = '✓' if item.completed else '○'
+                lines.append(
+                    f'    - {meal.name}: {item.name} ({item.calories} cal, {item.protein}g P, '
+                    f'{item.carbs}g C, {item.fats}g F){status}'
+                )
+                meal_cals += item.calories
+                meal_protein += item.protein
+                meal_carbs += item.carbs
+                meal_fats += item.fats
+
+            day_totals[current_date]['cals'] += meal_cals
+            day_totals[current_date]['protein'] += meal_protein
+            day_totals[current_date]['carbs'] += meal_carbs
+            day_totals[current_date]['fats'] += meal_fats
+
+    # Add final day total
+    if current_date is not None and current_date in day_totals:
+        totals = day_totals[current_date]
+        lines.append(
+            f'    DAY TOTAL: {totals["cals"]} cal, {totals["protein"]}g P, '
+            f'{totals["carbs"]}g C, {totals["fats"]}g F'
+        )
+
+    return '\n'.join(lines)
+
+
+
+    if not user or not user.is_authenticated:
+        return None
+
+    if conversation_id is None:
+        return AIChatConversation.objects.create(
+            user=user,
+            title=_build_chat_conversation_title(normalized_messages),
+        )
+
+    try:
+        conversation_id = int(conversation_id)
+    except (TypeError, ValueError):
+        return False
+
+    return AIChatConversation.objects.filter(id=conversation_id, user=user).first()
+
+
+def _save_chat_conversation_state(conversation, normalized_messages, reply):
+    if not conversation:
+        return
+
+    all_messages = [*normalized_messages, {'role': 'assistant', 'content': reply}]
+    conversation.messages.all().delete()
+    AIChatMessage.objects.bulk_create(
+        [
+            AIChatMessage(
+                conversation=conversation,
+                role=message['role'],
+                content=message['content'],
+            )
+            for message in all_messages
+        ]
+    )
+    conversation.title = _build_chat_conversation_title(all_messages)
+    conversation.save()
+
+
 def _build_ai_user_context(user):
     """Build a compact user context snapshot for personalized coaching."""
+    profile_options_context = _build_profile_option_catalog()
+
     if not user or not user.is_authenticated:
         return (
             '- User session: not authenticated\n'
-            '- Guidance mode: general coaching only'
+            '- Guidance mode: general coaching only\n'
+            f'{profile_options_context}'
         )
 
     today = date.today()
@@ -341,6 +870,9 @@ def _build_ai_user_context(user):
     profile_home_gym = 'Not set'
     profile_equipment = 'None listed'
     profile_bio = 'Not provided'
+    profile_height = 'Not set'
+    profile_weight = 'Not set'
+    profile_age = 'Not set'
     if profile:
         profile_goal = profile.get_primary_goal_display() if profile.primary_goal else 'Not set'
         profile_experience = (
@@ -361,6 +893,15 @@ def _build_ai_user_context(user):
             profile_bio = ' '.join(profile.bio.split())
             if len(profile_bio) > 600:
                 profile_bio = f'{profile_bio[:600]}...'
+        if profile.height:
+            feet, inches = _height_cm_to_us(profile.height)
+            profile_height = f'{profile.height} cm ({feet} ft {inches} in)'
+        if profile.weight:
+            weight_kg = float(profile.weight)
+            weight_lbs = _weight_kg_to_lbs(profile.weight)
+            profile_weight = f'{weight_kg:.2f} kg ({weight_lbs:.2f} lb)'
+        if profile.age:
+            profile_age = f'{profile.age} years'
 
     injuries_context = 'None logged'
     active_injuries = list(
@@ -380,6 +921,9 @@ def _build_ai_user_context(user):
         f'- Goal: {profile_goal}\n'
         f'- Experience level: {profile_experience}\n'
         f'- Dietary preference: {profile_diet}\n'
+        f'- Height: {profile_height}\n'
+        f'- Weight: {profile_weight}\n'
+        f'- Age: {profile_age}\n'
         f'- Home gym available: {profile_home_gym}\n'
         f'- Available equipment: {profile_equipment}\n'
         f'- About You field value: {profile_bio}\n'
@@ -389,7 +933,10 @@ def _build_ai_user_context(user):
         f'{total_carbs}g carbs, {total_fats}g fats\n'
         f'- Workouts planned today: {workouts_today}\n'
         f'- Exercises completed today: {completed_exercises}\n'
-        f'- Supplements taken today: {supplements_taken}/{supplements_total}'
+        f'- Supplements taken today: {supplements_taken}/{supplements_total}\n\n'
+        f'{_get_week_train_context(user)}\n\n'
+        f'{_get_week_nutrition_context(user)}\n\n'
+        f'{profile_options_context}'
     )
 
 
@@ -411,19 +958,29 @@ def _build_ai_system_prompt(user):
             '5. For supplements, include concise caution about interactions/contraindications when relevant.\n'
             '6. Keep responses concise and coach-like: usually 3-6 sentences, optionally short bullets.\n'
             '7. If key info is missing, ask one focused follow-up question.\n'
-            '8. When giving app navigation help, use exact user-visible UI labels from this app; '
-            'avoid generic or invented menus.\n'
-            '9. Do not tell users to paste text unless there is a real text input for that exact step; '
-            'for goal selection, instruct tap/select the listed option.\n'
-            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names '
-            'unless they actually exist in this app.\n'
+            '8. When giving app navigation help, use exact user-visible UI labels from this app; avoid generic or invented menus.\n'
+            '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
+            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
+            '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
+            '12. Use the provided "Train Plan (Next 7 days)" and "Nutrition Plan (Next 7 days)" context sections to understand what the user has scheduled. When user asks about their plan (e.g., "what\'s my plan today?", "what exercises do I have tomorrow?", "show me next week"), refer to these sections. Plans are organized by date with headers (e.g., "Mon, Apr 28"). If a day is already heavily planned, mention it; if empty, suggest adding workouts/meals. When suggesting new plans, check for existing content and integrate thoughtfully (don\'t duplicate if similar workouts/meals exist for that date).\n'
+            '13. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
+            '14. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
+            'Use this exact planner_payload format. ONLY include sections you are creating (omit null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
+            'Single-day example:\n'
+            '<planner_payload>\n'
+            '{"workout_plan":{"workout_name":"Upper Body","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}],"supplements":[]}}\n'
+            '</planner_payload>\n'
+            'MULTI-DAY RULE (MANDATORY): When user asks for "7-day" OR "weekly" OR "multiple days" plan, you MUST generate plan_payload with workout_plan and nutrition_plan as ARRAYS containing ALL requested days. See multi-day example below:\n'
+            '<planner_payload>\n'
+            '{"workout_plan":[{"workout_name":"Day 1 Upper","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Dumbbell Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2 Lower","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0},{"name":"Deadlifts","muscle_group":"back","sets":3,"reps":8,"weight":0}]},{"workout_name":"Day 3 Full Body","goal":"muscle_gain","date":"2026-05-01","exercises":[{"name":"Bench Press","muscle_group":"chest","sets":3,"reps":8,"weight":0},{"name":"Pull-ups","muscle_group":"back","sets":3,"reps":5,"weight":0}]}],"nutrition_plan":[{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]},{"name":"Lunch","items":[{"name":"Chicken","calories":350,"protein":50,"carbs":0,"fats":15},{"name":"Rice","calories":250,"protein":5,"carbs":55,"fats":1}]}],"supplements":[]},{"date":"2026-04-30","meals":[{"name":"Breakfast","items":[{"name":"Eggs","calories":155,"protein":13,"carbs":1,"fats":11},{"name":"Toast","calories":80,"protein":3,"carbs":14,"fats":1}]},{"name":"Lunch","items":[{"name":"Salmon","calories":300,"protein":35,"carbs":0,"fats":18},{"name":"Quinoa","calories":220,"protein":8,"carbs":39,"fats":3}]}],"supplements":[]},{"date":"2026-05-01","meals":[{"name":"Breakfast","items":[{"name":"Greek Yogurt","calories":150,"protein":20,"carbs":8,"fats":2},{"name":"Berries","calories":80,"protein":1,"carbs":18,"fats":0}]},{"name":"Lunch","items":[{"name":"Turkey","calories":280,"protein":50,"carbs":0,"fats":6},{"name":"Sweet Potato","calories":200,"protein":4,"carbs":45,"fats":0}]}],"supplements":[]}]}\n'
+            '</planner_payload>\n'
+            '15. Only include <planner_payload> when responding to user request for a concrete plan. Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", "plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from the payload. Response description must match payload exactly.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
             '- Home dashboard tracks daily progress toward calorie and workout goals.\n'
             '- Profile editing opens from the top-right profile bubble menu item "Profile".\n'
-            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" '
-            '(tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
+            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" (tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
             '- Calorie target changes use field "Daily Calorie Goal (kcal)" on the same page.\n\n'
             '- Bio is in section "Additional Information" with field label "About You" (textarea).\n'
             '- Profile form fields are directly editable on the page; there is no separate edit/pencil step.\n\n'
@@ -470,14 +1027,230 @@ def api_chat(request):
             model=model_name,
             messages=ai_messages,
         )
-        reply = response.choices[0].message.content
-        _save_chat_conversation_state(conversation, messages_for_storage, reply)
-        return JsonResponse({
+        reply = response.choices[0].message.content or ''
+        cleaned_reply, planner_action = _extract_ai_planner_action(reply, request.user)
+        _save_chat_conversation_state(conversation, messages_for_storage, cleaned_reply)
+        response_payload = {
             "reply": reply,
             "conversation_id": conversation.id if conversation else None,
-        })
+        }
+        response_payload['reply'] = cleaned_reply
+        if planner_action:
+            response_payload['planner_action'] = planner_action
+        return JsonResponse(response_payload)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=502)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_chat_stream(request):
+    """Stream chat responses token-by-token using Server-Sent Events."""
+    try:
+        body = json.loads(request.body)
+        incoming_messages = body.get('messages', [])
+        conversation_id = body.get('conversation_id')
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+
+    messages_for_model = _normalize_chat_messages(incoming_messages, max_messages=30)
+    if not messages_for_model:
+        return JsonResponse({"error": "messages list is required."}, status=400)
+    messages_for_storage = _normalize_chat_messages(incoming_messages, max_messages=None)
+
+    conversation = _get_user_chat_conversation(
+        request.user,
+        conversation_id,
+        messages_for_storage,
+    )
+    if conversation is False:
+        return JsonResponse({"error": "conversation_id must be an integer."}, status=400)
+    if conversation_id is not None and request.user.is_authenticated and conversation is None:
+        return JsonResponse({"error": "Conversation not found."}, status=404)
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return JsonResponse({"error": "OPENAI_API_KEY not configured."}, status=500)
+
+    model_name = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5-mini')
+    client = OpenAI(api_key=api_key)
+    ai_messages = [_build_ai_system_prompt(request.user), *messages_for_model]
+
+    def event_stream():
+        """Generator that yields SSE formatted chunks."""
+        try:
+            full_reply = ""
+            stream = client.chat.completions.create(
+                model=model_name,
+                messages=ai_messages,
+                stream=True,
+            )
+
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    token = chunk.choices[0].delta.content
+                    full_reply += token
+                    # Send token as SSE event
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+
+            # After streaming completes, extract planner action and save conversation
+            cleaned_reply, planner_action = _extract_ai_planner_action(full_reply, request.user)
+            _save_chat_conversation_state(conversation, messages_for_storage, cleaned_reply)
+
+            # If we cleaned the reply (removed payload), send the cleaned version to frontend
+            if cleaned_reply != full_reply:
+                yield f"data: {json.dumps({'type': 'replace_text', 'text': cleaned_reply})}\n\n"
+
+            # Send metadata at end
+            metadata = {
+                "type": "done",
+                "conversation_id": conversation.id if conversation else None,
+            }
+            if planner_action:
+                metadata['planner_action'] = planner_action
+
+            yield f"data: {json.dumps(metadata)}\n\n"
+
+        except Exception as e:
+            error_data = {"type": "error", "error": str(e)}
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    response = StreamingHttpResponse(
+        event_stream(),
+        content_type="text/event-stream"
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_chat_apply_plan(request):
+    """Apply a planner payload from AI chat into train/nutrition records."""
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    raw_payload = body.get('planner_payload')
+    if not isinstance(raw_payload, dict):
+        return JsonResponse({'error': 'planner_payload object is required.'}, status=400)
+
+    # Support both single plans and multiple plans (arrays for multi-day)
+    raw_workout_plans = raw_payload.get('workout_plan')
+    raw_nutrition_plans = raw_payload.get('nutrition_plan')
+
+    # Convert single plans to arrays for uniform processing
+    if isinstance(raw_workout_plans, dict):
+        raw_workout_plans = [raw_workout_plans]
+    elif not isinstance(raw_workout_plans, list):
+        raw_workout_plans = []
+
+    if isinstance(raw_nutrition_plans, dict):
+        raw_nutrition_plans = [raw_nutrition_plans]
+    elif not isinstance(raw_nutrition_plans, list):
+        raw_nutrition_plans = []
+
+    if not raw_workout_plans and not raw_nutrition_plans:
+        return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
+
+    workouts_created = 0
+    exercises_created = 0
+    meals_created = 0
+    food_items_created = 0
+    supplements_created = 0
+
+    with transaction.atomic():
+        # Process all workout plans
+        for raw_workout in raw_workout_plans:
+            workout_plan = _normalize_ai_workout_plan(raw_workout, request.user)
+            if not workout_plan:
+                continue
+
+            workout = Workout.objects.create(
+                user=request.user,
+                name=workout_plan['workout_name'],
+                goal=workout_plan['goal'],
+                status='planned',
+                date=workout_plan['date'],
+            )
+            workouts_created += 1
+
+            for exercise_data in workout_plan['exercises']:
+                Exercise.objects.create(
+                    workout=workout,
+                    name=exercise_data['name'],
+                    muscle_group=exercise_data['muscle_group'],
+                    sets=exercise_data['sets'],
+                    reps=exercise_data['reps'],
+                    weight=exercise_data['weight'],
+                    completed=False,
+                )
+                exercises_created += 1
+
+        # Process all nutrition plans
+        for raw_nutrition in raw_nutrition_plans:
+            nutrition_plan = _normalize_ai_nutrition_plan(raw_nutrition)
+            if not nutrition_plan:
+                continue
+
+            nutrition_date = nutrition_plan['date']
+            for meal_data in nutrition_plan['meals']:
+                meal = Meal.objects.create(
+                    user=request.user,
+                    name=meal_data['name'],
+                    date=nutrition_date,
+                )
+                meals_created += 1
+
+                for item_data in meal_data['items']:
+                    FoodItem.objects.create(
+                        meal=meal,
+                        name=item_data['name'],
+                        calories=item_data['calories'],
+                        protein=item_data['protein'],
+                        carbs=item_data['carbs'],
+                        fats=item_data['fats'],
+                    )
+                    food_items_created += 1
+
+            for supplement_data in nutrition_plan['supplements']:
+                supplement_obj = SupplementDatabase.objects.filter(
+                    name__iexact=supplement_data['name'],
+                ).first()
+                SupplementEntry.objects.create(
+                    user=request.user,
+                    supplement=supplement_obj,
+                    name=supplement_data['name'],
+                    supplement_type=supplement_data['supplement_type'],
+                    dosage=supplement_data['dosage'],
+                    unit=supplement_data['unit'],
+                    date=nutrition_date,
+                    taken=False,
+                )
+                supplements_created += 1
+
+    # Validate that at least something was created
+    if not (workouts_created or meals_created or supplements_created):
+        return JsonResponse({'error': 'No valid workout or nutrition plan to apply.'}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'message': (
+            f'Added {exercises_created} exercises, {food_items_created} food items, '
+            f'and {supplements_created} supplements to your planners.'
+        ),
+        'summary': {
+            'workouts_created': workouts_created,
+            'exercises_created': exercises_created,
+            'meals_created': meals_created,
+            'food_items_created': food_items_created,
+            'supplements_created': supplements_created,
+        },
+    })
 
 
 @login_required
@@ -528,12 +1301,10 @@ def api_chat_history_detail(request, conversation_id):
     }
     return JsonResponse(payload)
 
-
-from django.core.mail import send_mail  # noqa: E402
-from .models import EmailVerification  # noqa: E402
+from django.core.mail import send_mail
+from .models import EmailVerification
 
 logger = logging.getLogger(__name__)
-
 
 def user_get_started(request):
     if request.user.is_authenticated:
@@ -555,25 +1326,16 @@ def user_get_started(request):
                         verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
                         logger.info(f'Verify URL: {verify_url}')
 
-                        html_message = (
-                            '<div style="font-family:Arial,sans-serif;max-width:480px;'
-                            'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
-                            '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
-                            '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
-                            'Welcome! Click the button below to verify your email and activate your account.'
-                            '</p>'
-                            '<div style="text-align:center;margin:32px 0;">'
-                            f'<a href="{verify_url}" style="display:inline-block;'
-                            'padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;'
-                            'font-weight:600;border-radius:12px;text-decoration:none;">'
-                            'Verify My Email</a>'
-                            '</div>'
-                            '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">'
-                            "This link expires in 24 hours. "
-                            "If you didn't create an account, you can ignore this email."
-                            '</p>'
-                            '</div>'
-                        )
+                        html_message = f"""
+                        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                            <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                            <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
+                            <div style="text-align:center;margin:32px 0;">
+                                <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
+                            </div>
+                            <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
+                        </div>
+                        """
 
                         logger.info(f'Sending verification email to {user.email} from {settings.DEFAULT_FROM_EMAIL}')
                         result = send_mail(
@@ -593,7 +1355,7 @@ def user_get_started(request):
                         verification = EmailVerification.objects.create(user=user, verified=True)
                         logger.info(f'Email verification disabled - user auto-activated: {user.username}')
                         messages.success(request, 'Account created successfully! You can now log in.')
-            except Exception:
+            except Exception as e:
                 logger.exception(f'Failed during signup for {form.cleaned_data.get("email")}')
                 form.add_error(None, 'We could not create your account right now.')
                 return render(request, 'core/user_get_started.html', {'form': form})
@@ -832,25 +1594,16 @@ def forgot_password(request):
                     reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
 
                     # Send reset email
-                    html_message = (
-                        '<div style="font-family:Arial,sans-serif;max-width:480px;'
-                        'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
-                        '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
-                        '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
-                        'Click the button below to reset your password.'
-                        '</p>'
-                        '<div style="text-align:center;margin:32px 0;">'
-                        f'<a href="{reset_url}" style="display:inline-block;'
-                        'padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;'
-                        'font-weight:600;border-radius:12px;text-decoration:none;">'
-                        'Reset Password</a>'
-                        '</div>'
-                        '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">'
-                        "This link expires in 24 hours. "
-                        "If you didn't request a password reset, you can ignore this email."
-                        '</p>'
-                        '</div>'
-                    )
+                    html_message = f"""
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
+                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
+                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
+                        <div style="text-align:center;margin:32px 0;">
+                            <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
+                        </div>
+                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
+                    </div>
+                    """
 
                     send_mail(
                         'Reset your Spotter.ai password',
@@ -931,7 +1684,7 @@ def home_dash(request):
         profile = request.user.profile
         if profile.social_login_user and not profile.onboarding_completed:
             return redirect('get_started_profile')
-    except Exception:
+    except:
         pass
 
     # Check for discard action from profile
@@ -976,45 +1729,6 @@ def home_dash(request):
         .annotate(total_exercises=Count('id'))
         .values_list('workout__date', 'total_exercises')
     )
-    today_activities = list(
-        Exercise.objects.filter(
-            workout__user=request.user,
-            workout__date=today,
-            completed=False,
-        )
-        .select_related('workout')
-        .order_by('workout__created_at', 'created_at')
-    )
-    today_meals = list(
-        Meal.objects.filter(
-            user=request.user,
-            date=today,
-        )
-        .prefetch_related('items', 'supplements')
-        .order_by('created_at')
-    )
-    today_nutrition = []
-    for meal in today_meals:
-        food_names = [item.name for item in meal.items.all() if not item.completed]
-        supplement_names = [supplement.name for supplement in meal.supplements.all() if not supplement.taken]
-        nutrition_names = food_names + supplement_names
-        if not nutrition_names:
-            continue
-        foods_text = ', '.join(nutrition_names)
-        today_nutrition.append({
-            'meal_name': meal.name,
-            'foods_text': foods_text,
-        })
-    today_supplements = SupplementEntry.objects.filter(
-        user=request.user,
-        date=today,
-        taken=False,
-    ).order_by('name')
-    for supplement in today_supplements:
-        today_nutrition.append({
-            'meal_name': 'Supplements',
-            'foods_text': supplement.name,
-        })
 
     completion_streak = 0
     streak_date = today
@@ -1027,6 +1741,57 @@ def home_dash(request):
             continue
         break
 
+    # Fetch today's activities (incomplete exercises from today's workouts)
+    today_activities = Exercise.objects.filter(
+        workout__user=request.user,
+        workout__date=today,
+        completed=False,
+    ).select_related('workout').order_by('created_at')
+
+    # Fetch today's nutrition items
+    class NutritionItem:
+        def __init__(self, foods_text, meal_name):
+            self.foods_text = foods_text
+            self.meal_name = meal_name
+
+    today_nutrition_items = []
+
+    # Incomplete food items from today's meals
+    incomplete_food_items = FoodItem.objects.filter(
+        meal__user=request.user,
+        meal__date=today,
+        completed=False,
+    ).select_related('meal').order_by('meal__created_at', 'created_at')
+
+    for food_item in incomplete_food_items:
+        today_nutrition_items.append(
+            NutritionItem(food_item.name, food_item.meal.name)
+        )
+
+    # Meal supplements from today's meals (only untaken ones)
+    meal_supplements = MealSupplement.objects.filter(
+        meal__user=request.user,
+        meal__date=today,
+        taken=False,
+    ).select_related('meal').order_by('meal__created_at', 'created_at')
+
+    for supplement in meal_supplements:
+        today_nutrition_items.append(
+            NutritionItem(supplement.name, supplement.meal.name)
+        )
+
+    # Untaken standalone supplements for today
+    standalone_supplements = SupplementEntry.objects.filter(
+        user=request.user,
+        date=today,
+        taken=False,
+    ).order_by('created_at')
+
+    for supplement in standalone_supplements:
+        today_nutrition_items.append(
+            NutritionItem(supplement.name, 'Supplements')
+        )
+
     return render(request, 'home_dash_dir/home_dash.html', {
         'active_tab': 'home',
         'total_calories': total_calories,
@@ -1037,7 +1802,7 @@ def home_dash(request):
         'workout_goal_percentage': workout_goal_percentage,
         'completion_streak': completion_streak,
         'today_activities': today_activities,
-        'today_nutrition': today_nutrition,
+        'today_nutrition': today_nutrition_items,
     })
 
 
@@ -1180,7 +1945,10 @@ def add_exercise(request):
             .first()
         )
         if not training_exercise:
-            messages.error(request, 'Selected exercise was not found in the exercise database.')
+            error_msg = 'Selected exercise was not found in the exercise database.'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': error_msg}, status=400)
+            messages.error(request, error_msg)
             return redirect(base_redirect_url)
 
     if training_exercise:
@@ -1194,7 +1962,10 @@ def add_exercise(request):
             reps = str(training_exercise.default_reps)
 
     if not workout_id or not exercise_name or not muscle_group:
-        messages.error(request, 'Exercise name and muscle group are required.')
+        error_msg = 'Exercise name and muscle group are required.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        messages.error(request, error_msg)
         return redirect(base_redirect_url)
 
     workout = get_object_or_404(Workout, id=workout_id, user=request.user)
@@ -1204,12 +1975,14 @@ def add_exercise(request):
 
     validation_error = sets_error or reps_error or weight_error
     if validation_error:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': validation_error}, status=400)
         messages.error(request, validation_error)
         return redirect(base_redirect_url)
 
     progress_before = compute_achievements_challenges(request.user) if status == 'completed' else None
 
-    Exercise.objects.create(
+    exercise = Exercise.objects.create(
         workout=workout,
         name=exercise_name,
         muscle_group=muscle_group,
@@ -1221,6 +1994,9 @@ def add_exercise(request):
 
     if progress_before is not None:
         _emit_achievement_challenge_diffs(request.user, progress_before)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'exercise_id': exercise.id})
 
     return redirect(base_redirect_url)
 
@@ -1350,6 +2126,22 @@ def nutrition_page(request):
     # Get supplements for the selected date
     supplements = SupplementEntry.objects.filter(user=request.user, date=selected_date).order_by('name')
 
+    # Sets used by the template to pre-fill saved bookmark buttons
+    saved_food_id_by_name = dict(
+        SavedFood.objects.filter(user=request.user).values_list('name', 'id')
+    )
+    saved_supplement_id_by_name = dict(
+        SavedSupplement.objects.filter(user=request.user).values_list('name', 'id')
+    )
+    saved_meal_id_by_name = dict(
+        SavedMeal.objects.filter(user=request.user).values_list('name', 'id')
+    )
+    saved_food_names = set(saved_food_id_by_name)
+    saved_supplement_names = set(saved_supplement_id_by_name)
+    saved_meal_ids = set(saved_meal_id_by_name)
+
+    meals_for_picker = [{'id': m.id, 'name': m.name} for m in meals]
+
     context = {
         'active_tab': 'nutrition',
         'meals': meals,
@@ -1364,6 +2156,13 @@ def nutrition_page(request):
         'calorie_goal': calorie_goal,
         'calories_percentage': calories_percentage,
         'supplements': supplements,
+        'saved_food_names': saved_food_names,
+        'saved_supplement_names': saved_supplement_names,
+        'saved_meal_names': saved_meal_ids,
+        'saved_food_ids_json': json.dumps(saved_food_id_by_name),
+        'saved_supplement_ids_json': json.dumps(saved_supplement_id_by_name),
+        'saved_meal_ids_json': json.dumps(saved_meal_id_by_name),
+        'meals_json': json.dumps(meals_for_picker),
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
@@ -1404,20 +2203,6 @@ def add_meal(request):
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
 
 
-def _parse_serving_size(raw):
-    """Parse a serving size string (whole number, decimal, or fraction like '1/2') into a float clamped to (0, 1000]."""
-    raw = (raw or '1').strip()
-    try:
-        if '/' in raw:
-            num, den = raw.split('/', 1)
-            result = float(num) / float(den)
-        else:
-            result = float(raw)
-    except (ValueError, ZeroDivisionError):
-        result = 1.0
-    return max(0.01, min(result, 1000))
-
-
 @login_required
 @require_POST
 def add_food_item(request):
@@ -1451,9 +2236,6 @@ def add_food_item(request):
     except ValueError:
         protein = carbs = fats = 0
 
-    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
-    serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
-
     # Check if this is an update or create
     if item_id:
         try:
@@ -1463,13 +2245,14 @@ def add_food_item(request):
             food_item.protein = protein
             food_item.carbs = carbs
             food_item.fats = fats
-            food_item.serving_size = serving_size
-            food_item.serving_unit = serving_unit
             food_item.save()
             messages.success(request, f'Food item "{food_name}" updated.')
         except FoodItem.DoesNotExist:
             messages.error(request, 'Food item not found.')
     else:
+        if meal.items.count() >= 30:
+            messages.error(request, 'Item limit reached (30 max per meal).')
+            return redirect(f"{reverse('nutrition_page')}?date={date_param}")
         progress_before = compute_achievements_challenges(request.user)
         FoodItem.objects.create(
             meal=meal,
@@ -1477,9 +2260,7 @@ def add_food_item(request):
             calories=calories,
             protein=protein,
             carbs=carbs,
-            fats=fats,
-            serving_size=serving_size,
-            serving_unit=serving_unit,
+            fats=fats
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
         _emit_achievement_challenge_diffs(request.user, progress_before)
@@ -1513,6 +2294,8 @@ def add_food_item_ajax(request):
     except ValueError:
         protein = carbs = fats = 0
 
+    if meal.items.count() >= 30:
+        return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
     serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
     serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
 
@@ -1525,7 +2308,6 @@ def add_food_item_ajax(request):
     item = FoodItem.objects.create(
         meal=meal, name=food_name, calories=calories,
         protein=protein, carbs=carbs, fats=fats, group=group,
-        serving_size=serving_size, serving_unit=serving_unit,
     )
     _emit_achievement_challenge_diffs(request.user, progress_before)
     return JsonResponse({
@@ -1535,8 +2317,6 @@ def add_food_item_ajax(request):
         'protein': item.protein,
         'carbs': item.carbs,
         'fats': item.fats,
-        'serving_size': str(item.serving_size),
-        'serving_unit': item.serving_unit,
     })
 
 
@@ -1571,6 +2351,19 @@ def toggle_food_item(request):
 
 @login_required
 @require_POST
+def delete_food_item(request):
+    item_id = request.POST.get('item_id')
+    date_param = request.POST.get('date')
+
+    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
+    food_item.delete()
+    messages.success(request, 'Food item deleted.')
+
+    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
+
+
+@login_required
+@require_POST
 def toggle_food_group(request):
     group_id = request.POST.get('group_id')
     date_param = request.POST.get('date')
@@ -1584,19 +2377,6 @@ def toggle_food_group(request):
 
     if progress_before is not None:
         _emit_achievement_challenge_diffs(request.user, progress_before)
-
-    return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
-
-
-@login_required
-@require_POST
-def delete_food_item(request):
-    item_id = request.POST.get('item_id')
-    date_param = request.POST.get('date')
-
-    food_item = get_object_or_404(FoodItem, id=item_id, meal__user=request.user)
-    food_item.delete()
-    messages.success(request, 'Food item deleted.')
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}" if date_param else reverse('nutrition_page'))
 
@@ -1675,6 +2455,30 @@ def add_supplement_to_meal(request):
         messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def add_supplement_to_meal_ajax(request):
+    """JSON endpoint: add a supplement to a meal from the saved items modal."""
+    meal_id = request.POST.get('meal_id')
+    supplement_name = request.POST.get('supplement_name', '').strip()
+    supplement_type = request.POST.get('supplement_type', 'other').strip() or 'other'
+    dosage = request.POST.get('dosage', '1').strip() or '1'
+    unit = request.POST.get('unit', 'serving').strip() or 'serving'
+
+    if not meal_id or not supplement_name:
+        return JsonResponse({'error': 'Meal and supplement name are required.'}, status=400)
+
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    MealSupplement.objects.create(
+        meal=meal,
+        name=supplement_name,
+        supplement_type=supplement_type,
+        dosage=dosage,
+        unit=unit,
+    )
+    return JsonResponse({'success': True})
 
 
 @login_required
@@ -2124,7 +2928,7 @@ def search_foods(request):
     food_items = (
         FoodItem.objects
         .filter(name__icontains=query)
-        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_unit', 'serving_size')
+        .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')[:20]
     )
 
@@ -2173,7 +2977,6 @@ def get_all_foods(request):
     return JsonResponse({'foods': results, 'count': len(results)})
 
 
-@login_required
 def get_food_units(request):
     """Return distinct serving units from the food database, always including grams, cups, and ounces."""
     db_units = list(FoodItem.objects.values_list('serving_unit', flat=True).distinct())
@@ -2559,6 +3362,8 @@ def save_set_progress(request):
         return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
 
     try:
+        from django.db.models import Q
+
         saved_count = 0
         for item in set_data:
             exercise_id = item.get('exercise_id')
@@ -2648,3 +3453,241 @@ def get_set_progress(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ==================== SAVED ITEMS ====================
+
+@require_POST
+@login_required
+def save_food_item(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    name = data.get('name', '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
+    if SavedFood.objects.filter(user=request.user, name=name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    try:
+        calories = int(data.get('calories', 0))
+        protein = int(data.get('protein', 0))
+        carbs = int(data.get('carbs', 0))
+        fats = int(data.get('fats', 0))
+        serving_size = float(data.get('serving_size', 1))
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid numeric value'}, status=400)
+    if not (0 <= calories <= 9999 and 0 <= protein <= 999 and 0 <= carbs <= 999 and 0 <= fats <= 999):
+        return JsonResponse({'success': False, 'error': 'Numeric values out of range'}, status=400)
+    if serving_size <= 0:
+        return JsonResponse({'success': False, 'error': 'Serving size must be greater than 0'}, status=400)
+    saved = SavedFood.objects.create(
+        user=request.user,
+        name=name,
+        calories=calories,
+        protein=protein,
+        carbs=carbs,
+        fats=fats,
+        serving_size=serving_size,
+        serving_unit=data.get('serving_unit', 'serving').strip(),
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@require_POST
+@login_required
+def save_supplement_item(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    name = data.get('name', '').strip()
+    if not name:
+        return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
+    if SavedSupplement.objects.filter(user=request.user, name=name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    saved = SavedSupplement.objects.create(
+        user=request.user,
+        name=name,
+        supplement_type=data.get('supplement_type', 'other').strip(),
+        dosage=str(data.get('dosage', '')).strip(),
+        unit=str(data.get('unit', '')).strip(),
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@require_POST
+@login_required
+def save_meal_template(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    meal_id = data.get('meal_id')
+    try:
+        meal = Meal.objects.get(id=meal_id, user=request.user)
+    except Meal.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Meal not found'}, status=404)
+
+    items = []
+    for item in meal.items.all():
+        items.append({
+            'type': 'food',
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': str(item.serving_size),
+            'serving_unit': item.serving_unit,
+        })
+    for supp in meal.supplements.all():
+        items.append({
+            'type': 'supplement',
+            'name': supp.name,
+            'supplement_type': supp.supplement_type,
+            'dosage': supp.dosage,
+            'unit': supp.unit,
+        })
+
+    if SavedMeal.objects.filter(user=request.user, name=meal.name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+    saved = SavedMeal.objects.create(
+        user=request.user,
+        name=meal.name,
+        items=items,
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@require_POST
+@login_required
+def save_food_group_template(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    group_id = data.get('group_id')
+    try:
+        group = FoodGroup.objects.get(id=group_id, meal__user=request.user)
+    except FoodGroup.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Group not found'}, status=404)
+
+    if SavedMeal.objects.filter(user=request.user, name=group.name).exists():
+        return JsonResponse({'success': True, 'already_saved': True})
+
+    items = []
+    for item in group.grouped_items.all():
+        items.append({
+            'type': 'food',
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': str(item.serving_size),
+            'serving_unit': item.serving_unit,
+        })
+
+    saved = SavedMeal.objects.create(
+        user=request.user,
+        name=group.name,
+        items=items,
+    )
+    return JsonResponse({'success': True, 'already_saved': False, 'id': saved.id})
+
+
+@login_required
+def get_saved_items(request):
+    foods = list(SavedFood.objects.filter(user=request.user).values(
+        'id', 'name', 'calories', 'protein', 'carbs', 'fats', 'serving_size', 'serving_unit', 'created_at'
+    ))
+    for f in foods:
+        f['serving_size'] = str(f['serving_size'])
+        f['created_at'] = f['created_at'].strftime('%b %d')
+
+    supplements = list(SavedSupplement.objects.filter(user=request.user).values(
+        'id', 'name', 'supplement_type', 'dosage', 'unit', 'created_at'
+    ))
+    for s in supplements:
+        s['created_at'] = s['created_at'].strftime('%b %d')
+
+    meals = list(SavedMeal.objects.filter(user=request.user).values(
+        'id', 'name', 'items', 'created_at'
+    ))
+    for m in meals:
+        m['created_at'] = m['created_at'].strftime('%b %d')
+
+    return JsonResponse({'foods': foods, 'supplements': supplements, 'meals': meals})
+
+
+@require_POST
+@login_required
+def delete_saved_item(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    item_type = data.get('type')
+    item_id = data.get('id')
+    model_map = {'food': SavedFood, 'supplement': SavedSupplement, 'meal': SavedMeal}
+    Model = model_map.get(item_type)
+    if not Model:
+        return JsonResponse({'success': False, 'error': 'Invalid type'}, status=400)
+    try:
+        Model.objects.get(id=item_id, user=request.user).delete()
+        return JsonResponse({'success': True})
+    except Model.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+
+
+@require_POST
+@login_required
+def add_saved_meal_to_date(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    saved_meal_id = data.get('saved_meal_id')
+    date_str = data.get('date')
+    try:
+        saved_meal = SavedMeal.objects.get(id=saved_meal_id, user=request.user)
+    except SavedMeal.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Saved meal not found'}, status=404)
+
+    from datetime import date as date_cls
+    try:
+        target_date = date_cls.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        target_date = date_cls.today()
+
+    food_items = [i for i in saved_meal.items if i.get('type') == 'food']
+    if len(food_items) > 30:
+        return JsonResponse({'success': False, 'error': 'Saved meal exceeds the 30-item limit.'}, status=400)
+
+    meal = Meal.objects.create(user=request.user, name=saved_meal.name, date=target_date)
+    try:
+        for item in saved_meal.items:
+            if item.get('type') == 'food':
+                FoodItem.objects.create(
+                    meal=meal,
+                    name=item['name'],
+                    calories=int(item.get('calories', 0)),
+                    protein=int(item.get('protein', 0)),
+                    carbs=int(item.get('carbs', 0)),
+                    fats=int(item.get('fats', 0)),
+                    serving_size=float(item.get('serving_size', 1)),
+                    serving_unit=item.get('serving_unit', 'serving'),
+                )
+            elif item.get('type') == 'supplement':
+                MealSupplement.objects.create(
+                    meal=meal,
+                    name=item['name'],
+                    supplement_type=item.get('supplement_type', 'other'),
+                    dosage=str(item.get('dosage', '')),
+                    unit=str(item.get('unit', '')),
+                )
+    except (TypeError, ValueError):
+        meal.delete()
+        return JsonResponse({'success': False, 'error': 'Saved meal contains invalid data.'}, status=400)
+    return JsonResponse({'success': True, 'meal_id': meal.id})

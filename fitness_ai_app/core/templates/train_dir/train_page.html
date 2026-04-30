@@ -622,7 +622,6 @@
                                 <option value="">Home + Gym</option>
                                 <option value="home">Home</option>
                                 <option value="gym">Gym</option>
-                                <option value="both">Both only</option>
                             </select>
                         </div>
                         <div class="library-field">
@@ -737,6 +736,24 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+    // Save scroll position before form submission and restore after page load
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        // Save scroll position for forms that cause page redirects (toggles, deletes, adds)
+        if (form.method.toUpperCase() === 'POST') {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        }
+    });
+
+    // Restore scroll position after page load
+    window.addEventListener('load', function() {
+        const scrollPosition = sessionStorage.getItem('scrollPosition');
+        if (scrollPosition !== null) {
+            window.scrollTo(0, parseInt(scrollPosition));
+            sessionStorage.removeItem('scrollPosition');
+        }
+    });
+
     // Initialize flatpickr calendar picker
     var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
@@ -1012,7 +1029,7 @@
                 </footer>
             `;
 
-            const addButton = card.querySelector('.library-add-btn');
+                const addButton = card.querySelector('.library-add-btn');
             addButton.addEventListener('click', function() {
                 const workoutSelect = document.getElementById('libraryWorkoutSelect');
                 const selectedWorkout = workoutSelect ? workoutSelect.value : '';
@@ -1032,7 +1049,38 @@
                 document.getElementById('libraryQuickAddReps').value = exercise.default_reps || '';
                 document.getElementById('libraryQuickAddWeight').value = '';
                 document.getElementById('libraryQuickAddTrainingExerciseId').value = exercise.id || '';
-                quickAddForm.submit();
+                
+                // Submit via AJAX instead of traditional form submit
+                const formData = new FormData(quickAddForm);
+                const csrfToken = quickAddForm.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                fetch(quickAddForm.getAttribute('action'), {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // Show success message and keep user on same page/scroll position
+                        const successMsg = document.createElement('div');
+                        successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:15px 20px;border-radius:6px;z-index:10000;font-weight:500;';
+                        successMsg.textContent = 'Exercise added successfully!';
+                        document.body.appendChild(successMsg);
+                        setTimeout(() => successMsg.remove(), 3000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Fallback to traditional form submit on error
+                    quickAddForm.submit();
+                });
             });
 
             resultsRoot.appendChild(card);

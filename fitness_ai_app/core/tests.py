@@ -18,7 +18,8 @@ from django.utils import timezone
 from .models import (
     EmailVerification, ExerciseType, MuscleGroup, Muscle, Equipment,
     TrainingExercise, UserInjury, UserEquipmentProfile, SupplementDatabase, SupplementEntry,
-    Meal, FoodItem, Workout, Exercise
+    Meal, FoodItem, Workout, Exercise,
+    SavedFood, SavedSupplement, SavedMeal, FoodGroup,
 )
 from .forms import RegistrationForm
 
@@ -1004,6 +1005,178 @@ class ApiChatViewTests(TestCase):
         self.assertIn('menu item "Profile"', create_kwargs['messages'][0]['content'])
         self.assertIn('section "Additional Information"', create_kwargs['messages'][0]['content'])
         self.assertIn('field label "About You"', create_kwargs['messages'][0]['content'])
+        self.assertIn('<planner_payload>', create_kwargs['messages'][0]['content'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_planner_action_when_payload_is_present(self, mock_openai_cls):
+        from core.models import AIChatConversation
+
+        user = User.objects.create_user(
+            username='plannerchat@example.com',
+            email='plannerchat@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='plannerchat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'I built a workout and nutrition plan. Does this look good to add?\n'
+            '<planner_payload>'
+            '{"workout_plan":{"workout_name":"Push Day","goal":"strength","date":"2026-04-27",'
+            '"exercises":[{"name":"Bench Press","muscle_group":"chest","sets":4,"reps":8,"weight":135}]},'
+            '"nutrition_plan":{"date":"2026-04-27","meals":[{"name":"Lunch","items":[{"name":"Chicken Rice","calories":650,"protein":45,"carbs":70,"fats":18}]}],'
+            '"supplements":[{"name":"Creatine Monohydrate","supplement_type":"amino_acid","dosage":"5","unit":"g"}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'make me a full plan'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add both exercises and nutritions')
+        self.assertIn('workout_plan', payload['planner_action']['payload'])
+        self.assertIn('nutrition_plan', payload['planner_action']['payload'])
+        self.assertNotIn('<planner_payload>', payload['reply'])
+        self.assertIn('Does this look good to add?', payload['reply'])
+
+        conversation_id = payload.get('conversation_id')
+        conversation = AIChatConversation.objects.get(id=conversation_id, user=user)
+        latest_assistant_message = conversation.messages.filter(role='assistant').latest('id')
+        self.assertNotIn('<planner_payload>', latest_assistant_message.content)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_exercises_only_button_label(self, mock_openai_cls):
+        """Verify button shows 'Add exercises' when only workout_plan is in payload."""
+        user = User.objects.create_user(
+            username='exerciseonly@example.com',
+            email='exerciseonly@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='exerciseonly@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'Here is your home-friendly full-body session for tomorrow.\n'
+            '<planner_payload>'
+            '{"workout_plan":{"workout_name":"Full Body","goal":"general_health","date":"2026-04-29",'
+            '"exercises":[{"name":"Pull-up negatives","muscle_group":"back","sets":3,"reps":6,"weight":0},'
+            '{"name":"Incline push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},'
+            '{"name":"Bodyweight squats","muscle_group":"legs","sets":3,"reps":12,"weight":0}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create only exercises'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add exercises')
+        self.assertIn('workout_plan', payload['planner_action']['payload'])
+        self.assertNotIn('nutrition_plan', payload['planner_action']['payload'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_returns_nutrition_only_button_label(self, mock_openai_cls):
+        """Verify button shows 'Add nutritions' when only nutrition_plan is in payload."""
+        user = User.objects.create_user(
+            username='nutritiononly@example.com',
+            email='nutritiononly@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='nutritiononly@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = (
+            'Here is a meal plan for your muscle gain.\n'
+            '<planner_payload>'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":300,"protein":10,"carbs":50,"fats":5}]}],'
+            '"supplements":[{"name":"Whey Protein","supplement_type":"protein","dosage":"30","unit":"g"}]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create only meals'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        self.assertEqual(payload['planner_action']['button_label'], 'Add nutritions')
+        self.assertNotIn('workout_plan', payload['planner_action']['payload'])
+        self.assertIn('nutrition_plan', payload['planner_action']['payload'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_chat_meal_items_are_separated_not_combined(self, mock_openai_cls):
+        """Verify that meal items are separate, not combined (e.g., Oatmeal, Milk, Banana as 3 items, not 1)."""
+        user = User.objects.create_user(
+            username='mealseparate@example.com',
+            email='mealseparate@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='mealseparate@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        # AI response with properly separated items (NOT combined)
+        mock_resp.choices[0].message.content = (
+            'Here is your breakfast plan with all components separated.\n'
+            '<planner_payload>'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0},{"name":"Peanut Butter","calories":190,"protein":8,"carbs":7,"fats":16},{"name":"Whey Protein","calories":120,"protein":25,"carbs":2,"fats":1}]}],'
+            '"supplements":[]}}'
+            '</planner_payload>'
+        )
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'create breakfast with oatmeal, milk, banana, peanut butter, and whey'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        payload = r.json()
+        self.assertIn('planner_action', payload)
+        
+        # Verify payload has 5 separate items
+        nutrition_plan = payload['planner_action']['payload'].get('nutrition_plan')
+        self.assertIsNotNone(nutrition_plan)
+        meals = nutrition_plan.get('meals', [])
+        self.assertEqual(len(meals), 1)
+        
+        items = meals[0].get('items', [])
+        self.assertEqual(len(items), 5, f"Expected 5 items but got {len(items)}: {[item['name'] for item in items]}")
+        
+        # Verify each item has correct name and macro values
+        item_names = [item['name'] for item in items]
+        self.assertIn('Oatmeal', item_names)
+        self.assertIn('Milk', item_names)
+        self.assertIn('Banana', item_names)
+        self.assertIn('Peanut Butter', item_names)
+        self.assertIn('Whey Protein', item_names)
+        
+        # Verify individual calorie values (not combined)
+        item_dict = {item['name']: item for item in items}
+        self.assertEqual(item_dict['Oatmeal']['calories'], 200)
+        self.assertEqual(item_dict['Milk']['calories'], 100)
+        self.assertEqual(item_dict['Banana']['calories'], 90)
+        self.assertEqual(item_dict['Peanut Butter']['calories'], 190)
+        self.assertEqual(item_dict['Whey Protein']['calories'], 120)
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
@@ -1209,6 +1382,72 @@ class ApiChatViewTests(TestCase):
 
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_profile_height_weight_and_age_are_included_in_system_context(self, mock_openai_cls):
+        from core.models import UserProfile
+
+        user = User.objects.create_user(
+            username='metricschat@example.com',
+            email='metricschat@example.com',
+            password='TestPass123!',
+        )
+        UserProfile.objects.create(
+            user=user,
+            height=180,
+            weight=Decimal('75.50'),
+            age=34,
+        )
+        self.client.login(username='metricschat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Metric-aware response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'What is my height and weight?'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        self.assertIn('Height: 180 cm (5 ft 11 in)', create_kwargs['messages'][0]['content'])
+        self.assertIn('Weight: 75.50 kg (166.45 lb)', create_kwargs['messages'][0]['content'])
+        self.assertIn('Age: 34 years', create_kwargs['messages'][0]['content'])
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    def test_profile_option_catalog_is_included_in_system_context(self, mock_openai_cls):
+        user = User.objects.create_user(
+            username='optionschat@example.com',
+            email='optionschat@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='optionschat@example.com', password='TestPass123!')
+
+        mock_client = mock_openai_cls.return_value
+        mock_resp = mock.MagicMock()
+        mock_resp.choices[0].message.content = 'Options-aware response'
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        r = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'What options are there for my profile?'}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        prompt = create_kwargs['messages'][0]['content']
+        self.assertIn('Profile fields and selectable options:', prompt)
+        self.assertIn('Primary Fitness Goal: Weight Loss, Muscle Gain', prompt)
+        self.assertIn('Experience Level: Beginner, Intermediate, Advanced', prompt)
+        self.assertIn('Dietary Preference: Omnivore, Vegetarian, Vegan', prompt)
+        self.assertIn('Fitness at Home?: Yes, No', prompt)
+        self.assertIn('Available Home Equipment: Dumbbells, Resistance Bands', prompt)
+        self.assertIn('Height input range: 4-9 ft (plus 0-11 in) or 122-272 cm', prompt)
+        self.assertIn('Weight input range: 80-1400 lb or 36-635 kg', prompt)
+
+    @mock.patch('core.views.OpenAI')
+    @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_active_injuries_are_included_in_system_context(self, mock_openai_cls):
         from core.models import UserInjury, UserProfile
 
@@ -1280,6 +1519,229 @@ class ApiChatViewTests(TestCase):
         )
         self.assertEqual(r.status_code, 502)
         self.assertIn('error', r.json())
+
+
+class ApiChatPlannerApplyTests(TestCase):
+    """Tests for applying AI planner payloads to workout/nutrition data."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='applyplanner@example.com',
+            email='applyplanner@example.com',
+            password='TestPass123!',
+        )
+        self.client.login(username='applyplanner@example.com', password='TestPass123!')
+
+    def test_apply_plan_creates_workout_nutrition_and_supplements(self):
+        from core.models import Exercise, FoodItem, Meal, SupplementEntry, Workout
+
+        payload = {
+            'planner_payload': {
+                'workout_plan': {
+                    'workout_name': 'AI Strength Session',
+                    'goal': 'strength',
+                    'date': '2026-04-27',
+                    'exercises': [
+                        {'name': 'Bench Press', 'muscle_group': 'chest', 'sets': 4, 'reps': 8, 'weight': 135},
+                        {'name': 'Dumbbell Row', 'muscle_group': 'back', 'sets': 3, 'reps': 10, 'weight': 60},
+                    ],
+                },
+                'nutrition_plan': {
+                    'date': '2026-04-27',
+                    'meals': [
+                        {
+                            'name': 'Lunch',
+                            'items': [
+                                {
+                                    'name': 'Chicken Bowl',
+                                    'calories': 700,
+                                    'protein': 50,
+                                    'carbs': 60,
+                                    'fats': 20,
+                                }
+                            ],
+                        }
+                    ],
+                    'supplements': [
+                        {
+                            'name': 'Creatine',
+                            'supplement_type': 'amino_acid',
+                            'dosage': '5',
+                            'unit': 'g',
+                        }
+                    ],
+                },
+            }
+        }
+
+        r = self.client.post('/api/chat/apply_plan', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+
+        self.assertEqual(Workout.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Exercise.objects.filter(workout__user=self.user).count(), 2)
+        self.assertEqual(Meal.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(FoodItem.objects.filter(meal__user=self.user).count(), 1)
+        self.assertEqual(SupplementEntry.objects.filter(user=self.user).count(), 1)
+
+    def test_apply_plan_multiple_food_items_created_separately(self):
+        """Verify that multiple food items in a meal are created as separate records."""
+        from core.models import FoodItem, Meal
+
+        payload = {
+            'planner_payload': {
+                'nutrition_plan': {
+                    'date': '2026-04-27',
+                    'meals': [
+                        {
+                            'name': 'Breakfast',
+                            'items': [
+                                {
+                                    'name': 'Eggs',
+                                    'calories': 150,
+                                    'protein': 12,
+                                    'carbs': 1,
+                                    'fats': 11,
+                                },
+                                {
+                                    'name': 'Toast',
+                                    'calories': 100,
+                                    'protein': 4,
+                                    'carbs': 20,
+                                    'fats': 1,
+                                },
+                                {
+                                    'name': 'Orange Juice',
+                                    'calories': 110,
+                                    'protein': 2,
+                                    'carbs': 26,
+                                    'fats': 0,
+                                },
+                            ],
+                        }
+                    ],
+                    'supplements': [],
+                },
+            }
+        }
+
+        r = self.client.post('/api/chat/apply_plan', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+
+        meal = Meal.objects.filter(user=self.user).first()
+        self.assertIsNotNone(meal)
+        self.assertEqual(meal.name, 'Breakfast')
+
+        food_items = FoodItem.objects.filter(meal=meal)
+        self.assertEqual(food_items.count(), 3)
+
+        item_names = sorted([item.name for item in food_items])
+        self.assertEqual(item_names, ['Eggs', 'Orange Juice', 'Toast'])
+
+        item_calories = {item.name: item.calories for item in food_items}
+        self.assertEqual(item_calories['Eggs'], 150)
+        self.assertEqual(item_calories['Toast'], 100)
+        self.assertEqual(item_calories['Orange Juice'], 110)
+
+    def test_apply_plan_requires_valid_payload(self):
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps({'planner_payload': {'workout_plan': {'exercises': []}}}),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json())
+
+    def test_apply_plan_supports_multi_day_workout_plans(self):
+        """Verify that multiple workout plans (e.g., 7-day) are all created."""
+        payload = {
+            'planner_payload': {
+                'workout_plan': [
+                    {
+                        'workout_name': 'Day 1 Workout',
+                        'goal': 'muscle_gain',
+                        'date': str(date.today()),
+                        'exercises': [
+                            {'name': 'Push-ups', 'muscle_group': 'chest', 'sets': 3, 'reps': 10, 'weight': 0},
+                        ],
+                    },
+                    {
+                        'workout_name': 'Day 2 Workout',
+                        'goal': 'muscle_gain',
+                        'date': str(date.today()),
+                        'exercises': [
+                            {'name': 'Squats', 'muscle_group': 'legs', 'sets': 3, 'reps': 10, 'weight': 0},
+                        ],
+                    },
+                ],
+            }
+        }
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['summary']['workouts_created'], 2)
+        self.assertEqual(data['summary']['exercises_created'], 2)
+
+        # Verify both workouts exist
+        workouts = Workout.objects.filter(user=self.user).order_by('name')
+        self.assertEqual(workouts.count(), 2)
+        self.assertEqual(workouts[0].name, 'Day 1 Workout')
+        self.assertEqual(workouts[1].name, 'Day 2 Workout')
+
+    def test_apply_plan_supports_multi_day_nutrition_plans(self):
+        """Verify that multiple nutrition plans (e.g., 7-day) are all created."""
+        payload = {
+            'planner_payload': {
+                'nutrition_plan': [
+                    {
+                        'date': str(date.today()),
+                        'meals': [
+                            {
+                                'name': 'Breakfast',
+                                'items': [
+                                    {'name': 'Oatmeal', 'calories': 150, 'protein': 5, 'carbs': 27, 'fats': 3},
+                                ],
+                            },
+                        ],
+                        'supplements': [],
+                    },
+                    {
+                        'date': str(date.today()),
+                        'meals': [
+                            {
+                                'name': 'Lunch',
+                                'items': [
+                                    {'name': 'Chicken', 'calories': 350, 'protein': 50, 'carbs': 0, 'fats': 15},
+                                ],
+                            },
+                        ],
+                        'supplements': [],
+                    },
+                ],
+            }
+        }
+        r = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['summary']['meals_created'], 2)
+        self.assertEqual(data['summary']['food_items_created'], 2)
+
+        # Verify both meals exist
+        meals = Meal.objects.filter(user=self.user).order_by('name')
+        self.assertEqual(meals.count(), 2)
+        self.assertEqual(meals[0].name, 'Breakfast')
+        self.assertEqual(meals[1].name, 'Lunch')
 
 
 # ---------------------------------------------------------------------------
@@ -7997,3 +8459,470 @@ class RiverSparkAPITests(TestCase):
     def test_nonexistent_event_404(self):
         r = self.client.post('/api/river/spark/999999/')
         self.assertEqual(r.status_code, 404)
+
+# ===========================================================================
+# Saved Items – Unit Tests
+# ===========================================================================
+
+class SaveFoodItemViewTests(TestCase):
+    """Tests for POST /nutrition/save_food_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='saved@test.com', email='saved@test.com', password='Test1234!'
+        )
+        self.client.login(username='saved@test.com', password='Test1234!')
+        self.url = '/nutrition/save_food_item/'
+        self.valid_payload = {
+            'name': 'Chicken Breast',
+            'calories': 165,
+            'protein': 31,
+            'carbs': 0,
+            'fats': 4,
+            'serving_size': 100,
+            'serving_unit': 'g',
+        }
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_food_item(self):
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+        self.assertTrue(SavedFood.objects.filter(user=self.user, name='Chicken Breast').exists())
+
+    def test_duplicate_returns_already_saved(self):
+        SavedFood.objects.create(user=self.user, name='Chicken Breast', calories=165)
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(data['already_saved'])
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='not-json', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_name_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['name'] = '   '
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_invalid_calories_type_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 'lots'
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_negative_calories_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = -1
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_calories_at_upper_limit_accepted(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 9999
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 200)
+
+    def test_calories_above_upper_limit_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 10000
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_macro_above_999_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['protein'] = 1000
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_zero_serving_size_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['serving_size'] = 0
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_requires_login(self):
+        self.client.logout()
+        r = self._post(self.valid_payload)
+        self.assertIn(r.status_code, [302, 403])
+
+    def test_user_isolation(self):
+        other = User.objects.create_user(
+            username='other@test.com', email='other@test.com', password='Test1234!'
+        )
+        SavedFood.objects.create(user=other, name='Chicken Breast', calories=165)
+        r = self._post(self.valid_payload)
+        data = json.loads(r.content)
+        self.assertFalse(data.get('already_saved'))
+
+
+class SaveSupplementItemViewTests(TestCase):
+    """Tests for POST /nutrition/save_supplement_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='suppsaved@test.com', email='suppsaved@test.com', password='Test1234!'
+        )
+        self.client.login(username='suppsaved@test.com', password='Test1234!')
+        self.url = '/nutrition/save_supplement_item/'
+        self.valid_payload = {
+            'name': 'Creatine',
+            'supplement_type': 'creatine',
+            'dosage': '5',
+            'unit': 'g',
+        }
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_supplement(self):
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+
+    def test_duplicate_returns_already_saved(self):
+        SavedSupplement.objects.create(
+            user=self.user, name='Creatine', supplement_type='creatine', dosage='5', unit='g'
+        )
+        r = self._post(self.valid_payload)
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_name_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['name'] = ''
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+
+class SaveMealTemplateViewTests(TestCase):
+    """Tests for POST /nutrition/save_meal_template/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='mealtemplate@test.com', email='mealtemplate@test.com', password='Test1234!'
+        )
+        self.client.login(username='mealtemplate@test.com', password='Test1234!')
+        self.meal = Meal.objects.create(user=self.user, name='Breakfast', date=date.today())
+        FoodItem.objects.create(meal=self.meal, name='Eggs', calories=200, protein=14)
+        self.url = '/nutrition/save_meal_template/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_meal_template(self):
+        r = self._post({'meal_id': self.meal.id})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+        self.assertTrue(SavedMeal.objects.filter(user=self.user, name='Breakfast').exists())
+
+    def test_saved_meal_items_contain_food(self):
+        self._post({'meal_id': self.meal.id})
+        saved = SavedMeal.objects.get(user=self.user, name='Breakfast')
+        food_names = [i['name'] for i in saved.items if i.get('type') == 'food']
+        self.assertIn('Eggs', food_names)
+
+    def test_duplicate_returns_already_saved(self):
+        SavedMeal.objects.create(user=self.user, name='Breakfast', items=[])
+        r = self._post({'meal_id': self.meal.id})
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_nonexistent_meal_returns_404(self):
+        r = self._post({'meal_id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='oops', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_cannot_save_other_users_meal(self):
+        other = User.objects.create_user(
+            username='other3@test.com', email='other3@test.com', password='Test1234!'
+        )
+        other_meal = Meal.objects.create(user=other, name='Secret', date=date.today())
+        r = self._post({'meal_id': other_meal.id})
+        self.assertEqual(r.status_code, 404)
+
+
+class SaveFoodGroupTemplateViewTests(TestCase):
+    """Tests for POST /nutrition/save_food_group_template/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='grouptemplate@test.com', email='grouptemplate@test.com', password='Test1234!'
+        )
+        self.client.login(username='grouptemplate@test.com', password='Test1234!')
+        self.meal = Meal.objects.create(user=self.user, name='Dinner', date=date.today())
+        self.group = FoodGroup.objects.create(meal=self.meal, name='Salad')
+        FoodItem.objects.create(meal=self.meal, group=self.group, name='Lettuce', calories=10)
+        self.url = '/nutrition/save_food_group_template/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_group_as_meal_template(self):
+        r = self._post({'group_id': self.group.id})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(SavedMeal.objects.filter(user=self.user, name='Salad').exists())
+
+    def test_saved_group_items_correct(self):
+        self._post({'group_id': self.group.id})
+        saved = SavedMeal.objects.get(user=self.user, name='Salad')
+        self.assertEqual(len(saved.items), 1)
+        self.assertEqual(saved.items[0]['name'], 'Lettuce')
+
+    def test_duplicate_group_returns_already_saved(self):
+        SavedMeal.objects.create(user=self.user, name='Salad', items=[])
+        r = self._post({'group_id': self.group.id})
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_nonexistent_group_returns_404(self):
+        r = self._post({'group_id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_cannot_save_other_users_group(self):
+        other = User.objects.create_user(
+            username='other4@test.com', email='other4@test.com', password='Test1234!'
+        )
+        other_meal = Meal.objects.create(user=other, name='Lunch', date=date.today())
+        other_group = FoodGroup.objects.create(meal=other_meal, name='Soup')
+        r = self._post({'group_id': other_group.id})
+        self.assertEqual(r.status_code, 404)
+
+
+class GetSavedItemsViewTests(TestCase):
+    """Tests for GET /nutrition/saved_items/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='getitems@test.com', email='getitems@test.com', password='Test1234!'
+        )
+        self.client.login(username='getitems@test.com', password='Test1234!')
+        self.url = '/nutrition/saved_items/'
+
+    def test_returns_json(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertIn('foods', data)
+        self.assertIn('supplements', data)
+        self.assertIn('meals', data)
+
+    def test_returns_only_users_items(self):
+        other = User.objects.create_user(
+            username='other5@test.com', email='other5@test.com', password='Test1234!'
+        )
+        SavedFood.objects.create(user=self.user, name='My Food', calories=100)
+        SavedFood.objects.create(user=other, name='Their Food', calories=200)
+        r = self.client.get(self.url)
+        data = json.loads(r.content)
+        food_names = [f['name'] for f in data['foods']]
+        self.assertIn('My Food', food_names)
+        self.assertNotIn('Their Food', food_names)
+
+    def test_requires_login(self):
+        self.client.logout()
+        r = self.client.get(self.url)
+        self.assertIn(r.status_code, [302, 403])
+
+
+class DeleteSavedItemViewTests(TestCase):
+    """Tests for POST /nutrition/delete_saved_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='deleteitem@test.com', email='deleteitem@test.com', password='Test1234!'
+        )
+        self.client.login(username='deleteitem@test.com', password='Test1234!')
+        self.url = '/nutrition/delete_saved_item/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_deletes_saved_food(self):
+        food = SavedFood.objects.create(user=self.user, name='Apple', calories=80)
+        r = self._post({'type': 'food', 'id': food.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedFood.objects.filter(id=food.id).exists())
+
+    def test_deletes_saved_supplement(self):
+        supp = SavedSupplement.objects.create(
+            user=self.user, name='B12', supplement_type='vitamin', dosage='500', unit='mcg'
+        )
+        r = self._post({'type': 'supplement', 'id': supp.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedSupplement.objects.filter(id=supp.id).exists())
+
+    def test_deletes_saved_meal(self):
+        meal = SavedMeal.objects.create(user=self.user, name='Lunch', items=[])
+        r = self._post({'type': 'meal', 'id': meal.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedMeal.objects.filter(id=meal.id).exists())
+
+    def test_invalid_type_returns_400(self):
+        r = self._post({'type': 'unknown', 'id': 1})
+        self.assertEqual(r.status_code, 400)
+
+    def test_nonexistent_item_returns_404(self):
+        r = self._post({'type': 'food', 'id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_cannot_delete_other_users_saved_food(self):
+        other = User.objects.create_user(
+            username='other6@test.com', email='other6@test.com', password='Test1234!'
+        )
+        food = SavedFood.objects.create(user=other, name='Secret', calories=100)
+        r = self._post({'type': 'food', 'id': food.id})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+
+class AddSavedMealToDateViewTests(TestCase):
+    """Tests for POST /nutrition/add_saved_meal_to_date/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='addmeal@test.com', email='addmeal@test.com', password='Test1234!'
+        )
+        self.client.login(username='addmeal@test.com', password='Test1234!')
+        self.url = '/nutrition/add_saved_meal_to_date/'
+        self.saved_meal = SavedMeal.objects.create(
+            user=self.user,
+            name='Power Lunch',
+            items=[
+                {'type': 'food', 'name': 'Rice', 'calories': 200, 'protein': 4,
+                 'carbs': 45, 'fats': 1, 'serving_size': '100', 'serving_unit': 'g'},
+                {'type': 'supplement', 'name': 'Omega-3', 'supplement_type': 'omega',
+                 'dosage': '1000', 'unit': 'mg'},
+            ],
+        )
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_creates_meal_with_food_item(self):
+        r = self._post({'saved_meal_id': self.saved_meal.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(Meal.objects.filter(user=self.user, name='Power Lunch').exists())
+        meal = Meal.objects.get(user=self.user, name='Power Lunch')
+        self.assertTrue(meal.items.filter(name='Rice').exists())
+
+    def test_nonexistent_saved_meal_returns_404(self):
+        r = self._post({'saved_meal_id': 99999, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_cannot_add_other_users_saved_meal(self):
+        other = User.objects.create_user(
+            username='other7@test.com', email='other7@test.com', password='Test1234!'
+        )
+        other_saved = SavedMeal.objects.create(user=other, name='Private', items=[])
+        r = self._post({'saved_meal_id': other_saved.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 404)
+
+    def test_30_item_limit_enforced(self):
+        items = [
+            {'type': 'food', 'name': f'Food {i}', 'calories': 100, 'protein': 0,
+             'carbs': 0, 'fats': 0, 'serving_size': '1', 'serving_unit': 'serving'}
+            for i in range(31)
+        ]
+        big_saved = SavedMeal.objects.create(user=self.user, name='Huge Meal', items=items)
+        r = self._post({'saved_meal_id': big_saved.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 400)
+        data = json.loads(r.content)
+        self.assertFalse(data['success'])
+        self.assertIn('30', data['error'])
+
+    def test_exactly_30_items_accepted(self):
+        items = [
+            {'type': 'food', 'name': f'Food {i}', 'calories': 100, 'protein': 0,
+             'carbs': 0, 'fats': 0, 'serving_size': '1', 'serving_unit': 'serving'}
+            for i in range(30)
+        ]
+        saved30 = SavedMeal.objects.create(user=self.user, name='Max Meal', items=items)
+        r = self._post({'saved_meal_id': saved30.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+
+    def test_invalid_date_falls_back_to_today(self):
+        r = self._post({'saved_meal_id': self.saved_meal.id, 'date': 'not-a-date'})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(Meal.objects.filter(user=self.user, date=date.today()).exists())
