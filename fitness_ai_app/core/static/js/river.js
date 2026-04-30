@@ -115,6 +115,12 @@
   let riverHeight = 700;
   let generatorTimeout = null;
 
+  // Per-event comment drafts (preserved across DOM re-renders)
+  var commentDrafts = {};
+
+  // State fingerprint for mobile popup (avoids wiping input on every tick)
+  var mobilePopupState = {};
+
   // Hold tracking (hover-pause)
   const holdAccum = new Map();
   let currentHoldId = null;
@@ -488,6 +494,7 @@
   function addComment(id, text) {
     var ev = activeEvents.find(function (e) { return e.id === id; });
     if (!ev || !text.trim()) return;
+    delete commentDrafts[id];
     var displayName = currentUsername || 'You';
     var optimistic = {
       username: displayName,
@@ -865,7 +872,7 @@
       commentsHtml = '<div class="pill-comments' + (expanded ? ' pill-comments-expanded' : '') + '" data-comments-zone="' + ev.id + '">';
       if (ev.comments.length > 0) {
         var shown = expanded ? ev.comments : ev.comments.slice(-2);
-        commentsHtml += '<div class="pill-comments-header"><span class="pill-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span></div>';
+        commentsHtml += '<div class="pill-comments-header" data-comments-toggle="' + ev.id + '" style="cursor:pointer;"><span class="pill-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span></div>';
         commentsHtml += '<div class="pill-comments-scroll">';
         for (var i = 0; i < shown.length; i++) {
           var c = shown[i];
@@ -975,6 +982,11 @@
 
         html += '</div>';
         trackEl.innerHTML = html;
+        // Restore any in-progress comment draft so typing isn't lost on re-render
+        if (commentDrafts[ev.id]) {
+          var draftInput = trackEl.querySelector('[data-comment-input="' + ev.id + '"]');
+          if (draftInput) draftInput.value = commentDrafts[ev.id];
+        }
         trackEl._renderedId = ev.id;
         trackEl._renderedHovered = isHovered;
         trackEl._renderedExpandUp = expandUp;
@@ -1054,14 +1066,38 @@
   function renderMobilePopup() {
     var popup = document.getElementById('river-mobile-popup');
     if (!popup) return;
-    if (hoveredId == null) { popup.style.display = 'none'; return; }
+    if (hoveredId == null) {
+      popup.style.display = 'none';
+      mobilePopupState = {};
+      return;
+    }
     var ev = activeEvents.find(function (e) { return e.id === hoveredId; });
-    if (!ev) { popup.style.display = 'none'; return; }
+    if (!ev) {
+      popup.style.display = 'none';
+      mobilePopupState = {};
+      return;
+    }
 
-    var tc = tierColor(ev.actorTier); // kept for potential future use
     popup.style.display = 'block';
+
+    // Skip re-render when nothing meaningful changed — preserves input focus and draft text
+    var minuteBucket = Math.floor(nowMs / 60000);
+    var lastComment = ev.comments.length > 0 ? ev.comments[ev.comments.length - 1].text : '';
+    if (mobilePopupState.id === ev.id &&
+        mobilePopupState.sparkCount === ev.sparkCount &&
+        mobilePopupState.sparkedByMe === ev.sparkedByMe &&
+        mobilePopupState.commentCount === ev.comments.length &&
+        mobilePopupState.lastComment === lastComment &&
+        mobilePopupState.minuteBucket === minuteBucket) {
+      return;
+    }
+    mobilePopupState = {
+      id: ev.id, sparkCount: ev.sparkCount, sparkedByMe: ev.sparkedByMe,
+      commentCount: ev.comments.length, lastComment: lastComment, minuteBucket: minuteBucket,
+    };
+
     popup.className = 'river-mobile-popup';
-    popup.style.cssText += ';border-color:' + rarityBorder(ev) + ';';
+    popup.style.borderColor = rarityBorder(ev);
 
     var html = '<div class="mobile-popup-header">' +
       '<div class="mobile-popup-avatar"><img src="' + esc(ev.actorAvatarUrl) + '" alt=""></div>' +
@@ -1077,8 +1113,15 @@
     '<div class="mobile-popup-action">' + esc(ev.title) + '</div>' +
     (ev.detail ? '<div class="mobile-popup-detail">' + esc(ev.detail) + '</div>' : '');
 
+    html += '<div class="mobile-popup-spark-row">' +
+      '<button class="mobile-popup-spark-btn' + (ev.sparkedByMe ? ' active' : '') + '" data-mobile-spark="' + ev.id + '">' +
+        '<svg viewBox="0 0 24 24" fill="' + (ev.sparkedByMe ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
+        '<span class="mobile-popup-spark-count">' + ev.sparkCount + '</span>' +
+      '</button>' +
+    '</div>';
+
     if (ev.comments.length > 0) {
-      html += '<div class="mobile-popup-comments"><span class="mobile-popup-comments-label">' + ev.comments.length + ' comments</span>';
+      html += '<div class="mobile-popup-comments"><span class="mobile-popup-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span>';
       var shown = ev.comments.slice(-3);
       for (var i = 0; i < shown.length; i++) {
         var c = shown[i];
@@ -1091,7 +1134,18 @@
       html += '</div>';
     }
 
+    html += '<div class="mobile-popup-comment-input">' +
+      '<input class="mobile-popup-comment-field" data-mobile-comment-input="' + ev.id + '" placeholder="Add a comment…" maxlength="100">' +
+      '<button class="mobile-popup-comment-send" data-mobile-comment-send="' + ev.id + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>' +
+      '</button>' +
+    '</div>';
+
     popup.innerHTML = html;
+    if (commentDrafts['m' + ev.id]) {
+      var draftField = popup.querySelector('[data-mobile-comment-input]');
+      if (draftField) draftField.value = commentDrafts['m' + ev.id];
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1216,12 +1270,18 @@
         }
         return;
       }
-      var commentsZone = e.target.closest('[data-comments-zone]');
-      if (commentsZone) {
-        var cId = parseInt(commentsZone.dataset.commentsZone, 10);
+      // Only the comments header (data-comments-toggle) toggles expand — not the input row
+      var commentsToggle = e.target.closest('[data-comments-toggle]');
+      if (commentsToggle) {
+        var cId = parseInt(commentsToggle.dataset.commentsToggle, 10);
         commentsExpandedId = (commentsExpandedId === cId) ? null : cId;
         return;
       }
+    });
+
+    channelEl.addEventListener('input', function (e) {
+      var field = e.target.closest('[data-comment-input]');
+      if (field) commentDrafts[parseInt(field.dataset.commentInput, 10)] = field.value;
     });
 
     channelEl.addEventListener('keydown', function (e) {
@@ -1250,6 +1310,7 @@
           hoveredId = id;
           currentHoldId = id;
           currentHoldStart = Date.now();
+          mobilePopupState = {};
           renderMobilePopup();
         }
       }
@@ -1260,9 +1321,53 @@
         hoveredId = null;
         currentHoldId = null;
         currentHoldStart = 0;
+        mobilePopupState = {};
         renderMobilePopup();
       }
     });
+
+    var popupEl = document.getElementById('river-mobile-popup');
+    if (popupEl) {
+      popupEl.addEventListener('click', function (e) {
+        var sparkBtn = e.target.closest('[data-mobile-spark]');
+        if (sparkBtn) {
+          sparkEvent(parseInt(sparkBtn.dataset.mobileSpark, 10));
+          mobilePopupState = {};
+          return;
+        }
+        var sendBtn = e.target.closest('[data-mobile-comment-send]');
+        if (sendBtn) {
+          var evId = parseInt(sendBtn.dataset.mobileCommentSend, 10);
+          var field = popupEl.querySelector('[data-mobile-comment-input]');
+          if (field && field.value.trim()) {
+            addComment(evId, field.value);
+            delete commentDrafts['m' + evId];
+            field.value = '';
+            mobilePopupState = {};
+          }
+          return;
+        }
+      });
+
+      popupEl.addEventListener('input', function (e) {
+        var field = e.target.closest('[data-mobile-comment-input]');
+        if (field) commentDrafts['m' + parseInt(field.dataset.mobileCommentInput, 10)] = field.value;
+      });
+
+      popupEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          var field = e.target.closest('[data-mobile-comment-input]');
+          if (field && field.value.trim()) {
+            e.preventDefault();
+            var evId = parseInt(field.dataset.mobileCommentInput, 10);
+            addComment(evId, field.value);
+            delete commentDrafts['m' + evId];
+            field.value = '';
+            mobilePopupState = {};
+          }
+        }
+      });
+    }
   }
 
   function setupDragHandle() {
