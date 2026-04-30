@@ -1682,3 +1682,310 @@ class OpenRedirectSecurityTests(TestCase):
             self.assertNotIn('evil.com', response.url)
             self.assertNotIn('attacker.io', response.url)
             self.assertNotIn('malicious-site.com', response.url)
+
+
+class CrossUserDataExposureSecurityTests(TestCase):
+    """Test suite for cross-user nutrition data exposure vulnerability"""
+    
+    def setUp(self):
+        """Create test users with food data"""
+        self.client = Client()
+        
+        # User 1
+        self.user1 = User.objects.create_user(
+            username='user1@test.com',
+            email='user1@test.com',
+            password='Pass123'
+        )
+        self.meal1 = Meal.objects.create(
+            user=self.user1,
+            name='Breakfast',
+            date=date(2026, 4, 30)
+        )
+        self.food1_user1 = FoodItem.objects.create(
+            meal=self.meal1,
+            name='User1 Chicken Breast',
+            calories=200,
+            protein=30,
+            carbs=0,
+            fats=5
+        )
+        self.food2_user1 = FoodItem.objects.create(
+            meal=self.meal1,
+            name='User1 Brown Rice',
+            calories=150,
+            protein=3,
+            carbs=30,
+            fats=1
+        )
+        
+        # User 2
+        self.user2 = User.objects.create_user(
+            username='user2@test.com',
+            email='user2@test.com',
+            password='Pass123'
+        )
+        self.meal2 = Meal.objects.create(
+            user=self.user2,
+            name='Dinner',
+            date=date(2026, 4, 30)
+        )
+        self.food1_user2 = FoodItem.objects.create(
+            meal=self.meal2,
+            name='User2 Salmon Fillet',
+            calories=250,
+            protein=35,
+            carbs=0,
+            fats=12
+        )
+        self.food2_user2 = FoodItem.objects.create(
+            meal=self.meal2,
+            name='User2 Kale Salad',
+            calories=50,
+            protein=3,
+            carbs=8,
+            fats=1
+        )
+    
+    def test_search_foods_filters_by_user(self):
+        """Test that search_foods only returns current user's items"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=chicken')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Should only see User1's chicken, not User2's
+        self.assertEqual(len(data['results']), 1)
+        self.assertIn('User1 Chicken', data['results'][0]['name'])
+        self.assertNotIn('User2', data['results'][0]['name'])
+    
+    def test_search_foods_cannot_see_other_users_data(self):
+        """Test that User1 cannot see User2's food via search"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=salmon')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # User1 searches for "salmon" (User2's item)
+        # Should return empty because User1 has no salmon
+        self.assertEqual(len(data['results']), 0)
+    
+    def test_search_foods_user2_cannot_see_user1_data(self):
+        """Test that User2 cannot see User1's food via search"""
+        self.client.login(username='user2@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=brown rice')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # User2 searches for "brown rice" (User1's item)
+        # Should return empty because User2 has no brown rice
+        self.assertEqual(len(data['results']), 0)
+    
+    def test_get_all_foods_filters_by_user(self):
+        """Test that get_all_foods only returns current user's items"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # User1 should only see their 2 foods
+        self.assertEqual(data['count'], 2)
+        names = [f['name'] for f in data['foods']]
+        self.assertIn('User1 Brown Rice', names)
+        self.assertIn('User1 Chicken Breast', names)
+        
+        # Should NOT see User2's foods
+        self.assertNotIn('User2 Salmon Fillet', names)
+        self.assertNotIn('User2 Kale Salad', names)
+    
+    def test_get_all_foods_user2_isolated(self):
+        """Test that User2 sees only their own foods"""
+        self.client.login(username='user2@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # User2 should only see their 2 foods
+        self.assertEqual(data['count'], 2)
+        names = [f['name'] for f in data['foods']]
+        self.assertIn('User2 Salmon Fillet', names)
+        self.assertIn('User2 Kale Salad', names)
+        
+        # Should NOT see User1's foods
+        self.assertNotIn('User1 Chicken Breast', names)
+        self.assertNotIn('User1 Brown Rice', names)
+    
+    def test_unauthenticated_cannot_search_foods(self):
+        """Test that unauthenticated users cannot search foods"""
+        response = self.client.get('/api/search_foods/?q=chicken', follow=False)
+        
+        # Should redirect to login (302) because of @login_required
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user_login/', response.url)
+    
+    def test_unauthenticated_cannot_get_all_foods(self):
+        """Test that unauthenticated users cannot access all_foods"""
+        response = self.client.get('/api/all_foods/', follow=False)
+        
+        # Should redirect to login (302)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user_login/', response.url)
+    
+    def test_search_foods_returns_user_specific_ids(self):
+        """Test that search results contain correct IDs for current user"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=chicken')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Should contain User1's food ID, not User2's
+        self.assertEqual(data['results'][0]['id'], self.food1_user1.id)
+        self.assertNotEqual(data['results'][0]['id'], self.food1_user2.id)
+    
+    def test_search_foods_ids_cannot_be_used_for_idor(self):
+        """Test that search results IDs from search cannot be used by other users"""
+        # User1 searches and gets their food ID
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=chicken')
+        food_id = response.json()['results'][0]['id']
+        self.assertEqual(food_id, self.food1_user1.id)
+        
+        # Logout and login as User2
+        self.client.logout()
+        self.client.login(username='user2@test.com', password='Pass123')
+        
+        # User2 tries to get User1's food via search (shouldn't find it)
+        response = self.client.get('/api/search_foods/?q=chicken')
+        data = response.json()
+        
+        # Should be empty - User2 has no chicken
+        self.assertEqual(len(data['results']), 0)
+        
+        # Verify the ID is NOT in User2's all_foods
+        response = self.client.get('/api/all_foods/')
+        returned_ids = [f['id'] for f in response.json()['foods']]
+        self.assertNotIn(food_id, returned_ids)
+    
+    def test_search_foods_empty_for_no_matches(self):
+        """Test that search returns empty when no user matches"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=nonexistent_food_xyz')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+    
+    def test_search_foods_case_insensitive_user_filtered(self):
+        """Test that search is case-insensitive but still user-filtered"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        
+        # Try uppercase
+        response = self.client.get('/api/search_foods/?q=CHICKEN')
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        
+        # Try mixed case
+        response = self.client.get('/api/search_foods/?q=ChIcKeN')
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        
+        # All results should be User1's
+        self.assertIn('User1', data['results'][0]['name'])
+    
+    def test_get_all_foods_returns_user_owned_foods_only(self):
+        """Test that get_all_foods strictly returns only user's foods"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        data = response.json()
+        
+        # All foods should have 'User1' in the name
+        for food in data['foods']:
+            self.assertIn('User1', food['name'], 
+                         f"Found non-user1 food: {food['name']}")
+    
+    def test_search_foods_deduplication_respects_user_filter(self):
+        """Test that deduplication still respects user ownership"""
+        # Create another User1 food with similar name
+        food3 = FoodItem.objects.create(
+            meal=self.meal1,
+            name='User1 Chicken Breast',  # Duplicate name for User1
+            calories=210,
+            protein=31,
+            carbs=0,
+            fats=6
+        )
+        
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/search_foods/?q=chicken')
+        data = response.json()
+        
+        # Should still have only 1 result (deduplicated) from User1
+        self.assertEqual(len(data['results']), 1)
+        # ID should be one of User1's chicken items
+        returned_id = data['results'][0]['id']
+        self.assertIn(returned_id, [self.food1_user1.id, food3.id])
+        # Should NOT be User2's ID
+        self.assertNotEqual(returned_id, self.food1_user2.id)
+    
+    def test_all_foods_count_accuracy(self):
+        """Test that count field in get_all_foods is accurate per user"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        data = response.json()
+        
+        # Count should match actual foods returned
+        self.assertEqual(data['count'], len(data['foods']))
+        self.assertEqual(data['count'], 2)  # User1 has 2 foods
+    
+    def test_search_foods_query_too_short_blocked(self):
+        """Test that very short queries return empty (less than 2 chars)"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        
+        response = self.client.get('/api/search_foods/?q=a')
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+        
+        response = self.client.get('/api/search_foods/?q=')
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+    
+    def test_food_item_nutritional_data_isolation(self):
+        """Test that nutritional data is not leaked between users"""
+        # Get User1's data
+        self.client.login(username='user1@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        user1_foods = response.json()['foods']
+        
+        # Get User2's data
+        self.client.logout()
+        self.client.login(username='user2@test.com', password='Pass123')
+        response = self.client.get('/api/all_foods/')
+        user2_foods = response.json()['foods']
+        
+        # Verify completely different food sets
+        user1_names = {f['name'] for f in user1_foods}
+        user2_names = {f['name'] for f in user2_foods}
+        
+        # No overlap
+        self.assertEqual(len(user1_names & user2_names), 0)
+    
+    def test_cross_user_enumeration_prevention(self):
+        """Test that users cannot enumerate other users' food via search"""
+        self.client.login(username='user1@test.com', password='Pass123')
+        
+        # Try various searches that should find User2's foods
+        search_queries = ['salmon', 'kale', 'salad', 'fillet']
+        
+        for query in search_queries:
+            response = self.client.get(f'/api/search_foods/?q={query}')
+            data = response.json()
+            
+            # Each search should return 0 results for User1
+            self.assertEqual(len(data['results']), 0,
+                           f"User1 found User2's food with query: {query}")

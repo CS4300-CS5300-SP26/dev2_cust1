@@ -2698,10 +2698,10 @@ def search_foods(request):
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
 
-    # Search for food items matching the query (case-insensitive)
+    # Search for food items matching the query (case-insensitive) — filter by user
     food_items = (
         FoodItem.objects
-        .filter(name__icontains=query)
+        .filter(name__icontains=query, meal__user=request.user)
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')[:20]
     )
@@ -2726,9 +2726,10 @@ def search_foods(request):
 @login_required
 def get_all_foods(request):
     """Get all unique foods from the database for display in the Food Database card."""
-    # Get all food items, deduplicated by name
+    # Get all food items for this user only, deduplicated by name
     food_items = (
         FoodItem.objects
+        .filter(meal__user=request.user)
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')
     )
