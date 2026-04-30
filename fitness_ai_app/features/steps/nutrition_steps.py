@@ -1,11 +1,12 @@
 """Step definitions for nutrition-tracking BDD scenarios."""
 
+import json
 from datetime import date
 
 from behave import given, when, then
 from django.contrib.auth.models import User
 
-from core.models import Meal, FoodItem
+from core.models import Meal, FoodItem, SavedFood, SavedMeal
 
 
 # ── Given steps ──────────────────────────────────────────────────────────────
@@ -186,3 +187,143 @@ def step_food_item_deleted(context):
 def step_total_calories(context, expected):
     actual = context.response.context['total_calories']
     assert actual == expected, f'Expected {expected} calories, got {actual}'
+
+
+# ── Saved items – Given steps ────────────────────────────────────────────────
+
+@given('the food item is already saved')
+def step_food_item_already_saved(context):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    SavedFood.objects.get_or_create(
+        user=user,
+        name=context.current_food_item.name,
+        defaults={'calories': context.current_food_item.calories},
+    )
+
+
+@given('I have a saved food item "{name}"')
+def step_have_saved_food_item(context, name):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    context.saved_food = SavedFood.objects.create(user=user, name=name, calories=100)
+
+
+@given('I have a saved meal template "{name}" with {count:d} food items')
+def step_have_saved_meal_template(context, name, count):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    items = [
+        {'type': 'food', 'name': f'Item {i}', 'calories': 100, 'protein': 0,
+         'carbs': 0, 'fats': 0, 'serving_size': '1', 'serving_unit': 'serving'}
+        for i in range(count)
+    ]
+    context.saved_meal = SavedMeal.objects.create(user=user, name=name, items=items)
+
+
+# ── Saved items – When steps ─────────────────────────────────────────────────
+
+@when('I save the food item via API')
+def step_save_food_item_api(context):
+    item = context.current_food_item
+    context.response = context.test.client.post(
+        '/nutrition/save_food_item/',
+        data=json.dumps({
+            'name': item.name,
+            'calories': item.calories,
+            'protein': item.protein,
+            'carbs': item.carbs,
+            'fats': item.fats,
+            'serving_size': float(item.serving_size),
+            'serving_unit': item.serving_unit,
+        }),
+        content_type='application/json',
+    )
+
+
+@when('I try to save a food item with calories {calories:d}')
+def step_try_save_food_item_bad_calories(context, calories):
+    context.response = context.test.client.post(
+        '/nutrition/save_food_item/',
+        data=json.dumps({
+            'name': 'Bad Item',
+            'calories': calories,
+            'protein': 0,
+            'carbs': 0,
+            'fats': 0,
+            'serving_size': 1.0,
+            'serving_unit': 'serving',
+        }),
+        content_type='application/json',
+    )
+
+
+@when('I GET the save food item endpoint')
+def step_get_save_food_item(context):
+    context.response = context.test.client.get('/nutrition/save_food_item/')
+
+
+@when('I save the meal as a template')
+def step_save_meal_as_template(context):
+    context.response = context.test.client.post(
+        '/nutrition/save_meal_template/',
+        data=json.dumps({'meal_id': context.current_meal.id}),
+        content_type='application/json',
+    )
+
+
+@when('I delete the saved food item')
+def step_delete_saved_food_item(context):
+    context.response = context.test.client.post(
+        '/nutrition/delete_saved_item/',
+        data=json.dumps({'type': 'food', 'id': context.saved_food.id}),
+        content_type='application/json',
+    )
+
+
+@when('I add the saved meal to today')
+def step_add_saved_meal_to_today(context):
+    context.response = context.test.client.post(
+        '/nutrition/add_saved_meal_to_date/',
+        data=json.dumps({
+            'saved_meal_id': context.saved_meal.id,
+            'date': str(date.today()),
+        }),
+        content_type='application/json',
+    )
+
+
+# ── Saved items – Then steps ─────────────────────────────────────────────────
+
+@then('a meal named "{name}" should exist for today')
+def step_meal_exists_today_check(context, name):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    assert Meal.objects.filter(user=user, name=name, date=date.today()).exists(), (
+        f'Meal "{name}" for today not found'
+    )
+
+
+@then('the food item should be in my saved foods')
+def step_food_item_in_saved_foods(context):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    assert SavedFood.objects.filter(user=user, name=context.current_food_item.name).exists(), (
+        f'SavedFood "{context.current_food_item.name}" not found'
+    )
+
+
+@then('the response should indicate already saved')
+def step_response_already_saved(context):
+    data = json.loads(context.response.content)
+    assert data.get('already_saved') is True, f'Expected already_saved=True, got {data}'
+
+
+@then('the meal template should be in my saved meals')
+def step_meal_template_in_saved_meals(context):
+    user = User.objects.get(username='nutrition@spotter.ai')
+    assert SavedMeal.objects.filter(user=user, name=context.current_meal.name).exists(), (
+        f'SavedMeal "{context.current_meal.name}" not found'
+    )
+
+
+@then('the saved food item should no longer exist')
+def step_saved_food_item_deleted(context):
+    assert not SavedFood.objects.filter(id=context.saved_food.id).exists(), (
+        'SavedFood still exists after deletion'
+    )

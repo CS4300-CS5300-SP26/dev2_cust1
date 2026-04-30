@@ -18,7 +18,8 @@ from django.utils import timezone
 from .models import (
     EmailVerification, ExerciseType, MuscleGroup, Muscle, Equipment,
     TrainingExercise, UserInjury, UserEquipmentProfile, SupplementDatabase, SupplementEntry,
-    Meal, FoodItem, Workout, Exercise
+    Meal, FoodItem, Workout, Exercise,
+    SavedFood, SavedSupplement, SavedMeal, FoodGroup,
 )
 from .forms import RegistrationForm
 
@@ -7998,3 +7999,471 @@ class SocialPageAchievementContextTests(TestCase):
         response = self.client.get('/social/')
         self.assertEqual(response.context['total_exercises'], 0)
         self.assertEqual(json.loads(response.context['earned_ids_json']), [])
+
+
+# ===========================================================================
+# Saved Items – Unit Tests
+# ===========================================================================
+
+class SaveFoodItemViewTests(TestCase):
+    """Tests for POST /nutrition/save_food_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='saved@test.com', email='saved@test.com', password='Test1234!'
+        )
+        self.client.login(username='saved@test.com', password='Test1234!')
+        self.url = '/nutrition/save_food_item/'
+        self.valid_payload = {
+            'name': 'Chicken Breast',
+            'calories': 165,
+            'protein': 31,
+            'carbs': 0,
+            'fats': 4,
+            'serving_size': 100,
+            'serving_unit': 'g',
+        }
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_food_item(self):
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+        self.assertTrue(SavedFood.objects.filter(user=self.user, name='Chicken Breast').exists())
+
+    def test_duplicate_returns_already_saved(self):
+        SavedFood.objects.create(user=self.user, name='Chicken Breast', calories=165)
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(data['already_saved'])
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='not-json', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_name_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['name'] = '   '
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_invalid_calories_type_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 'lots'
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_negative_calories_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = -1
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_calories_at_upper_limit_accepted(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 9999
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 200)
+
+    def test_calories_above_upper_limit_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['calories'] = 10000
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_macro_above_999_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['protein'] = 1000
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_zero_serving_size_rejected(self):
+        payload = dict(self.valid_payload)
+        payload['serving_size'] = 0
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+    def test_requires_login(self):
+        self.client.logout()
+        r = self._post(self.valid_payload)
+        self.assertIn(r.status_code, [302, 403])
+
+    def test_user_isolation(self):
+        other = User.objects.create_user(
+            username='other@test.com', email='other@test.com', password='Test1234!'
+        )
+        SavedFood.objects.create(user=other, name='Chicken Breast', calories=165)
+        r = self._post(self.valid_payload)
+        data = json.loads(r.content)
+        self.assertFalse(data.get('already_saved'))
+
+
+class SaveSupplementItemViewTests(TestCase):
+    """Tests for POST /nutrition/save_supplement_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='suppsaved@test.com', email='suppsaved@test.com', password='Test1234!'
+        )
+        self.client.login(username='suppsaved@test.com', password='Test1234!')
+        self.url = '/nutrition/save_supplement_item/'
+        self.valid_payload = {
+            'name': 'Creatine',
+            'supplement_type': 'creatine',
+            'dosage': '5',
+            'unit': 'g',
+        }
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_supplement(self):
+        r = self._post(self.valid_payload)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+
+    def test_duplicate_returns_already_saved(self):
+        SavedSupplement.objects.create(
+            user=self.user, name='Creatine', supplement_type='creatine', dosage='5', unit='g'
+        )
+        r = self._post(self.valid_payload)
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_missing_name_returns_400(self):
+        payload = dict(self.valid_payload)
+        payload['name'] = ''
+        r = self._post(payload)
+        self.assertEqual(r.status_code, 400)
+
+
+class SaveMealTemplateViewTests(TestCase):
+    """Tests for POST /nutrition/save_meal_template/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='mealtemplate@test.com', email='mealtemplate@test.com', password='Test1234!'
+        )
+        self.client.login(username='mealtemplate@test.com', password='Test1234!')
+        self.meal = Meal.objects.create(user=self.user, name='Breakfast', date=date.today())
+        FoodItem.objects.create(meal=self.meal, name='Eggs', calories=200, protein=14)
+        self.url = '/nutrition/save_meal_template/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_meal_template(self):
+        r = self._post({'meal_id': self.meal.id})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['already_saved'])
+        self.assertTrue(SavedMeal.objects.filter(user=self.user, name='Breakfast').exists())
+
+    def test_saved_meal_items_contain_food(self):
+        self._post({'meal_id': self.meal.id})
+        saved = SavedMeal.objects.get(user=self.user, name='Breakfast')
+        food_names = [i['name'] for i in saved.items if i.get('type') == 'food']
+        self.assertIn('Eggs', food_names)
+
+    def test_duplicate_returns_already_saved(self):
+        SavedMeal.objects.create(user=self.user, name='Breakfast', items=[])
+        r = self._post({'meal_id': self.meal.id})
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_nonexistent_meal_returns_404(self):
+        r = self._post({'meal_id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='oops', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_cannot_save_other_users_meal(self):
+        other = User.objects.create_user(
+            username='other3@test.com', email='other3@test.com', password='Test1234!'
+        )
+        other_meal = Meal.objects.create(user=other, name='Secret', date=date.today())
+        r = self._post({'meal_id': other_meal.id})
+        self.assertEqual(r.status_code, 404)
+
+
+class SaveFoodGroupTemplateViewTests(TestCase):
+    """Tests for POST /nutrition/save_food_group_template/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='grouptemplate@test.com', email='grouptemplate@test.com', password='Test1234!'
+        )
+        self.client.login(username='grouptemplate@test.com', password='Test1234!')
+        self.meal = Meal.objects.create(user=self.user, name='Dinner', date=date.today())
+        self.group = FoodGroup.objects.create(meal=self.meal, name='Salad')
+        FoodItem.objects.create(meal=self.meal, group=self.group, name='Lettuce', calories=10)
+        self.url = '/nutrition/save_food_group_template/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_saves_group_as_meal_template(self):
+        r = self._post({'group_id': self.group.id})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(SavedMeal.objects.filter(user=self.user, name='Salad').exists())
+
+    def test_saved_group_items_correct(self):
+        self._post({'group_id': self.group.id})
+        saved = SavedMeal.objects.get(user=self.user, name='Salad')
+        self.assertEqual(len(saved.items), 1)
+        self.assertEqual(saved.items[0]['name'], 'Lettuce')
+
+    def test_duplicate_group_returns_already_saved(self):
+        SavedMeal.objects.create(user=self.user, name='Salad', items=[])
+        r = self._post({'group_id': self.group.id})
+        data = json.loads(r.content)
+        self.assertTrue(data['already_saved'])
+
+    def test_nonexistent_group_returns_404(self):
+        r = self._post({'group_id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_cannot_save_other_users_group(self):
+        other = User.objects.create_user(
+            username='other4@test.com', email='other4@test.com', password='Test1234!'
+        )
+        other_meal = Meal.objects.create(user=other, name='Lunch', date=date.today())
+        other_group = FoodGroup.objects.create(meal=other_meal, name='Soup')
+        r = self._post({'group_id': other_group.id})
+        self.assertEqual(r.status_code, 404)
+
+
+class GetSavedItemsViewTests(TestCase):
+    """Tests for GET /nutrition/saved_items/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='getitems@test.com', email='getitems@test.com', password='Test1234!'
+        )
+        self.client.login(username='getitems@test.com', password='Test1234!')
+        self.url = '/nutrition/saved_items/'
+
+    def test_returns_json(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertIn('foods', data)
+        self.assertIn('supplements', data)
+        self.assertIn('meals', data)
+
+    def test_returns_only_users_items(self):
+        other = User.objects.create_user(
+            username='other5@test.com', email='other5@test.com', password='Test1234!'
+        )
+        SavedFood.objects.create(user=self.user, name='My Food', calories=100)
+        SavedFood.objects.create(user=other, name='Their Food', calories=200)
+        r = self.client.get(self.url)
+        data = json.loads(r.content)
+        food_names = [f['name'] for f in data['foods']]
+        self.assertIn('My Food', food_names)
+        self.assertNotIn('Their Food', food_names)
+
+    def test_requires_login(self):
+        self.client.logout()
+        r = self.client.get(self.url)
+        self.assertIn(r.status_code, [302, 403])
+
+
+class DeleteSavedItemViewTests(TestCase):
+    """Tests for POST /nutrition/delete_saved_item/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='deleteitem@test.com', email='deleteitem@test.com', password='Test1234!'
+        )
+        self.client.login(username='deleteitem@test.com', password='Test1234!')
+        self.url = '/nutrition/delete_saved_item/'
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_deletes_saved_food(self):
+        food = SavedFood.objects.create(user=self.user, name='Apple', calories=80)
+        r = self._post({'type': 'food', 'id': food.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedFood.objects.filter(id=food.id).exists())
+
+    def test_deletes_saved_supplement(self):
+        supp = SavedSupplement.objects.create(
+            user=self.user, name='B12', supplement_type='vitamin', dosage='500', unit='mcg'
+        )
+        r = self._post({'type': 'supplement', 'id': supp.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedSupplement.objects.filter(id=supp.id).exists())
+
+    def test_deletes_saved_meal(self):
+        meal = SavedMeal.objects.create(user=self.user, name='Lunch', items=[])
+        r = self._post({'type': 'meal', 'id': meal.id})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(SavedMeal.objects.filter(id=meal.id).exists())
+
+    def test_invalid_type_returns_400(self):
+        r = self._post({'type': 'unknown', 'id': 1})
+        self.assertEqual(r.status_code, 400)
+
+    def test_nonexistent_item_returns_404(self):
+        r = self._post({'type': 'food', 'id': 99999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_cannot_delete_other_users_saved_food(self):
+        other = User.objects.create_user(
+            username='other6@test.com', email='other6@test.com', password='Test1234!'
+        )
+        food = SavedFood.objects.create(user=other, name='Secret', calories=100)
+        r = self._post({'type': 'food', 'id': food.id})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+
+class AddSavedMealToDateViewTests(TestCase):
+    """Tests for POST /nutrition/add_saved_meal_to_date/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='addmeal@test.com', email='addmeal@test.com', password='Test1234!'
+        )
+        self.client.login(username='addmeal@test.com', password='Test1234!')
+        self.url = '/nutrition/add_saved_meal_to_date/'
+        self.saved_meal = SavedMeal.objects.create(
+            user=self.user,
+            name='Power Lunch',
+            items=[
+                {'type': 'food', 'name': 'Rice', 'calories': 200, 'protein': 4,
+                 'carbs': 45, 'fats': 1, 'serving_size': '100', 'serving_unit': 'g'},
+                {'type': 'supplement', 'name': 'Omega-3', 'supplement_type': 'omega',
+                 'dosage': '1000', 'unit': 'mg'},
+            ],
+        )
+
+    def _post(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_creates_meal_with_food_item(self):
+        r = self._post({'saved_meal_id': self.saved_meal.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(Meal.objects.filter(user=self.user, name='Power Lunch').exists())
+        meal = Meal.objects.get(user=self.user, name='Power Lunch')
+        self.assertTrue(meal.items.filter(name='Rice').exists())
+
+    def test_nonexistent_saved_meal_returns_404(self):
+        r = self._post({'saved_meal_id': 99999, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 404)
+
+    def test_requires_post(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        r = self.client.post(self.url, data='bad', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_cannot_add_other_users_saved_meal(self):
+        other = User.objects.create_user(
+            username='other7@test.com', email='other7@test.com', password='Test1234!'
+        )
+        other_saved = SavedMeal.objects.create(user=other, name='Private', items=[])
+        r = self._post({'saved_meal_id': other_saved.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 404)
+
+    def test_30_item_limit_enforced(self):
+        items = [
+            {'type': 'food', 'name': f'Food {i}', 'calories': 100, 'protein': 0,
+             'carbs': 0, 'fats': 0, 'serving_size': '1', 'serving_unit': 'serving'}
+            for i in range(31)
+        ]
+        big_saved = SavedMeal.objects.create(user=self.user, name='Huge Meal', items=items)
+        r = self._post({'saved_meal_id': big_saved.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 400)
+        data = json.loads(r.content)
+        self.assertFalse(data['success'])
+        self.assertIn('30', data['error'])
+
+    def test_exactly_30_items_accepted(self):
+        items = [
+            {'type': 'food', 'name': f'Food {i}', 'calories': 100, 'protein': 0,
+             'carbs': 0, 'fats': 0, 'serving_size': '1', 'serving_unit': 'serving'}
+            for i in range(30)
+        ]
+        saved30 = SavedMeal.objects.create(user=self.user, name='Max Meal', items=items)
+        r = self._post({'saved_meal_id': saved30.id, 'date': str(date.today())})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+
+    def test_invalid_date_falls_back_to_today(self):
+        r = self._post({'saved_meal_id': self.saved_meal.id, 'date': 'not-a-date'})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        self.assertTrue(data['success'])
+        self.assertTrue(Meal.objects.filter(user=self.user, date=date.today()).exists())
