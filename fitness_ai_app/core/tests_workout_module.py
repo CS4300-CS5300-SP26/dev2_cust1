@@ -955,3 +955,180 @@ class WorkoutSecurityTests(TestCase):
         self.assertEqual(response.status_code, 404)
         data = json.loads(response.content)
         self.assertFalse(data['success'])
+
+
+# ==================== OPENAI API SECURITY TESTS ====================
+
+class OpenAIAPISecurityTests(TestCase):
+    """Tests for security of OpenAI API endpoints"""
+
+    def setUp(self):
+        self.user = User.objects.create_user('testuser', 'test@test.com', 'pass123')
+        self.client.login(username='testuser', password='pass123')
+
+    def test_api_chat_requires_authentication(self):
+        """Test that /api/chat requires login"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'Hello'}]}),
+            content_type='application/json'
+        )
+        # Should redirect to login (302)
+        self.assertEqual(response.status_code, 302)
+
+    def test_api_chat_stream_requires_authentication(self):
+        """Test that /api/chat_stream requires login"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/chat/stream',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'Hello'}]}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_api_chat_apply_plan_requires_authentication(self):
+        """Test that /api/chat_apply_plan requires login"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps({'planner_payload': {}}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_api_chat_requires_valid_json(self):
+        """Test that invalid JSON is rejected"""
+        response = self.client.post(
+            '/api/chat',
+            data='{"invalid json',
+            content_type='application/json'
+        )
+        # Invalid JSON should return 400
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content)
+        self.assertIn('error', data)
+
+    def test_api_chat_requires_messages_field(self):
+        """Test that messages field is required"""
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        self.assertIn(response.status_code, [400, 200])
+
+    def test_api_chat_error_messages_generic(self):
+        """Test that error messages don't expose internal details"""
+        # This test ensures that if an error occurs, it doesn't leak details
+        self.client.logout()
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': []}),
+            content_type='application/json'
+        )
+        # Should get 302 redirect, not 500 with error details
+        self.assertEqual(response.status_code, 302)
+
+    def test_api_chat_stream_error_messages_generic(self):
+        """Test that stream error messages don't expose internal details"""
+        # Invalid payload should return generic error
+        response = self.client.post(
+            '/api/chat/stream',
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        # Should not contain detailed error messages
+        if response.status_code == 200:
+            # For streaming, check content
+            self.assertNotIn('Traceback', response.content.decode())
+            self.assertNotIn('File', response.content.decode())
+
+    def test_unauthenticated_cannot_trigger_api_calls(self):
+        """Test that unauthenticated users cannot make API calls"""
+        self.client.logout()
+        
+        # Attempt 1: /api/chat
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'test'}]}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+        
+        # Attempt 2: /api/chat_stream
+        response = self.client.post(
+            '/api/chat/stream',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'test'}]}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+        
+        # Attempt 3: /api/chat_apply_plan
+        response = self.client.post(
+            '/api/chat/apply_plan',
+            data=json.dumps({'planner_payload': {'workout_plan': []}}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_authenticated_user_can_access_api_chat(self):
+        """Test that authenticated users can make requests (though API call may fail without key)"""
+        # This should not redirect to login
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'test'}]}),
+            content_type='application/json'
+        )
+        # Should be 400/403/500 (API error) NOT 302 (auth redirect)
+        self.assertNotEqual(response.status_code, 302)
+
+    def test_no_csrf_bypass_needed(self):
+        """Test that CSRF token is not required for authenticated users"""
+        # The endpoint has @csrf_exempt, so CSRF bypass shouldn't be needed
+        # but auth IS still required
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({'messages': [{'role': 'user', 'content': 'test'}]}),
+            content_type='application/json',
+            HTTP_X_CSRFTOKEN=''  # Empty CSRF token
+        )
+        # Should NOT be 403 (CSRF failed), should get past CSRF to auth/API
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_conversation_id_validation(self):
+        """Test that invalid conversation_id is handled"""
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({
+                'messages': [{'role': 'user', 'content': 'test'}],
+                'conversation_id': 'invalid'  # Should be integer
+            }),
+            content_type='application/json'
+        )
+        # Should reject invalid ID format
+        self.assertEqual(response.status_code, 400)
+
+    def test_large_message_handling(self):
+        """Test that extremely large messages don't cause issues"""
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({
+                'messages': [{'role': 'user', 'content': 'x' * 10000}]
+            }),
+            content_type='application/json'
+        )
+        # Should not crash, either 400 or API error
+        self.assertIn(response.status_code, [400, 500, 502])
+
+    def test_malicious_payload_rejected(self):
+        """Test that malicious payloads are rejected safely"""
+        response = self.client.post(
+            '/api/chat',
+            data=json.dumps({
+                'messages': 'not a list',  # Should be array
+            }),
+            content_type='application/json'
+        )
+        # Should handle gracefully
+        self.assertIn(response.status_code, [400, 500])

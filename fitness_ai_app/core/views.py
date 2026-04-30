@@ -913,6 +913,7 @@ def _build_ai_system_prompt(user):
     }
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat(request):
@@ -963,7 +964,7 @@ def api_chat(request):
             response_payload['planner_action'] = planner_action
         return JsonResponse(response_payload)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=502)
+        return JsonResponse({"error": "Failed to process chat request"}, status=502)
 
 
 @login_required
@@ -1037,7 +1038,7 @@ def api_chat_stream(request):
             yield f"data: {json.dumps(metadata)}\n\n"
 
         except Exception as e:
-            error_data = {"type": "error", "error": str(e)}
+            error_data = {"type": "error", "error": "Failed to process stream"}
             yield f"data: {json.dumps(error_data)}\n\n"
 
     response = StreamingHttpResponse(
