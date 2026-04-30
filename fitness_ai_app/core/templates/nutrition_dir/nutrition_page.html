@@ -2171,6 +2171,33 @@
         return `<div class="saved-item-card" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${content}</div>`;
     }
 
+    function mealPickerHtml(pickerId) {
+        if (!availableMeals.length) {
+            return `<span style="font-size:11px;color:#888;margin-left:6px;">No meals today</span>`;
+        }
+        const opts = availableMeals.map(m =>
+            `<option value="${m.id}">${m.name.replace(/"/g,'&quot;')}</option>`
+        ).join('');
+        return `
+            <div id="${pickerId}" style="display:none;margin-top:8px;display:none;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
+                        <option value="">Pick a meal…</option>
+                        ${opts}
+                    </select>
+                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
+                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;">✕</button>
+                </div>
+            </div>`;
+    }
+
+    function toggleMealPicker(btn) {
+        const card = btn.closest('.saved-item-card');
+        const picker = card.querySelector('.meal-picker-row');
+        const isOpen = picker.style.display !== 'none';
+        picker.style.display = isOpen ? 'none' : 'block';
+    }
+
     function renderSavedFoods(foods) {
         const el = document.getElementById('saved-foods-list');
         if (!foods.length) {
@@ -2179,16 +2206,63 @@
         }
         el.innerHTML = foods.map(f => savedItemCard(`
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div style="flex:1;">
+                <div style="flex:1;min-width:0;">
                     <div style="font-weight:600;color:white;font-size:14px;">${f.name}</div>
                     <div style="font-size:11px;color:#888;margin-top:2px;">${f.calories} kcal &bull; P:${f.protein}g C:${f.carbs}g F:${f.fats}g</div>
                     <div style="font-size:11px;color:#666;margin-top:1px;">${f.serving_size} ${f.serving_unit} &bull; saved ${f.created_at}</div>
                 </div>
-                <button onclick="deleteSavedItem('food',${f.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;flex-shrink:0;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;">
+                    <button class="add-saved-to-meal-btn" data-type="food"
+                        data-name="${f.name.replace(/"/g,'&quot;')}"
+                        data-calories="${f.calories}" data-protein="${f.protein}"
+                        data-carbs="${f.carbs}" data-fats="${f.fats}"
+                        data-serving-size="${f.serving_size}" data-serving-unit="${f.serving_unit}"
+                        title="Add to a meal" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;">+ Add</button>
+                    <button onclick="deleteSavedItem('food',${f.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="meal-picker-row" style="display:none;margin-top:8px;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
+                        <option value="">Pick a meal…</option>
+                        ${availableMeals.map(m => `<option value="${m.id}">${m.name.replace(/</g,'&lt;')}</option>`).join('')}
+                    </select>
+                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
+                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+                </div>
             </div>
         `)).join('');
+
+        // Wire "+ Add" buttons for foods
+        el.querySelectorAll('.add-saved-to-meal-btn[data-type="food"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const card = btn.closest('.saved-item-card');
+                const picker = card.querySelector('.meal-picker-row');
+                picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+        wireMealPickerConfirm(el, (mealId, card) => {
+            const btn = card.querySelector('.add-saved-to-meal-btn');
+            const body = new URLSearchParams({
+                meal_id: mealId,
+                food_name: btn.dataset.name,
+                food_calories: btn.dataset.calories,
+                protein: btn.dataset.protein,
+                carbs: btn.dataset.carbs,
+                fats: btn.dataset.fats,
+                serving_size: btn.dataset.servingSize,
+                serving_unit: btn.dataset.servingUnit,
+            });
+            return fetch('/nutrition/add_food_item_ajax/', {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: body.toString(),
+            }).then(r => r.json()).then(data => {
+                if (data.error) throw new Error(data.error);
+            });
+        });
     }
 
     function renderSavedSupplements(supplements) {
@@ -2199,16 +2273,90 @@
         }
         el.innerHTML = supplements.map(s => savedItemCard(`
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div style="flex:1;">
+                <div style="flex:1;min-width:0;">
                     <div style="font-weight:600;color:white;font-size:14px;">${s.name}</div>
                     <div style="font-size:11px;color:#888;margin-top:2px;">${s.dosage} ${s.unit} &bull; ${s.supplement_type}</div>
                     <div style="font-size:11px;color:#666;margin-top:1px;">saved ${s.created_at}</div>
                 </div>
-                <button onclick="deleteSavedItem('supplement',${s.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;flex-shrink:0;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;">
+                    <button class="add-saved-to-meal-btn" data-type="supplement"
+                        data-name="${s.name.replace(/"/g,'&quot;')}"
+                        data-supplement-type="${s.supplement_type}"
+                        data-dosage="${s.dosage}" data-unit="${s.unit}"
+                        title="Add to a meal" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;">+ Add</button>
+                    <button onclick="deleteSavedItem('supplement',${s.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="meal-picker-row" style="display:none;margin-top:8px;">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
+                        <option value="">Pick a meal…</option>
+                        ${availableMeals.map(m => `<option value="${m.id}">${m.name.replace(/</g,'&lt;')}</option>`).join('')}
+                    </select>
+                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
+                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
+                </div>
             </div>
         `)).join('');
+
+        // Wire "+ Add" buttons for supplements
+        el.querySelectorAll('.add-saved-to-meal-btn[data-type="supplement"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const card = btn.closest('.saved-item-card');
+                const picker = card.querySelector('.meal-picker-row');
+                picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+        wireMealPickerConfirm(el, (mealId, card) => {
+            const btn = card.querySelector('.add-saved-to-meal-btn');
+            const body = new URLSearchParams({
+                meal_id: mealId,
+                supplement_name: btn.dataset.name,
+                supplement_type: btn.dataset.supplementType,
+                dosage: btn.dataset.dosage,
+                unit: btn.dataset.unit,
+            });
+            return fetch('/nutrition/add_supplement_to_meal_ajax/', {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: body.toString(),
+            }).then(r => r.json()).then(data => {
+                if (data.error) throw new Error(data.error);
+            });
+        });
+    }
+
+    // Shared: wire the confirm/cancel buttons inside a meal picker
+    function wireMealPickerConfirm(container, onConfirm) {
+        container.querySelectorAll('.meal-picker-confirm').forEach(confirmBtn => {
+            confirmBtn.addEventListener('click', () => {
+                const card = confirmBtn.closest('.saved-item-card');
+                const select = card.querySelector('.meal-picker-select');
+                const mealId = select.value;
+                if (!mealId) { select.style.borderColor = '#e74c3c'; return; }
+                select.style.borderColor = '';
+                confirmBtn.textContent = 'Adding…';
+                confirmBtn.disabled = true;
+                onConfirm(mealId, card)
+                    .then(() => {
+                        savedModal.style.display = 'none';
+                        location.reload();
+                    })
+                    .catch(err => {
+                        confirmBtn.textContent = 'Add →';
+                        confirmBtn.disabled = false;
+                        alert(err.message || 'Failed to add item.');
+                    });
+            });
+        });
+        container.querySelectorAll('.meal-picker-cancel').forEach(cancelBtn => {
+            cancelBtn.addEventListener('click', () => {
+                const picker = cancelBtn.closest('.meal-picker-row');
+                picker.style.display = 'none';
+            });
+        });
     }
 
     function renderSavedMeals(meals) {
@@ -2250,7 +2398,38 @@
             body: JSON.stringify({type, id}),
         })
         .then(r => r.json())
-        .then(data => { if (data.success && card) card.remove(); });
+        .then(data => {
+            if (!data.success) return;
+            if (card) card.remove();
+            // Live-update the bookmark save button on the page so it reverts to unsaved
+            if (type === 'food') {
+                const addBtn = card && card.querySelector('.add-saved-to-meal-btn[data-type="food"]');
+                const name = addBtn ? addBtn.dataset.name : null;
+                if (name) {
+                    delete savedFoodIdByName[name];
+                    document.querySelectorAll('.save-food-btn').forEach(b => {
+                        if (b.dataset.name === name) markSaveBtnUnsaved(b);
+                    });
+                }
+            } else if (type === 'supplement') {
+                const addBtn = card && card.querySelector('.add-saved-to-meal-btn[data-type="supplement"]');
+                const name = addBtn ? addBtn.dataset.name : null;
+                if (name) {
+                    delete savedSupplementIdByName[name];
+                    document.querySelectorAll('.save-supplement-btn').forEach(b => {
+                        if (b.dataset.name === name) markSaveBtnUnsaved(b);
+                    });
+                }
+            } else if (type === 'meal') {
+                const name = Object.keys(savedMealIdByName).find(k => savedMealIdByName[k] === id);
+                if (name) {
+                    delete savedMealIdByName[name];
+                    document.querySelectorAll('.save-group-btn').forEach(b => {
+                        if (b.dataset.groupName === name) markSaveBtnUnsaved(b);
+                    });
+                }
+            }
+        });
     }
 
     function addSavedMealToday(savedMealId) {
@@ -2278,6 +2457,8 @@
     const savedFoodIdByName = {{ saved_food_ids_json|safe }};
     const savedSupplementIdByName = {{ saved_supplement_ids_json|safe }};
     const savedMealIdByName = {{ saved_meal_ids_json|safe }};
+    // Today's meals for the saved-items "Add to meal" picker
+    const availableMeals = {{ meals_json|safe }};
 
     function markSaveBtnSaved(btn) {
         btn.dataset.saved = 'true';

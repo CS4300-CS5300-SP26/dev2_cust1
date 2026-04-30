@@ -1260,6 +1260,8 @@ def nutrition_page(request):
     saved_supplement_names = set(saved_supplement_id_by_name)
     saved_meal_ids = set(saved_meal_id_by_name)
 
+    meals_for_picker = [{'id': m.id, 'name': m.name} for m in meals]
+
     context = {
         'active_tab': 'nutrition',
         'meals': meals,
@@ -1280,6 +1282,7 @@ def nutrition_page(request):
         'saved_food_ids_json': json.dumps(saved_food_id_by_name),
         'saved_supplement_ids_json': json.dumps(saved_supplement_id_by_name),
         'saved_meal_ids_json': json.dumps(saved_meal_id_by_name),
+        'meals_json': json.dumps(meals_for_picker),
     }
     return render(request, 'nutrition_dir/nutrition_page.html', context)
 
@@ -1582,6 +1585,30 @@ def add_supplement_to_meal(request):
         messages.success(request, f'Supplement "{supplement_name}" added to {meal.name}.')
 
     return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+
+
+@login_required
+@require_POST
+def add_supplement_to_meal_ajax(request):
+    """JSON endpoint: add a supplement to a meal from the saved items modal."""
+    meal_id = request.POST.get('meal_id')
+    supplement_name = request.POST.get('supplement_name', '').strip()
+    supplement_type = request.POST.get('supplement_type', 'other').strip() or 'other'
+    dosage = request.POST.get('dosage', '1').strip() or '1'
+    unit = request.POST.get('unit', 'serving').strip() or 'serving'
+
+    if not meal_id or not supplement_name:
+        return JsonResponse({'error': 'Meal and supplement name are required.'}, status=400)
+
+    meal = get_object_or_404(Meal, id=meal_id, user=request.user)
+    MealSupplement.objects.create(
+        meal=meal,
+        name=supplement_name,
+        supplement_type=supplement_type,
+        dosage=dosage,
+        unit=unit,
+    )
+    return JsonResponse({'success': True})
 
 
 @login_required
