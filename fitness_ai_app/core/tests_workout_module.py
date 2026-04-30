@@ -7,6 +7,7 @@ Tests for the Workout Module functionality including:
 """
 
 import json
+from datetime import date
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -776,3 +777,181 @@ class WorkoutIntegrationTests(TestCase):
 
         refreshed_workout = Workout.objects.get(id=self.workout.id)
         self.assertEqual(refreshed_workout.status, 'completed')
+
+
+# ==================== SECURITY TESTS ====================
+
+class WorkoutSecurityTests(TestCase):
+    """Tests for security vulnerabilities in workout API endpoints"""
+
+    def setUp(self):
+        self.user1 = User.objects.create_user('user1', 'user1@test.com', 'pass123')
+        self.user2 = User.objects.create_user('user2', 'user2@test.com', 'pass123')
+        
+        self.workout1 = Workout.objects.create(user=self.user1, date=date.today())
+        self.exercise1 = Exercise.objects.create(workout=self.workout1, name='Bench', sets=3)
+        self.set1 = SetProgress.objects.create(exercise=self.exercise1, set_number=1, completed=False)
+
+    def test_complete_workout_requires_authentication(self):
+        """Test that unauthenticated users cannot complete workouts"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({'workout_id': self.workout1.id}),
+            content_type='application/json'
+        )
+        # Should redirect to login (302)
+        self.assertEqual(response.status_code, 302)
+
+    def test_complete_workout_unauthorized_access(self):
+        """Test that users cannot complete other users' workouts"""
+        self.client.login(username='user2', password='pass123')
+        response = self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({'workout_id': self.workout1.id}),
+            content_type='application/json'
+        )
+        # Should return 404 - workout not found
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error'], 'Workout not found')
+
+    def test_save_workout_time_requires_authentication(self):
+        """Test that unauthenticated users cannot save workout time"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/workout/save_time/',
+            data=json.dumps({'workout_id': self.workout1.id, 'total_seconds': 300}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_save_workout_time_unauthorized_access(self):
+        """Test that users cannot modify other users' workouts"""
+        self.client.login(username='user2', password='pass123')
+        response = self.client.post(
+            '/api/workout/save_time/',
+            data=json.dumps({'workout_id': self.workout1.id, 'total_seconds': 300}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error'], 'Workout not found')
+
+    def test_complete_exercises_requires_authentication(self):
+        """Test that unauthenticated users cannot complete exercises"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/exercises/complete_by_ids/',
+            data=json.dumps({'exercise_ids': [self.exercise1.id]}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_complete_exercises_unauthorized_access(self):
+        """Test that users cannot complete other users' exercises"""
+        self.client.login(username='user2', password='pass123')
+        response = self.client.post(
+            '/api/exercises/complete_by_ids/',
+            data=json.dumps({'exercise_ids': [self.exercise1.id]}),
+            content_type='application/json'
+        )
+        # User2 has no exercises, so should get empty result
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['completed_count'], 0)
+        self.assertEqual(data['exercise_ids'], [])
+
+    def test_error_messages_dont_expose_details(self):
+        """Test that error messages don't expose internal details"""
+        self.client.login(username='user1', password='pass123')
+        
+        # Try with invalid JSON - should not expose parse details
+        response = self.client.post(
+            '/api/exercises/complete_by_ids/',
+            data='{"invalid json',
+            content_type='application/json'
+        )
+        data = json.loads(response.content)
+        # Error message should be generic, not contain traceback
+        self.assertNotIn('Traceback', data['error'])
+        self.assertNotIn('File', data['error'])
+        self.assertEqual(data['error'], 'Invalid JSON')
+
+    def test_invalid_exercise_ids_handled_gracefully(self):
+        """Test that invalid exercise IDs are handled without exposing details"""
+        self.client.login(username='user1', password='pass123')
+        response = self.client.post(
+            '/api/exercises/complete_by_ids/',
+            data=json.dumps({'exercise_ids': [999999, 888888]}),
+            content_type='application/json'
+        )
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+        # No matching exercises for this user
+        self.assertEqual(data['completed_count'], 0)
+        self.assertEqual(data['exercise_ids'], [])
+
+    def test_save_set_progress_requires_authentication(self):
+        """Test that unauthenticated users cannot save set progress"""
+        self.client.logout()
+        response = self.client.post(
+            '/api/set_progress/save/',
+            data=json.dumps({
+                'workout_id': self.workout1.id,
+                'set_data': [{'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True}]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_cross_user_set_progress_isolation(self):
+        """Test that users can only modify their own set progress"""
+        # User1 saves their progress
+        self.client.login(username='user1', password='pass123')
+        response = self.client.post(
+            '/api/set_progress/save/',
+            data=json.dumps({
+                'workout_id': self.workout1.id,
+                'set_data': [{'exercise_id': self.exercise1.id, 'set_number': 1, 'completed': True}],
+                'timer_seconds': 100
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        
+        # User2 tries to read User1's set progress
+        self.client.login(username='user2', password='pass123')
+        response = self.client.get(
+            '/api/set_progress/get/?workout_id=' + str(self.workout1.id)
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_invalid_request_data_handling(self):
+        """Test that invalid request data is handled securely"""
+        self.client.login(username='user1', password='pass123')
+        
+        # Missing required fields
+        response = self.client.post(
+            '/api/workout/complete/',
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])
+        self.assertIn('required', data['error'].lower())
+
+    def test_negative_workout_id_validation(self):
+        """Test that negative IDs are handled correctly"""
+        self.client.login(username='user1', password='pass123')
+        response = self.client.post(
+            '/api/workout/save_time/',
+            data=json.dumps({'workout_id': -1, 'total_seconds': 300}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertFalse(data['success'])

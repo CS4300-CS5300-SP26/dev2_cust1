@@ -3079,8 +3079,8 @@ def complete_exercises_by_ids(request):
             'completed_count': completed_count,
             'exercise_ids': list(exercises.values_list('id', flat=True)),
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to complete exercises'}, status=400)
 
 
 @login_required
@@ -3144,8 +3144,8 @@ def save_set_progress(request):
             'success': True,
             'saved_count': saved_count,
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to save set progress'}, status=400)
 
 
 @login_required
@@ -3190,8 +3190,8 @@ def get_set_progress(request):
             'set_progress': set_progress_dict,
             'timer_seconds': workout.current_session_seconds,
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to retrieve set progress'}, status=400)
 
 
 # ==================== SAVED ITEMS ====================
