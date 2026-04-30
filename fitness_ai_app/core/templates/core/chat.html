@@ -205,6 +205,33 @@
       border-bottom-left-radius: 4px;
     }
 
+    .planner-action-wrap {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .planner-action-btn {
+      border: none;
+      border-radius: 10px;
+      background: var(--harvest-orange);
+      color: #fff;
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .planner-action-btn:hover {
+      opacity: 0.9;
+    }
+
+    .planner-action-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     .msg.error {
       align-self: center;
       background: #2a0a0a;
@@ -604,10 +631,66 @@
         historyBackdrop.classList.remove('open');
     }
 
-    function addBubble(role, text) {
+    async function applyPlannerAction(button, plannerPayload) {
+        if (!plannerPayload) return;
+
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Adding...';
+
+        try {
+            const response = await fetch('/api/chat/apply_plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planner_payload: plannerPayload,
+                    conversation_id: currentConversationId,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                button.disabled = false;
+                button.textContent = originalLabel;
+                addBubble('error', data.error || 'Could not add plan to your planners.');
+                return;
+            }
+
+            button.textContent = 'Added';
+            const appliedMessage = data.message || 'Added your plan to the planners.';
+            history.push({ role: 'assistant', content: appliedMessage });
+            addBubble('assistant', appliedMessage);
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = originalLabel;
+            addBubble('error', 'Network error – could not add plan to planners.');
+        }
+    }
+
+    function addBubble(role, text, options = {}) {
         const div = document.createElement('div');
         div.className = 'msg ' + role;
         div.textContent = text;
+
+        const plannerAction = options.plannerAction;
+        if (
+            role === 'assistant'
+            && plannerAction
+            && plannerAction.payload
+            && plannerAction.button_label
+        ) {
+            const actionWrap = document.createElement('div');
+            actionWrap.className = 'planner-action-wrap';
+            const actionButton = document.createElement('button');
+            actionButton.type = 'button';
+            actionButton.className = 'planner-action-btn';
+            actionButton.textContent = plannerAction.button_label;
+            actionButton.addEventListener('click', () => {
+                applyPlannerAction(actionButton, plannerAction.payload);
+            });
+            actionWrap.appendChild(actionButton);
+            div.appendChild(actionWrap);
+        }
+
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
         return div;
@@ -619,7 +702,11 @@
             addBubble('assistant', 'Hey! I am your Spotter.ai coach. Ask me anything about workouts, nutrition, or supplements.');
             return;
         }
-        history.forEach((message) => addBubble(message.role, message.content));
+        history.forEach((message) => {
+            addBubble(message.role, message.content, {
+                plannerAction: message.planner_action || null,
+            });
+        });
     }
 
     function toLocalDateTimeText(isoDate) {
@@ -709,6 +796,19 @@
         registerUserActivity();
     }
 
+    function startThinkingAnimation(element, baseText = '✨ Creating your plan') {
+        const dots = ['.', '..', '...'];
+        let dotIndex = 0;
+        element.textContent = baseText + dots[dotIndex];
+        
+        const intervalId = setInterval(() => {
+            dotIndex = (dotIndex + 1) % dots.length;
+            element.textContent = baseText + dots[dotIndex];
+        }, 500);
+        
+        return intervalId;
+    }
+
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text) return;
@@ -724,12 +824,13 @@
 
         const typing = document.createElement('div');
         typing.className = 'typing';
-        typing.textContent = 'Thinking…';
         chatWindow.appendChild(typing);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        let typingAnimationId = startThinkingAnimation(typing, '✨ Thinking');
 
         try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch('/api/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -737,22 +838,149 @@
                     conversation_id: currentConversationId,
                 }),
             });
-            const data = await response.json();
-            typing.remove();
-
-            if (data.error) {
-                addBubble('error', data.error);
-            } else {
-                history.push({ role: 'assistant', content: data.reply });
-                addBubble('assistant', data.reply);
-                if (normalizeNumber(data.conversation_id)) {
-                    setCurrentConversationId(data.conversation_id);
-                }
-                await refreshConversationList();
+            
+            if (!response.ok) {
+                clearInterval(typingAnimationId);
+                typing.remove();
+                const errData = await response.json();
+                addBubble('error', errData.error || 'Server error');
+                sendBtn.disabled = false;
+                userInput.focus();
+                return;
             }
+
+            clearInterval(typingAnimationId);
+            typing.remove();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullReply = '';
+            let plannerAction = null;
+            let currentBubble = null;
+            let thinkingIndicator = null;
+            let thinkingAnimationId = null;
+            let hasPlannerPayload = false;
+            let payloadStartIndex = -1;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const jsonStr = line.slice(6);
+                            const data = JSON.parse(jsonStr);
+
+                            if (data.type === 'done') {
+                                // Stream finished, metadata received
+                                if (normalizeNumber(data.conversation_id)) {
+                                    setCurrentConversationId(data.conversation_id);
+                                }
+                                if (data.planner_action) {
+                                    plannerAction = data.planner_action;
+                                    // Re-create bubble with planner action if needed
+                                    if (currentBubble && plannerAction.payload && plannerAction.button_label) {
+                                        const actionWrap = document.createElement('div');
+                                        actionWrap.className = 'planner-action-wrap';
+                                        const actionButton = document.createElement('button');
+                                        actionButton.type = 'button';
+                                        actionButton.className = 'planner-action-btn';
+                                        actionButton.textContent = plannerAction.button_label;
+                                        actionButton.addEventListener('click', () => {
+                                            applyPlannerAction(actionButton, plannerAction.payload);
+                                        });
+                                        actionWrap.appendChild(actionButton);
+                                        currentBubble.appendChild(actionWrap);
+                                    }
+                                }
+                                await refreshConversationList();
+                            } else if (data.type === 'replace_text') {
+                                // Backend cleaned the text (removed payload)—remove thinking indicator
+                                // Keep routine displayed, just remove the "Creating..." message
+                                if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                    if (thinkingAnimationId) {
+                                        clearInterval(thinkingAnimationId);
+                                        thinkingAnimationId = null;
+                                    }
+                                    thinkingIndicator.parentNode.removeChild(thinkingIndicator);
+                                    thinkingIndicator = null;
+                                }
+                                fullReply = data.text;
+                                hasPlannerPayload = false;
+                            } else if (data.type === 'error') {
+                                addBubble('error', data.error);
+                            } else if (data.token) {
+                                // Stream token received
+                                fullReply += data.token;
+                                
+                                // Detect if payload is starting
+                                if (!hasPlannerPayload && fullReply.includes('<planner_payload>')) {
+                                    hasPlannerPayload = true;
+                                    payloadStartIndex = fullReply.indexOf('<planner_payload>');
+                                }
+                                
+                                // Create or update assistant bubble
+                                if (!currentBubble) {
+                                    currentBubble = addBubble('assistant', '', {
+                                        plannerAction: null,
+                                    });
+                                }
+                                
+                                // If we have a planner payload, keep routine visible and show thinking at bottom
+                                if (hasPlannerPayload) {
+                                    // Extract just the routine part (before payload)
+                                    const routineText = fullReply.substring(0, payloadStartIndex).trim();
+                                    
+                                    // Create or update thinking indicator below routine
+                                    if (!thinkingIndicator) {
+                                        // Clear bubble and set routine text directly
+                                        currentBubble.innerHTML = '';
+                                        const routineDiv = document.createElement('div');
+                                        routineDiv.textContent = routineText;
+                                        currentBubble.appendChild(routineDiv);
+                                        
+                                        // Create thinking indicator
+                                        thinkingIndicator = document.createElement('div');
+                                        thinkingIndicator.className = 'planner-thinking';
+                                        thinkingIndicator.style.fontSize = '0.9em';
+                                        thinkingIndicator.style.color = '#999';
+                                        thinkingIndicator.style.marginTop = '12px';
+                                        thinkingIndicator.style.fontStyle = 'italic';
+                                        thinkingIndicator.style.paddingTop = '8px';
+                                        thinkingIndicator.style.borderTop = '1px solid #eee';
+                                        currentBubble.appendChild(thinkingIndicator);
+                                        thinkingAnimationId = startThinkingAnimation(thinkingIndicator);
+                                    }
+                                    // Don't auto-scroll during thinking—let user control scroll
+                                } else {
+                                    // Show streaming text normally
+                                    currentBubble.textContent = fullReply;
+                                    // Auto-scroll for normal messages
+                                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse SSE data:', e);
+                        }
+                    }
+                }
+            }
+
+            // Add to history
+            const assistantMessage = { role: 'assistant', content: fullReply };
+            if (plannerAction) {
+                assistantMessage.planner_action = plannerAction;
+            }
+            history.push(assistantMessage);
+
         } catch (error) {
+            clearInterval(typingAnimationId);
             typing.remove();
             addBubble('error', 'Network error – could not reach server.');
+            console.error('Stream error:', error);
         }
 
         sendBtn.disabled = false;

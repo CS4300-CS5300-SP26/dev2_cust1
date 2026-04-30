@@ -1038,6 +1038,85 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+    // Save scroll position before form submission and restore after page load
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        // Save scroll position for forms that cause page redirects (toggles, deletes, adds)
+        if (form.method.toUpperCase() === 'POST') {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        }
+    });
+
+    // Restore scroll position after page load
+    window.addEventListener('load', function() {
+        const scrollPosition = sessionStorage.getItem('scrollPosition');
+        if (scrollPosition !== null) {
+            window.scrollTo(0, parseInt(scrollPosition));
+            sessionStorage.removeItem('scrollPosition');
+        }
+    });
+
+    // Function to load all foods into the Food Database card
+    function loadFoodDatabase() {
+        const listEl = document.getElementById('foodDatabaseList');
+        const countEl = document.getElementById('foodDatabaseCount');
+        
+        fetch('/api/all_foods/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.foods && data.foods.length > 0) {
+                    countEl.textContent = `(${data.count} items)`;
+                    listEl.innerHTML = data.foods.map(function(food) {
+                        return `<div class="food-db-item">
+                            <span class="food-db-name">${food.name}</span>
+                            <span class="food-db-macros">${food.calories} cal | P: ${food.protein || 0}g | C: ${food.carbs || 0}g | F: ${food.fats || 0}g</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    countEl.textContent = '(0 items)';
+                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No foods in database yet. Add foods using the Search tab!</div>';
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load food database:', err);
+                countEl.textContent = '';
+                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load food database</div>';
+            });
+    }
+
+    // Load food database on page load
+    document.addEventListener('DOMContentLoaded', loadFoodDatabase);
+
+    // Function to load all supplements into the Supplement Database card
+    function loadSupplementDatabase() {
+        const listEl = document.getElementById('supplementDatabaseList');
+        const countEl = document.getElementById('supplementDatabaseCount');
+        
+        fetch('/api/supplements/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.supplements && data.supplements.length > 0) {
+                    countEl.textContent = `(${data.supplements.length} items)`;
+                    listEl.innerHTML = data.supplements.map(function(supplement) {
+                        return `<div class="supplement-db-item">
+                            <span class="supplement-db-name">${supplement.name}</span>
+                            <span class="supplement-db-type">${supplement.supplement_type} | ${supplement.dosage}${supplement.unit}</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    countEl.textContent = '(0 items)';
+                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No supplements in database yet.</div>';
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to load supplement database:', err);
+                countEl.textContent = '';
+                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load supplement database</div>';
+            });
+    }
+
+    // Load supplement database on page load
+    document.addEventListener('DOMContentLoaded', loadSupplementDatabase);
 
     var fp = flatpickr('#dateInput', {
         dateFormat: 'Y-m-d',
