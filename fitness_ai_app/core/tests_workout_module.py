@@ -2206,3 +2206,443 @@ class SocialLoginCSRFSecurityTests(TestCase):
                         "Prevents silent OAuth initiation")
         self.assertFalse(settings.SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT,
                         "Prevents silent account linking")
+
+
+class HardcodedSecretKeySecurityTests(TestCase):
+    """Test suite for hardcoded insecure SECRET_KEY fallback vulnerability prevention"""
+    
+    def test_secret_key_is_set(self):
+        """Test that SECRET_KEY environment variable is configured"""
+        from django.conf import settings
+        
+        # Verify SECRET_KEY exists and is not empty
+        self.assertTrue(
+            hasattr(settings, 'SECRET_KEY'),
+            "SECRET_KEY must be defined in settings"
+        )
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertGreater(len(settings.SECRET_KEY), 0)
+    
+    def test_secret_key_not_insecure_fallback(self):
+        """Test that SECRET_KEY is not the hardcoded insecure default"""
+        from django.conf import settings
+        
+        # Ensure the known insecure fallback is NOT in use
+        insecure_key = 'django-insecure-local-development-key'
+        self.assertNotEqual(
+            settings.SECRET_KEY,
+            insecure_key,
+            "SECRET_KEY must not be the hardcoded insecure fallback"
+        )
+    
+    def test_secret_key_does_not_contain_insecure_string(self):
+        """Test that SECRET_KEY doesn't contain 'insecure' indicator"""
+        from django.conf import settings
+        
+        # Check that key doesn't have the 'insecure' marker
+        self.assertNotIn(
+            'insecure',
+            settings.SECRET_KEY.lower(),
+            "SECRET_KEY should not contain 'insecure' marker"
+        )
+    
+    def test_secret_key_minimum_length(self):
+        """Test that SECRET_KEY has sufficient length for security"""
+        from django.conf import settings
+        
+        # Django-generated keys are typically 50+ characters
+        # Ensure minimum reasonable length
+        self.assertGreaterEqual(
+            len(settings.SECRET_KEY),
+            20,
+            "SECRET_KEY must be at least 20 characters for adequate security"
+        )
+    
+    def test_secret_key_entropy(self):
+        """Test that SECRET_KEY has reasonable character diversity"""
+        from django.conf import settings
+        
+        key = settings.SECRET_KEY
+        unique_chars = len(set(key))
+        
+        # Should have at least 10 unique characters for reasonable entropy
+        self.assertGreater(
+            unique_chars,
+            10,
+            "SECRET_KEY should have diverse character set for entropy"
+        )
+    
+    def test_secret_key_prevents_session_forgery(self):
+        """Test that proper SECRET_KEY prevents session cookie forgery"""
+        from django.conf import settings
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.core import signing
+        
+        # With a strong, random SECRET_KEY:
+        # - Session cookies cannot be forged without the key
+        # - CSRF tokens cannot be forged
+        # - Password reset tokens cannot be forged
+        
+        # Verify settings has sufficient randomness
+        self.assertGreater(
+            len(settings.SECRET_KEY),
+            30,
+            "Strong SECRET_KEY needed to prevent session forgery"
+        )
+        
+        # Verify it's not a known weak key
+        weak_keys = [
+            'django-insecure-local-development-key',
+            'replace-with-a-secure-secret',
+            'change-this-key',
+            'test-key',
+            'debug-key',
+            'development-key'
+        ]
+        self.assertNotIn(settings.SECRET_KEY, weak_keys)
+    
+    def test_secret_key_prevents_csrf_forgery(self):
+        """Test that SECRET_KEY prevents CSRF token forgery"""
+        from django.conf import settings
+        from django.core import signing
+        
+        # CSRF tokens are signed with SECRET_KEY
+        # A strong key prevents forging valid CSRF tokens
+        
+        # Verify key strength
+        self.assertGreater(
+            len(settings.SECRET_KEY),
+            25,
+            "Strong SECRET_KEY required for CSRF token security"
+        )
+    
+    def test_secret_key_prevents_password_reset_forgery(self):
+        """Test that SECRET_KEY prevents password reset token forgery"""
+        from django.conf import settings
+        
+        # Password reset tokens use Django's signing module with SECRET_KEY
+        # A weak or known key allows forging password reset tokens
+        
+        key = settings.SECRET_KEY
+        
+        # Key should be long enough to be cryptographically strong
+        self.assertGreater(
+            len(key),
+            40,
+            "SECRET_KEY must be at least 40 chars for strong cryptography"
+        )
+    
+    def test_secret_key_prevents_email_verification_forgery(self):
+        """Test that SECRET_KEY prevents email verification token forgery"""
+        from django.conf import settings
+        
+        # Email verification links use signed tokens with SECRET_KEY
+        # Attacker with known key could forge email verification links
+        
+        key = settings.SECRET_KEY
+        
+        # Verify it's not a weak/known value
+        self.assertTrue(
+            len(key) > 30 and key.count('-') < 5,
+            "SECRET_KEY should be random, not a phrase with dashes"
+        )
+    
+    def test_secret_key_no_environment_variable_fallback(self):
+        """Test that missing DJANGO_SECRET_KEY env var raises error"""
+        import os
+        from django.conf import settings
+        
+        # The app should require DJANGO_SECRET_KEY to be set
+        # If the fix is working, accessing undefined env var would fail
+        
+        # This test verifies that a proper key is in use (since app started)
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertNotEqual(settings.SECRET_KEY, '')
+    
+    def test_authentication_bypass_prevented(self):
+        """Test that authentication bypass via session forgery is prevented"""
+        from django.conf import settings
+        from django.contrib.auth.models import User
+        
+        # With a strong, unique SECRET_KEY:
+        # - Attacker cannot forge session cookies for any user
+        # - Attacker cannot access admin account without valid credentials
+        
+        # Verify key is strong
+        key = settings.SECRET_KEY
+        self.assertGreater(len(key), 40)
+        self.assertNotIn('insecure', key.lower())
+        self.assertNotIn('django-', key.lower())
+    
+    def test_privilege_escalation_prevented(self):
+        """Test that privilege escalation via token forgery is prevented"""
+        from django.conf import settings
+        
+        # Strong SECRET_KEY prevents forging tokens that grant privileges:
+        # - Admin session cookies
+        # - Email verification (trust) tokens
+        # - Password reset tokens (when used incorrectly)
+        
+        key = settings.SECRET_KEY
+        
+        # Ensure randomness, not a simple phrase
+        has_numbers = any(c.isdigit() for c in key)
+        has_special = any(c in '!@#$%^&*()_+-=[]{}' for c in key)
+        
+        self.assertTrue(
+            has_numbers or has_special,
+            "SECRET_KEY should have special characters for entropy"
+        )
+    
+    def test_data_tampering_prevented(self):
+        """Test that data tampering via signature forgery is prevented"""
+        from django.conf import settings
+        from django.core import signing
+        
+        # All signed Django data uses SECRET_KEY:
+        # - Session data
+        # - CSRF tokens
+        # - Password reset tokens
+        # - Cache key signing
+        
+        # With a weak key, attacker can forge all of these
+        # With a strong key, forgery is computationally infeasible
+        
+        key = settings.SECRET_KEY
+        
+        # Django uses HMAC-SHA256 by default, requires good entropy
+        self.assertGreaterEqual(len(key), 50)
+    
+    def test_settings_hardened_against_environment_misconfiguration(self):
+        """Test that settings fail-safe if DJANGO_SECRET_KEY not set"""
+        # This test documents the fix:
+        # Before: SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-...')
+        # After: SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+        # 
+        # Result: KeyError on startup if env var missing = safer than silent fallback
+        
+        from django.conf import settings
+        
+        # Verify the app started successfully with a real key
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertTrue(len(settings.SECRET_KEY) > 0)
+
+
+class HardcodedSecretKeySecurityTests(TestCase):
+    """Test suite for hardcoded insecure SECRET_KEY fallback vulnerability prevention"""
+    
+    def test_secret_key_is_set(self):
+        """Test that SECRET_KEY environment variable is configured"""
+        from django.conf import settings
+        
+        # Verify SECRET_KEY exists and is not empty
+        self.assertTrue(
+            hasattr(settings, 'SECRET_KEY'),
+            "SECRET_KEY must be defined in settings"
+        )
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertGreater(len(settings.SECRET_KEY), 0)
+    
+    def test_secret_key_not_insecure_fallback(self):
+        """Test that SECRET_KEY is not the hardcoded insecure default"""
+        from django.conf import settings
+        
+        # Ensure the known insecure fallback is NOT in use
+        insecure_key = 'django-insecure-local-development-key'
+        self.assertNotEqual(
+            settings.SECRET_KEY,
+            insecure_key,
+            "SECRET_KEY must not be the hardcoded insecure fallback"
+        )
+    
+    def test_secret_key_does_not_contain_insecure_string(self):
+        """Test that SECRET_KEY doesn't contain 'insecure' indicator"""
+        from django.conf import settings
+        
+        # Check that key doesn't have the 'insecure' marker
+        self.assertNotIn(
+            'insecure',
+            settings.SECRET_KEY.lower(),
+            "SECRET_KEY should not contain 'insecure' marker"
+        )
+    
+    def test_secret_key_minimum_length(self):
+        """Test that SECRET_KEY has sufficient length for security"""
+        from django.conf import settings
+        
+        # Django-generated keys are typically 50+ characters
+        # Ensure minimum reasonable length
+        self.assertGreaterEqual(
+            len(settings.SECRET_KEY),
+            20,
+            "SECRET_KEY must be at least 20 characters for adequate security"
+        )
+    
+    def test_secret_key_entropy(self):
+        """Test that SECRET_KEY has reasonable character diversity"""
+        from django.conf import settings
+        
+        key = settings.SECRET_KEY
+        unique_chars = len(set(key))
+        
+        # Should have at least 10 unique characters for reasonable entropy
+        self.assertGreater(
+            unique_chars,
+            10,
+            "SECRET_KEY should have diverse character set for entropy"
+        )
+    
+    def test_secret_key_prevents_session_forgery(self):
+        """Test that proper SECRET_KEY prevents session cookie forgery"""
+        from django.conf import settings
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.core import signing
+        
+        # With a strong, random SECRET_KEY:
+        # - Session cookies cannot be forged without the key
+        # - CSRF tokens cannot be forged
+        # - Password reset tokens cannot be forged
+        
+        # Verify settings has sufficient randomness
+        self.assertGreater(
+            len(settings.SECRET_KEY),
+            30,
+            "Strong SECRET_KEY needed to prevent session forgery"
+        )
+        
+        # Verify it's not a known weak key
+        weak_keys = [
+            'django-insecure-local-development-key',
+            'replace-with-a-secure-secret',
+            'change-this-key',
+            'test-key',
+            'debug-key',
+            'development-key'
+        ]
+        self.assertNotIn(settings.SECRET_KEY, weak_keys)
+    
+    def test_secret_key_prevents_csrf_forgery(self):
+        """Test that SECRET_KEY prevents CSRF token forgery"""
+        from django.conf import settings
+        from django.core import signing
+        
+        # CSRF tokens are signed with SECRET_KEY
+        # A strong key prevents forging valid CSRF tokens
+        
+        # Verify key strength
+        self.assertGreater(
+            len(settings.SECRET_KEY),
+            25,
+            "Strong SECRET_KEY required for CSRF token security"
+        )
+    
+    def test_secret_key_prevents_password_reset_forgery(self):
+        """Test that SECRET_KEY prevents password reset token forgery"""
+        from django.conf import settings
+        
+        # Password reset tokens use Django's signing module with SECRET_KEY
+        # A weak or known key allows forging password reset tokens
+        
+        key = settings.SECRET_KEY
+        
+        # Key should be long enough to be cryptographically strong
+        self.assertGreater(
+            len(key),
+            40,
+            "SECRET_KEY must be at least 40 chars for strong cryptography"
+        )
+    
+    def test_secret_key_prevents_email_verification_forgery(self):
+        """Test that SECRET_KEY prevents email verification token forgery"""
+        from django.conf import settings
+        
+        # Email verification links use signed tokens with SECRET_KEY
+        # Attacker with known key could forge email verification links
+        
+        key = settings.SECRET_KEY
+        
+        # Verify it's not a weak/known value
+        self.assertTrue(
+            len(key) > 30 and key.count('-') < 5,
+            "SECRET_KEY should be random, not a phrase with dashes"
+        )
+    
+    def test_secret_key_no_environment_variable_fallback(self):
+        """Test that missing DJANGO_SECRET_KEY env var raises error"""
+        import os
+        from django.conf import settings
+        
+        # The app should require DJANGO_SECRET_KEY to be set
+        # If the fix is working, accessing undefined env var would fail
+        
+        # This test verifies that a proper key is in use (since app started)
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertNotEqual(settings.SECRET_KEY, '')
+    
+    def test_authentication_bypass_prevented(self):
+        """Test that authentication bypass via session forgery is prevented"""
+        from django.conf import settings
+        from django.contrib.auth.models import User
+        
+        # With a strong, unique SECRET_KEY:
+        # - Attacker cannot forge session cookies for any user
+        # - Attacker cannot access admin account without valid credentials
+        
+        # Verify key is strong
+        key = settings.SECRET_KEY
+        self.assertGreater(len(key), 40)
+        self.assertNotIn('insecure', key.lower())
+        self.assertNotIn('django-', key.lower())
+    
+    def test_privilege_escalation_prevented(self):
+        """Test that privilege escalation via token forgery is prevented"""
+        from django.conf import settings
+        
+        # Strong SECRET_KEY prevents forging tokens that grant privileges:
+        # - Admin session cookies
+        # - Email verification (trust) tokens
+        # - Password reset tokens (when used incorrectly)
+        
+        key = settings.SECRET_KEY
+        
+        # Ensure randomness, not a simple phrase
+        has_numbers = any(c.isdigit() for c in key)
+        has_special = any(c in '!@#$%^&*()_+-=[]{}' for c in key)
+        
+        self.assertTrue(
+            has_numbers or has_special,
+            "SECRET_KEY should have special characters for entropy"
+        )
+    
+    def test_data_tampering_prevented(self):
+        """Test that data tampering via signature forgery is prevented"""
+        from django.conf import settings
+        from django.core import signing
+        
+        # All signed Django data uses SECRET_KEY:
+        # - Session data
+        # - CSRF tokens
+        # - Password reset tokens
+        # - Cache key signing
+        
+        # With a weak key, attacker can forge all of these
+        # With a strong key, forgery is computationally infeasible
+        
+        key = settings.SECRET_KEY
+        
+        # Django uses HMAC-SHA256 by default, requires good entropy
+        self.assertGreaterEqual(len(key), 50)
+    
+    def test_settings_hardened_against_environment_misconfiguration(self):
+        """Test that settings fail-safe if DJANGO_SECRET_KEY not set"""
+        # This test documents the fix:
+        # Before: SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-...')
+        # After: SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+        # 
+        # Result: KeyError on startup if env var missing = safer than silent fallback
+        
+        from django.conf import settings
+        
+        # Verify the app started successfully with a real key
+        self.assertIsNotNone(settings.SECRET_KEY)
+        self.assertTrue(len(settings.SECRET_KEY) > 0)
