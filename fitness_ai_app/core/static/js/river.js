@@ -1317,7 +1317,7 @@
     });
 
     document.addEventListener('click', function (e) {
-      if (hoveredId != null && !e.target.closest('.river-mobile-field') && !e.target.closest('.river-mobile-popup')) {
+      if (hoveredId != null && !e.target.closest('.river-mobile-field') && !e.target.closest('.river-mobile-popup') && !e.target.closest('.pill-track')) {
         hoveredId = null;
         currentHoldId = null;
         currentHoldStart = 0;
