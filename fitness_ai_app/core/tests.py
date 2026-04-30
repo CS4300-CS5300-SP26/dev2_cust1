@@ -7857,3 +7857,94 @@ class RiverTriggerTests(TestCase):
             'group_id': group.id, 'date': str(date.today())
         })
         self.assertEqual(RiverEvent.objects.count(), before)
+
+
+class RiverCommentAPITests(TestCase):
+    """Tests for /api/river/comment/ and comment data in /api/river/feed/."""
+
+    def setUp(self):
+        from .models import RiverEvent
+        self.user = User.objects.create_user(
+            username='commenter', email='c@test.com', password='pass123'
+        )
+        self.other = User.objects.create_user(
+            username='eventer', email='e@test.com', password='pass123'
+        )
+        self.client.force_login(self.user)
+        self.event = RiverEvent.objects.create(
+            user=self.other, event_type='workout_complete',
+            title='eventer completed a workout', rarity='common',
+        )
+
+    def test_post_comment_returns_201(self):
+        response = self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': self.event.id, 'text': 'Great job!'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_post_comment_saves_to_db(self):
+        from .models import RiverEventComment
+        self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': self.event.id, 'text': 'Amazing!'}),
+            content_type='application/json',
+        )
+        self.assertTrue(
+            RiverEventComment.objects.filter(event=self.event, user=self.user, text='Amazing!').exists()
+        )
+
+    def test_post_comment_response_shape(self):
+        response = self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': self.event.id, 'text': 'Keep it up!'}),
+            content_type='application/json',
+        )
+        data = response.json()
+        for field in ('id', 'username', 'text', 'created_at_ms'):
+            self.assertIn(field, data)
+        self.assertEqual(data['username'], 'commenter')
+        self.assertEqual(data['text'], 'Keep it up!')
+
+    def test_post_comment_requires_auth(self):
+        self.client.logout()
+        response = self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': self.event.id, 'text': 'Hi'}),
+            content_type='application/json',
+        )
+        self.assertIn(response.status_code, [302, 401])
+
+    def test_post_comment_to_nonexistent_event_returns_404(self):
+        response = self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': 99999, 'text': 'Hello'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_post_empty_comment_returns_400(self):
+        response = self.client.post(
+            '/api/river/comment/',
+            data=json.dumps({'event_id': self.event.id, 'text': ''}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_feed_includes_comments_key(self):
+        response = self.client.get('/api/river/feed/')
+        events = response.json()['events']
+        self.assertTrue(len(events) > 0)
+        self.assertIn('comments', events[0])
+        self.assertIsInstance(events[0]['comments'], list)
+
+    def test_feed_includes_posted_comment(self):
+        from .models import RiverEventComment
+        RiverEventComment.objects.create(user=self.user, event=self.event, text='Woo!')
+        response = self.client.get('/api/river/feed/')
+        events = response.json()['events']
+        ev = next(e for e in events if e['id'] == self.event.id)
+        self.assertEqual(len(ev['comments']), 1)
+        self.assertEqual(ev['comments'][0]['text'], 'Woo!')
+        self.assertEqual(ev['comments'][0]['username'], 'commenter')

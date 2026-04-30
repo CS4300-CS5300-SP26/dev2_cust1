@@ -126,6 +126,17 @@
   let mobileFieldEl = null;
   let mobilePopupEl = null;
 
+  // Real-user identity (read from data-username on the sidebar root element)
+  var currentUsername = '';
+
+  // Track DB ids we've already pushed so polls don't create duplicates
+  var seenDbIds = new Set();
+
+  function getCsrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -406,6 +417,7 @@
     var durationMs = dur[0] + Math.random() * (dur[1] - dur[0]);
     var spawnDelay = opts.spawnAfterMs != null ? opts.spawnAfterMs : Math.random() * RIVER_TIMING.flowStartDelayMs;
     var id = nextId++;
+    var dbId = opts.dbId || null;
     var rarity = opts.rarity || pickRarity(opts.eventType);
     var classInteractive = opts.classInteractive != null ? opts.classInteractive : pickClassInteractive(rarity);
     var cpe = RIVER_TIMING.commentsPerEvent;
@@ -414,6 +426,7 @@
 
     activeEvents.push({
       id: id,
+      dbId: dbId,
       eventType: opts.eventType,
       actorUsername: opts.actorUsername,
       actorAvatarUrl: opts.actorAvatarUrl,
@@ -428,7 +441,8 @@
       sparkCount: Math.floor(Math.random() * 12),
       sparkedByMe: false,
       viewedByMe: false,
-      comments: opts.comments || generateMockComments(commentCount),
+      // Real events start with server-provided comments (or empty); mocks get fake ones
+      comments: opts.comments || (dbId ? [] : generateMockComments(commentCount)),
       createdAt: now,
       expiresAt: now + EVENT_LIFETIME[rarity],
       flowStartAt: now + spawnDelay,
@@ -459,13 +473,31 @@
   function addComment(id, text) {
     var ev = activeEvents.find(function (e) { return e.id === id; });
     if (!ev || !text.trim()) return;
-    ev.comments.push({
-      username: 'You',
-      avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=You',
+    var displayName = currentUsername || 'You';
+    var optimistic = {
+      username: displayName,
+      avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(displayName),
       tier: 'bronze',
       text: text.trim(),
       timestamp: Date.now(),
-    });
+    };
+    ev.comments.push(optimistic);
+
+    if (ev.dbId) {
+      fetch('/api/river/comment/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ event_id: ev.dbId, text: text.trim() }),
+      }).catch(function () {
+        // Roll back the optimistic comment on failure
+        var idx = ev.comments.indexOf(optimistic);
+        if (idx !== -1) ev.comments.splice(idx, 1);
+      });
+    }
   }
 
   function pickWeightedTemplate() {
@@ -600,7 +632,9 @@
   }
 
   function fetchRealEvents() {
-    fetch('/api/river/feed/?since=' + lastRealEventMs, { credentials: 'same-origin' })
+    // Always look back at least 5 min so comments on existing events stay fresh
+    var since = Math.min(lastRealEventMs, Date.now() - 5 * 60 * 1000);
+    fetch('/api/river/feed/?since=' + since, { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || !Array.isArray(data.events)) return;
@@ -609,7 +643,31 @@
         var evs = data.events.slice().reverse();
         evs.forEach(function (ev) {
           if (ev.created_at_ms > maxMs) maxMs = ev.created_at_ms;
+
+          // Map server comments to the local comment shape
+          var serverComments = (ev.comments || []).map(function (c) {
+            return {
+              username: c.username,
+              avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(c.username),
+              tier: 'bronze',
+              text: c.text,
+              timestamp: c.created_at_ms,
+            };
+          });
+
+          // If already in the active list, refresh its comments only
+          var existing = activeEvents.find(function (e) { return e.dbId === ev.id; });
+          if (existing) {
+            existing.comments = serverComments;
+            return;
+          }
+
+          // Skip events we've already pushed (they expired and were removed)
+          if (seenDbIds.has(ev.id)) return;
+          seenDbIds.add(ev.id);
+
           pushRiverEvent({
+            dbId: ev.id,
             eventType: ev.event_type,
             actorUsername: ev.username,
             actorAvatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(ev.username),
@@ -617,6 +675,7 @@
             title: ev.title,
             detail: ev.detail,
             rarity: ev.rarity,
+            comments: serverComments,
           });
         });
         lastRealEventMs = maxMs;
@@ -1266,6 +1325,9 @@
   function init() {
     sidebarEl = document.getElementById('river-sidebar');
     if (!sidebarEl) return;
+
+    // Read the logged-in user's name for comment attribution
+    currentUsername = sidebarEl.dataset.username || '';
 
     sidebarEl.innerHTML = buildSidebarHTML();
     channelEl = document.getElementById('river-channel');

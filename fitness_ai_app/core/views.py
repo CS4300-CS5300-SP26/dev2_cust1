@@ -43,6 +43,7 @@ from .models import (
     AIChatConversation,
     AIChatMessage,
     RiverEvent,
+    RiverEventComment,
 )
 
 
@@ -1994,20 +1995,28 @@ def river_feed_api(request):
     """Return recent real RiverEvents for the live feed widget.
 
     Supports ?since=<epoch_ms> for incremental polling — only events strictly
-    newer than that timestamp are returned.
+    newer than that timestamp are returned (but always looking back at most
+    5 minutes so existing-event comments stay fresh).
     """
-    qs = RiverEvent.objects.select_related('user').filter(
-        created_at__gte=timezone.now() - timedelta(hours=24)
-    )
+    lookback_dt = timezone.now() - timedelta(minutes=5)
     since_ms = request.GET.get('since')
     if since_ms:
         try:
             since_dt = datetime.fromtimestamp(int(since_ms) / 1000, tz=timezone.utc)
-            qs = qs.filter(created_at__gt=since_dt)
+            # Use the later of the two — never look back more than 24h
+            lookback_dt = max(since_dt, timezone.now() - timedelta(hours=24))
+            # But always look back at least 5 min so existing comments refresh
+            lookback_dt = min(lookback_dt, timezone.now() - timedelta(minutes=5))
         except (ValueError, TypeError, OSError):
             pass
 
-    events = qs.order_by('-created_at')[:50]
+    qs = (
+        RiverEvent.objects
+        .select_related('user')
+        .prefetch_related('comments__user')
+        .filter(created_at__gte=lookback_dt)
+        .order_by('-created_at')[:50]
+    )
     return JsonResponse({
         'events': [
             {
@@ -2018,10 +2027,51 @@ def river_feed_api(request):
                 'detail': ev.detail,
                 'rarity': ev.rarity,
                 'created_at_ms': int(ev.created_at.timestamp() * 1000),
+                'comments': [
+                    {
+                        'username': c.user.username or c.user.email.split('@')[0],
+                        'text': c.text,
+                        'created_at_ms': int(c.created_at.timestamp() * 1000),
+                    }
+                    for c in ev.comments.all()
+                ],
             }
-            for ev in events
+            for ev in qs
         ]
     })
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def river_comment_api(request):
+    """Post a comment on a RiverEvent."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    event_id = data.get('event_id')
+    text = (data.get('text') or '').strip()
+
+    if not event_id or not text:
+        return JsonResponse({'error': 'event_id and text are required'}, status=400)
+    if len(text) > 300:
+        return JsonResponse({'error': 'Comment too long (max 300 chars)'}, status=400)
+
+    try:
+        event = RiverEvent.objects.get(id=event_id)
+    except RiverEvent.DoesNotExist:
+        return JsonResponse({'error': 'Event not found'}, status=404)
+
+    comment = RiverEventComment.objects.create(user=request.user, event=event, text=text)
+    username = request.user.username or request.user.email.split('@')[0]
+    return JsonResponse({
+        'id': comment.id,
+        'username': username,
+        'text': comment.text,
+        'created_at_ms': int(comment.created_at.timestamp() * 1000),
+    }, status=201)
 
 
 @login_required

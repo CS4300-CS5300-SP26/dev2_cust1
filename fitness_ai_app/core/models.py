@@ -500,3 +500,16 @@ class RiverEvent(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event_type} - {self.created_at}"
+
+
+class RiverEventComment(models.Model):
+    event = models.ForeignKey(RiverEvent, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='river_comments')
+    text = models.CharField(max_length=300)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.user.username}: {self.text[:40]}"
