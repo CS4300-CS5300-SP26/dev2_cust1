@@ -24,6 +24,7 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncWeek
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
 from .models import (
@@ -1491,8 +1492,15 @@ def user_login(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            next_url = request.GET.get('next', 'home_dash')
-            return redirect(next_url)
+            next_url = request.GET.get('next', '')
+            # Validate next parameter to prevent open redirect attacks
+            if next_url and url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure()
+            ):
+                return redirect(next_url)
+            return redirect('home_dash')
         else:
             messages.error(request, 'Invalid email or password.')
 

@@ -1413,3 +1413,272 @@ class IDORFoodItemSecurityTests(TestCase):
         self.food2.refresh_from_db()
         self.assertEqual(self.food2.name, 'User2 Banana')
         self.assertEqual(self.food2.calories, 125)
+
+
+class OpenRedirectSecurityTests(TestCase):
+    """Test suite for open redirect vulnerability in login redirects"""
+    
+    def setUp(self):
+        """Create test user for login tests"""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='testuser@example.com',
+            email='testuser@example.com',
+            password='TestPass123'
+        )
+    
+    def test_valid_same_host_redirect_allowed(self):
+        """Test that valid same-host redirects are allowed"""
+        response = self.client.post(
+            '/user_login/?next=/train/',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to /train/ (same host)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.endswith('/train/') or '/train/' in response.url)
+    
+    def test_external_url_redirect_blocked(self):
+        """Test that external URL redirects are blocked"""
+        response = self.client.post(
+            '/user_login/?next=https://evil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default (home_dash), not evil.com
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('evil.com', response.url)
+        self.assertTrue(response.url.endswith('/') or 'home_dash' in response.url or response.url.endswith('/home_dash/'))
+    
+    def test_protocol_escape_redirect_blocked(self):
+        """Test that protocol-based escape attempts are blocked"""
+        response = self.client.post(
+            '/user_login/?next=//evil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default, not //evil.com
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('//evil.com', response.url)
+    
+    def test_javascript_protocol_redirect_blocked(self):
+        """Test that javascript: protocol redirects are blocked"""
+        response = self.client.post(
+            '/user_login/?next=javascript:alert(1)',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default, not javascript
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('javascript:', response.url)
+    
+    def test_data_protocol_redirect_blocked(self):
+        """Test that data: protocol redirects are blocked"""
+        response = self.client.post(
+            '/user_login/?next=data:text/html,<script>alert(1)</script>',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('data:', response.url)
+    
+    def test_http_to_https_redirect_blocked(self):
+        """Test that redirect from HTTPS to HTTP is blocked"""
+        # Simulate HTTPS connection
+        response = self.client.post(
+            '/user_login/?next=http://example.com/',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            secure=True,  # HTTPS request
+            follow=False
+        )
+        
+        # Should not redirect to HTTP when on HTTPS
+        self.assertEqual(response.status_code, 302)
+        # Should redirect to safe default
+        self.assertNotIn('http://example.com', response.url)
+    
+    def test_empty_next_parameter_safe_default(self):
+        """Test that empty next parameter uses safe default"""
+        response = self.client.post(
+            '/user_login/?next=',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to home_dash (safe default)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue('home_dash' in response.url or response.url.endswith('/'))
+    
+    def test_no_next_parameter_safe_default(self):
+        """Test that missing next parameter uses safe default"""
+        response = self.client.post(
+            '/user_login/',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to home_dash (safe default)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue('home_dash' in response.url or response.url.endswith('/'))
+    
+    def test_relative_path_redirect_allowed(self):
+        """Test that relative path redirects are allowed"""
+        response = self.client.post(
+            '/user_login/?next=/nutrition/',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to /nutrition/ (same host)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue('/nutrition/' in response.url or response.url.endswith('/nutrition/'))
+    
+    def test_invalid_credentials_no_redirect(self):
+        """Test that invalid credentials do not redirect at all"""
+        response = self.client.post(
+            '/user_login/?next=https://evil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'WrongPassword'
+            },
+            follow=False
+        )
+        
+        # Should stay on login page, no redirect
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Invalid email or password')
+    
+    def test_unicode_encoded_redirect_blocked(self):
+        """Test that unicode/encoded external URLs are blocked"""
+        response = self.client.post(
+            '/user_login/?next=https%3A%2F%2Fevil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('evil.com', response.url)
+    
+    def test_url_with_fragments_redirect_blocked(self):
+        """Test that URLs with URL fragments pointing to external hosts are blocked"""
+        response = self.client.post(
+            '/user_login/?next=https://evil.com#local',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('evil.com', response.url)
+    
+    def test_multiple_slashes_redirect_blocked(self):
+        """Test that multiple slashes for protocol bypass are blocked"""
+        response = self.client.post(
+            '/user_login/?next=///evil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('evil.com', response.url)
+    
+    def test_backslash_protocol_escape_redirect_blocked(self):
+        """Test that backslash protocol escapes are blocked"""
+        response = self.client.post(
+            '/user_login/?next=\\\\evil.com',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to safe default
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('evil.com', response.url)
+    
+    def test_localhost_redirect_allowed_same_host(self):
+        """Test that localhost/same host redirects are allowed"""
+        response = self.client.post(
+            '/user_login/?next=/accounts/profile/',
+            {
+                'email': 'testuser@example.com',
+                'password': 'TestPass123'
+            },
+            follow=False
+        )
+        
+        # Should redirect to local account profile
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue('profile' in response.url or '/accounts/' in response.url)
+    
+    def test_open_redirect_phishing_chain(self):
+        """Test comprehensive phishing attack scenario prevention"""
+        # Simulate attacker crafting malicious URL with next parameter
+        # pointing to fake login page
+        malicious_urls = [
+            '/user_login/?next=https://evil.com/fake-login',
+            '/user_login/?next=http://attacker.io/phish',
+            '/user_login/?next=//malicious-site.com/steal-data',
+        ]
+        
+        for malicious_url in malicious_urls:
+            response = self.client.post(
+                malicious_url,
+                {
+                    'email': 'testuser@example.com',
+                    'password': 'TestPass123'
+                },
+                follow=False
+            )
+            
+            # All should redirect to safe default, not attacker site
+            self.assertEqual(response.status_code, 302)
+            # Verify no external domains in redirect
+            self.assertNotIn('evil.com', response.url)
+            self.assertNotIn('attacker.io', response.url)
+            self.assertNotIn('malicious-site.com', response.url)
