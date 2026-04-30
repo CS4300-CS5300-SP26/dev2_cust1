@@ -11,7 +11,7 @@ from datetime import date
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import Workout, Exercise, SetProgress
+from .models import Workout, Exercise, SetProgress, Meal, FoodItem
 
 
 class WorkoutModelTests(TestCase):
@@ -1132,3 +1132,284 @@ class OpenAIAPISecurityTests(TestCase):
         )
         # Should handle gracefully
         self.assertIn(response.status_code, [400, 500])
+
+
+# ==================== IDOR VULNERABILITY TESTS ====================
+
+class IDORFoodItemSecurityTests(TestCase):
+    """Tests for IDOR (Insecure Direct Object Reference) vulnerabilities in food item endpoints"""
+
+    def setUp(self):
+        """Create two users with food items"""
+        self.user1 = User.objects.create_user('user1', 'user1@test.com', 'pass123')
+        self.user2 = User.objects.create_user('user2', 'user2@test.com', 'pass123')
+        
+        # Create meals for each user
+        self.meal1 = Meal.objects.create(user=self.user1, name='Breakfast', date=date.today())
+        self.meal2 = Meal.objects.create(user=self.user2, name='Breakfast', date=date.today())
+        
+        # Create food items for each user
+        self.food1 = FoodItem.objects.create(
+            meal=self.meal1,
+            name='Apple',
+            calories=100,
+            protein=0,
+            carbs=25,
+            fats=0
+        )
+        self.food2 = FoodItem.objects.create(
+            meal=self.meal2,
+            name='Banana',
+            calories=120,
+            protein=1,
+            carbs=27,
+            fats=0
+        )
+
+    def test_user_cannot_modify_other_users_food(self):
+        """Test that User1 cannot modify User2's food item via IDOR"""
+        self.client.login(username='user1', password='pass123')
+        
+        # Attempt to modify User2's food item
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food2.id,  # User2's food
+                'name': 'HACKED BANANA',
+                'calories': 9999,
+                'protein': 0,
+                'carbs': 0,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        # Should be denied (403 or 404)
+        self.assertIn(response.status_code, [403, 404])
+        
+        # Verify food was not modified
+        self.food2.refresh_from_db()
+        self.assertEqual(self.food2.name, 'Banana')
+        self.assertEqual(self.food2.calories, 120)
+
+    def test_user_can_modify_own_food(self):
+        """Test that User1 can modify their own food item"""
+        self.client.login(username='user1', password='pass123')
+        
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food1.id,  # User1's own food
+                'name': 'Green Apple',
+                'calories': 95,
+                'protein': 0,
+                'carbs': 24,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+        
+        # Verify food was modified
+        self.food1.refresh_from_db()
+        self.assertEqual(self.food1.name, 'Green Apple')
+        self.assertEqual(self.food1.calories, 95)
+
+    def test_idor_with_invalid_id(self):
+        """Test that accessing non-existent food ID returns 404"""
+        self.client.login(username='user1', password='pass123')
+        
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': 999999,  # Non-existent ID
+                'name': 'Fake Food',
+                'calories': 100,
+                'protein': 0,
+                'carbs': 0,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 404)
+
+    def test_idor_prevention_with_enumeration(self):
+        """Test IDOR prevention when enumerating food IDs"""
+        self.client.login(username='user1', password='pass123')
+        
+        # Try to modify each potential ID
+        for food_id in [self.food1.id, self.food2.id]:
+            response = self.client.post(
+                '/api/save_food/',
+                data=json.dumps({
+                    'id': food_id,
+                    'name': 'CORRUPTED',
+                    'calories': 0,
+                    'protein': 0,
+                    'carbs': 0,
+                    'fats': 0
+                }),
+                content_type='application/json'
+            )
+            
+            # Only own food should succeed
+            if food_id == self.food1.id:
+                self.assertEqual(response.status_code, 200)
+            else:
+                self.assertIn(response.status_code, [403, 404])
+
+    def test_unauthenticated_cannot_save_food(self):
+        """Test that unauthenticated users cannot save food"""
+        self.client.logout()
+        
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food1.id,
+                'name': 'Hacked',
+                'calories': 0,
+                'protein': 0,
+                'carbs': 0,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        # Should redirect or deny
+        self.assertIn(response.status_code, [302, 403, 404])
+
+    def test_food_modification_validation(self):
+        """Test that food modification validates input"""
+        self.client.login(username='user1', password='pass123')
+        
+        # Invalid numeric values
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food1.id,
+                'name': 'Apple',
+                'calories': 'not a number',
+                'protein': 0,
+                'carbs': 0,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+
+    def test_food_modification_updates_correct_fields(self):
+        """Test that only the specified fields are updated"""
+        self.client.login(username='user1', password='pass123')
+        
+        original_completed = self.food1.completed
+        
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food1.id,
+                'name': 'Modified Apple',
+                'calories': 110,
+                'protein': 1,
+                'carbs': 26,
+                'fats': 0.5
+            }),
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        
+        self.food1.refresh_from_db()
+        self.assertEqual(self.food1.name, 'Modified Apple')
+        self.assertEqual(self.food1.calories, 110)
+        self.assertEqual(self.food1.protein, 1)
+        self.assertEqual(self.food1.completed, original_completed)
+
+    def test_system_food_access_denied_for_regular_users(self):
+        """Test that regular users cannot modify system food items"""
+        # Create a system user and food
+        system_user, _ = User.objects.get_or_create(
+            username='system@spotter.ai',
+            defaults={'email': 'system@spotter.ai', 'is_active': False}
+        )
+        system_meal, _ = Meal.objects.get_or_create(
+            user=system_user,
+            name='Food Database',
+            date=date(2000, 1, 1)
+        )
+        system_food = FoodItem.objects.create(
+            meal=system_meal,
+            name='System Chicken',
+            calories=200,
+            protein=30,
+            carbs=0,
+            fats=5
+        )
+        
+        # Try to modify as regular user
+        self.client.login(username='user1', password='pass123')
+        response = self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': system_food.id,
+                'name': 'HACKED SYSTEM FOOD',
+                'calories': 0,
+                'protein': 0,
+                'carbs': 0,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        # Should be denied
+        self.assertEqual(response.status_code, 403)
+        
+        # Verify not modified
+        system_food.refresh_from_db()
+        self.assertEqual(system_food.name, 'System Chicken')
+
+    def test_cross_user_data_isolation(self):
+        """Test complete isolation between users"""
+        # User1 modifies their food
+        self.client.login(username='user1', password='pass123')
+        self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food1.id,
+                'name': 'User1 Apple',
+                'calories': 105,
+                'protein': 0,
+                'carbs': 25,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        # User2 modifies their food
+        self.client.login(username='user2', password='pass123')
+        self.client.post(
+            '/api/save_food/',
+            data=json.dumps({
+                'id': self.food2.id,
+                'name': 'User2 Banana',
+                'calories': 125,
+                'protein': 1,
+                'carbs': 28,
+                'fats': 0
+            }),
+            content_type='application/json'
+        )
+        
+        # Verify User1's food is still their version
+        self.food1.refresh_from_db()
+        self.assertEqual(self.food1.name, 'User1 Apple')
+        self.assertEqual(self.food1.calories, 105)
+        
+        # Verify User2's food is their version
+        self.food2.refresh_from_db()
+        self.assertEqual(self.food2.name, 'User2 Banana')
+        self.assertEqual(self.food2.calories, 125)

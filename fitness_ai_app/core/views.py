@@ -2791,29 +2791,40 @@ def save_food_to_database(request):
     )
 
     if food_id:
-        # Update existing food
+        # Update existing food - must be either user's own food or system food
         try:
-            food_item = FoodItem.objects.get(id=food_id)
-            food_item.name = name
-            food_item.calories = calories
-            food_item.protein = protein
-            food_item.carbs = carbs
-            food_item.fats = fats
-            food_item.save()
-            return JsonResponse({
-                'success': True,
-                'message': f'Updated "{name}" in database',
-                'food': {
-                    'id': food_item.id,
-                    'name': food_item.name,
-                    'calories': food_item.calories,
-                    'protein': food_item.protein,
-                    'carbs': food_item.carbs,
-                    'fats': food_item.fats,
-                }
-            })
+            # First try to get the user's own food item
+            food_item = FoodItem.objects.get(id=food_id, meal__user=request.user)
         except FoodItem.DoesNotExist:
-            pass  # Fall through to create new
+            # If not user's own, try system database (read-only for regular users)
+            try:
+                # For now, deny access to system foods to prevent IDOR
+                # System food management should be admin-only
+                food_item = FoodItem.objects.get(id=food_id, meal__user__username='system@spotter.ai')
+                # Only admins can modify system foods
+                if not request.user.is_staff:
+                    return JsonResponse({'error': 'Cannot modify system food items'}, status=403)
+            except FoodItem.DoesNotExist:
+                return JsonResponse({'error': 'Food item not found'}, status=404)
+        
+        food_item.name = name
+        food_item.calories = calories
+        food_item.protein = protein
+        food_item.carbs = carbs
+        food_item.fats = fats
+        food_item.save()
+        return JsonResponse({
+            'success': True,
+            'message': f'Updated "{name}" in database',
+            'food': {
+                'id': food_item.id,
+                'name': food_item.name,
+                'calories': food_item.calories,
+                'protein': food_item.protein,
+                'carbs': food_item.carbs,
+                'fats': food_item.fats,
+            }
+        })
 
     # Create new food item in database
     food_item = FoodItem.objects.create(
