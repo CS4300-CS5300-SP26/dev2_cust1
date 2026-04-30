@@ -7948,3 +7948,52 @@ class RiverCommentAPITests(TestCase):
         self.assertEqual(len(ev['comments']), 1)
         self.assertEqual(ev['comments'][0]['text'], 'Woo!')
         self.assertEqual(ev['comments'][0]['username'], 'commenter')
+
+
+class RiverSparkAPITests(TestCase):
+    def setUp(self):
+        from .models import RiverEvent
+        self.user = User.objects.create_user(username='sparker', password='pass')
+        self.other = User.objects.create_user(username='other', password='pass')
+        self.event = RiverEvent.objects.create(
+            user=self.user, event_type='workout_complete', title='Test', rarity='common',
+        )
+        self.url = f'/api/river/spark/{self.event.id}/'
+        self.client.login(username='sparker', password='pass')
+
+    def test_spark_adds_user(self):
+        r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['sparked'])
+        self.assertEqual(data['spark_count'], 1)
+
+    def test_spark_twice_removes(self):
+        self.client.post(self.url)
+        r = self.client.post(self.url)
+        data = r.json()
+        self.assertFalse(data['sparked'])
+        self.assertEqual(data['spark_count'], 0)
+
+    def test_spark_count_in_feed(self):
+        self.event.sparked_by.add(self.other)
+        self.client.login(username='sparker', password='pass')
+        r = self.client.get('/api/river/feed/')
+        ev = next(e for e in r.json()['events'] if e['id'] == self.event.id)
+        self.assertEqual(ev['spark_count'], 1)
+        self.assertFalse(ev['sparked_by_me'])
+
+    def test_sparked_by_me_flag(self):
+        self.event.sparked_by.add(self.user)
+        r = self.client.get('/api/river/feed/')
+        ev = next(e for e in r.json()['events'] if e['id'] == self.event.id)
+        self.assertTrue(ev['sparked_by_me'])
+
+    def test_unauthenticated_rejected(self):
+        self.client.logout()
+        r = self.client.post(self.url)
+        self.assertIn(r.status_code, [302, 401, 403])
+
+    def test_nonexistent_event_404(self):
+        r = self.client.post('/api/river/spark/999999/')
+        self.assertEqual(r.status_code, 404)

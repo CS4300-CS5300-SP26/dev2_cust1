@@ -47,6 +47,7 @@ urlpatterns = [
     path('api/achievements/progress/', views.achievements_progress_api, name='achievements_progress_api'),
     path('api/river/feed/', views.river_feed_api, name='river_feed_api'),
     path('api/river/comment/', views.river_comment_api, name='river_comment_api'),
+    path('api/river/spark/<int:event_id>/', views.river_spark_api, name='river_spark_api'),
     path('api/exercises/complete_by_ids/', views.complete_exercises_by_ids, name='complete_exercises_by_ids'),
     path('api/set_progress/save/', views.save_set_progress, name='save_set_progress'),
     path('api/set_progress/get/', views.get_set_progress, name='get_set_progress'),

@@ -438,8 +438,8 @@
       actionUrl: opts.actionUrl || '',
       rarity: rarity,
       classInteractive: classInteractive,
-      sparkCount: Math.floor(Math.random() * 12),
-      sparkedByMe: false,
+      sparkCount: opts.sparkCount != null ? opts.sparkCount : Math.floor(Math.random() * 12),
+      sparkedByMe: opts.sparkedByMe || false,
       viewedByMe: false,
       // Real events start with server-provided comments (or empty); mocks get fake ones
       comments: opts.comments || (dbId ? [] : generateMockComments(commentCount)),
@@ -466,8 +466,23 @@
   function sparkEvent(id) {
     var ev = activeEvents.find(function (e) { return e.id === id; });
     if (!ev) return;
+    // Optimistic toggle
     if (ev.sparkedByMe) { ev.sparkedByMe = false; ev.sparkCount = Math.max(0, ev.sparkCount - 1); }
     else { ev.sparkedByMe = true; ev.sparkCount += 1; }
+
+    if (ev.dbId) {
+      fetch('/api/river/spark/' + ev.dbId + '/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          ev.sparkCount = data.spark_count;
+          ev.sparkedByMe = data.sparked;
+        })
+        .catch(function () { /* silently ignore */ });
+    }
   }
 
   function addComment(id, text) {
@@ -655,10 +670,12 @@
             };
           });
 
-          // If already in the active list, refresh its comments only
+          // If already in the active list, refresh its comments and spark count
           var existing = activeEvents.find(function (e) { return e.dbId === ev.id; });
           if (existing) {
             existing.comments = serverComments;
+            existing.sparkCount = ev.spark_count != null ? ev.spark_count : existing.sparkCount;
+            existing.sparkedByMe = ev.sparked_by_me != null ? ev.sparked_by_me : existing.sparkedByMe;
             return;
           }
 
@@ -676,6 +693,8 @@
             detail: ev.detail,
             rarity: ev.rarity,
             comments: serverComments,
+            sparkCount: ev.spark_count || 0,
+            sparkedByMe: ev.sparked_by_me || false,
           });
         });
         lastRealEventMs = maxMs;
@@ -841,24 +860,26 @@
       '</div>';
 
     var commentsHtml = '';
-    if (ev.comments.length > 0) {
+    {
       var expanded = (commentsExpandedId === ev.id);
-      var shown = expanded ? ev.comments : ev.comments.slice(-2);
       commentsHtml = '<div class="pill-comments' + (expanded ? ' pill-comments-expanded' : '') + '" data-comments-zone="' + ev.id + '">';
-      commentsHtml += '<div class="pill-comments-header"><span class="pill-comments-label">' + ev.comments.length + ' comments</span></div>';
-      commentsHtml += '<div class="pill-comments-scroll">';
-      for (var i = 0; i < shown.length; i++) {
-        var c = shown[i];
-        commentsHtml += '<div class="pill-comment">' +
-          '<img class="pill-comment-avatar" src="' + esc(c.avatarUrl) + '" alt="" loading="lazy">' +
-          '<div class="pill-comment-body">' +
-            '<span class="pill-comment-user">' + esc(c.username) + '</span>' +
-            '<span class="pill-comment-text">' + esc(c.text) + '</span>' +
-          '</div>' +
-          '<span class="pill-comment-time">' + timeAgo(c.timestamp) + '</span>' +
-        '</div>';
+      if (ev.comments.length > 0) {
+        var shown = expanded ? ev.comments : ev.comments.slice(-2);
+        commentsHtml += '<div class="pill-comments-header"><span class="pill-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span></div>';
+        commentsHtml += '<div class="pill-comments-scroll">';
+        for (var i = 0; i < shown.length; i++) {
+          var c = shown[i];
+          commentsHtml += '<div class="pill-comment">' +
+            '<img class="pill-comment-avatar" src="' + esc(c.avatarUrl) + '" alt="" loading="lazy">' +
+            '<div class="pill-comment-body">' +
+              '<span class="pill-comment-user">' + esc(c.username) + '</span>' +
+              '<span class="pill-comment-text">' + esc(c.text) + '</span>' +
+            '</div>' +
+            '<span class="pill-comment-time">' + timeAgo(c.timestamp) + '</span>' +
+          '</div>';
+        }
+        commentsHtml += '</div>';
       }
-      commentsHtml += '</div>';
       commentsHtml += '<div class="pill-comment-input">' +
         '<input class="pill-comment-field" data-comment-input="' + ev.id + '" placeholder="Add a comment…" maxlength="100">' +
         '<button class="pill-comment-send" data-comment-send="' + ev.id + '">' +

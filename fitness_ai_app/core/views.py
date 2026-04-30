@@ -73,6 +73,15 @@ _ACHIEVEMENT_RARITY = {
 }
 
 
+def _safe_display_name(user):
+    """Return a display name for *user* that never exposes their email address."""
+    if user.username and '@' not in user.username:
+        return user.username
+    if user.first_name:
+        return user.first_name
+    return f'User{user.id}'
+
+
 def emit_river_event(user, event_type, title, detail='', rarity='common'):
     """Record a real user action as a RiverEvent for the live feed."""
     RiverEvent.objects.create(
@@ -90,7 +99,7 @@ def _emit_achievement_challenge_diffs(user, progress_before):
     newly earned or completed since progress_before was captured.
     Returns the freshly-computed progress dict so callers can reuse it.
     """
-    username = user.username or user.email.split('@')[0]
+    username = _safe_display_name(user)
     earned_before = set(progress_before['earned_ids'])
     challenges_done_before = {c['id'] for c in progress_before['challenges'] if c['completed']}
 
@@ -1120,11 +1129,11 @@ def add_workout(request):
     Workout.objects.create(user=request.user, name=workout_name, goal=goal, status=status, date=workout_date)
 
     if status == 'completed':
-        username = request.user.username or request.user.email.split('@')[0]
+        username = _safe_display_name(request.user)
         emit_river_event(
             user=request.user, event_type='workout_complete',
             title=f'{username} completed a workout',
-            detail=f'{workout_name} — keep the streak alive!',
+            detail=f'{workout_name} — {goal} goal',
             rarity='common',
         )
         _emit_achievement_challenge_diffs(request.user, progress_before)
@@ -2013,23 +2022,30 @@ def river_feed_api(request):
     qs = (
         RiverEvent.objects
         .select_related('user')
-        .prefetch_related('comments__user')
+        .prefetch_related('comments__user', 'sparked_by')
         .filter(created_at__gte=lookback_dt)
         .order_by('-created_at')[:50]
+    )
+    user_sparked_ids = set(
+        request.user.sparked_events.filter(
+            created_at__gte=lookback_dt
+        ).values_list('id', flat=True)
     )
     return JsonResponse({
         'events': [
             {
                 'id': ev.id,
                 'event_type': ev.event_type,
-                'username': ev.user.username or ev.user.email.split('@')[0],
+                'username': _safe_display_name(ev.user),
                 'title': ev.title,
                 'detail': ev.detail,
                 'rarity': ev.rarity,
                 'created_at_ms': int(ev.created_at.timestamp() * 1000),
+                'spark_count': ev.sparked_by.count(),
+                'sparked_by_me': ev.id in user_sparked_ids,
                 'comments': [
                     {
-                        'username': c.user.username or c.user.email.split('@')[0],
+                        'username': _safe_display_name(c.user),
                         'text': c.text,
                         'created_at_ms': int(c.created_at.timestamp() * 1000),
                     }
@@ -2065,13 +2081,36 @@ def river_comment_api(request):
         return JsonResponse({'error': 'Event not found'}, status=404)
 
     comment = RiverEventComment.objects.create(user=request.user, event=event, text=text)
-    username = request.user.username or request.user.email.split('@')[0]
+    username = _safe_display_name(request.user)
     return JsonResponse({
         'id': comment.id,
         'username': username,
         'text': comment.text,
         'created_at_ms': int(comment.created_at.timestamp() * 1000),
     }, status=201)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def river_spark_api(request, event_id):
+    """Toggle the current user's spark (like) on a RiverEvent."""
+    try:
+        event = RiverEvent.objects.get(id=event_id)
+    except RiverEvent.DoesNotExist:
+        return JsonResponse({'error': 'Event not found'}, status=404)
+
+    if request.user in event.sparked_by.all():
+        event.sparked_by.remove(request.user)
+        sparked = False
+    else:
+        event.sparked_by.add(request.user)
+        sparked = True
+
+    return JsonResponse({
+        'sparked': sparked,
+        'spark_count': event.sparked_by.count(),
+    })
 
 
 @login_required
@@ -2360,16 +2399,30 @@ def complete_workout(request):
     except Workout.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Workout not found'}, status=404)
 
-    username = request.user.username or request.user.email.split('@')[0]
+    username = _safe_display_name(request.user)
     progress_before = compute_achievements_challenges(request.user)
 
     workout.status = 'completed'
     workout.save()
 
+    # Build a meaningful detail string from the completed exercises
+    exercises = list(workout.exercises.filter(completed=True))
+    ex_count = len(exercises)
+    sets_total = sum(e.sets or 0 for e in exercises)
+    muscle_groups = sorted({e.muscle_group for e in exercises if e.muscle_group})
+    detail_parts = []
+    if ex_count:
+        detail_parts.append(f'{ex_count} exercise{"s" if ex_count != 1 else ""}')
+    if sets_total:
+        detail_parts.append(f'{sets_total} set{"s" if sets_total != 1 else ""}')
+    if muscle_groups:
+        detail_parts.append(', '.join(muscle_groups[:3]))
+    workout_detail = f'{workout.name} — {" · ".join(detail_parts)}' if detail_parts else workout.name
+
     emit_river_event(
         user=request.user, event_type='workout_complete',
         title=f'{username} completed a workout',
-        detail=f'{workout.name} — keep the streak alive!',
+        detail=workout_detail,
         rarity='common',
     )
     progress = _emit_achievement_challenge_diffs(request.user, progress_before)

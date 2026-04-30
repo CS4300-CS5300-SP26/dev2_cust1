@@ -490,6 +490,7 @@ class RiverEvent(models.Model):
     title = models.CharField(max_length=200)
     detail = models.CharField(max_length=300, default='')
     rarity = models.CharField(max_length=20, choices=RARITY_CHOICES, default='common')
+    sparked_by = models.ManyToManyField(User, related_name='sparked_events', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
