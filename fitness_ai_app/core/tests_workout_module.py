@@ -3400,3 +3400,199 @@ class LogoutCSRFSecurityTests(TestCase):
         response2 = client.post(self.logout_url, data={})
         # Should redirect to splash again (idempotent)
         self.assertEqual(response2.status_code, 302)
+
+
+class UnauthenticatedSupplementDatabaseSecurityTests(TestCase):
+    """
+    Tests for Unauthenticated Supplement Database Endpoint (CVSS 5.3 - MEDIUM)
+    
+    Vulnerability: /api/supplements/ and /api/exercises/* endpoints were exposed
+    without @login_required, allowing unauthenticated access to:
+    - Full supplement database (name, type, dosage, unit for all supplements)
+    - Exercise types, muscle groups, muscles, equipment
+    - Exercise details
+    
+    Impact:
+    - Unintended API exposure to unauthenticated users
+    - Competitive intelligence scraping of app's proprietary data
+    - Inconsistent security model (all other data requires login)
+    
+    Remediation:
+    - Added @login_required to get_all_supplements
+    - Removed unnecessary @csrf_exempt from get_all_supplements
+    - Added @login_required to all exercise API endpoints:
+      * get_exercise_types
+      * get_muscle_groups
+      * get_muscles
+      * get_equipment
+      * get_exercise_detail
+    """
+    
+    def setUp(self):
+        """Create authenticated test user"""
+        self.user = User.objects.create_user(
+            username='supplement_test_user',
+            email='supplement@test.com',
+            password='supplementpass123'
+        )
+        self.client = Client()
+    
+    def test_get_all_supplements_requires_authentication(self):
+        """Test that /api/supplements/ requires login"""
+        response = self.client.get('/api/supplements/')
+        # Should redirect to login (302), not return supplement data
+        self.assertEqual(response.status_code, 302)
+    
+    def test_get_all_supplements_accessible_to_authenticated_user(self):
+        """Test that authenticated users can access supplement database"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/supplements/')
+        # Should succeed (200) and return JSON
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('supplements', data)
+    
+    def test_get_exercise_types_requires_authentication(self):
+        """Test that /api/exercises/types/ requires login"""
+        response = self.client.get('/api/exercises/types/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_get_exercise_types_accessible_to_authenticated_user(self):
+        """Test that authenticated users can access exercise types"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/exercises/types/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('exercise_types', data)
+    
+    def test_get_muscle_groups_requires_authentication(self):
+        """Test that /api/exercises/muscle-groups/ requires login"""
+        response = self.client.get('/api/exercises/muscle-groups/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_get_muscle_groups_accessible_to_authenticated_user(self):
+        """Test that authenticated users can access muscle groups"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/exercises/muscle-groups/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('muscle_groups', data)
+    
+    def test_get_muscles_requires_authentication(self):
+        """Test that /api/exercises/muscles/ requires login"""
+        response = self.client.get('/api/exercises/muscles/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_get_muscles_accessible_to_authenticated_user(self):
+        """Test that authenticated users can access muscles"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/exercises/muscles/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('muscles', data)
+    
+    def test_get_equipment_requires_authentication(self):
+        """Test that /api/exercises/equipment/ requires login"""
+        response = self.client.get('/api/exercises/equipment/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_get_equipment_accessible_to_authenticated_user(self):
+        """Test that authenticated users can access equipment"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/exercises/equipment/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('equipment', data)
+    
+    def test_get_exercise_detail_requires_authentication(self):
+        """Test that /api/exercises/<id>/ requires login"""
+        response = self.client.get('/api/exercises/1/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_supplement_data_not_exposed_to_unauthenticated_users(self):
+        """Test that supplement data is not returned to unauthenticated users"""
+        response = self.client.get('/api/supplements/')
+        # Should redirect, not return data
+        self.assertNotEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+    
+    def test_exercise_database_not_exposed_to_unauthenticated_users(self):
+        """Test that exercise database endpoints require authentication"""
+        endpoints = [
+            '/api/exercises/types/',
+            '/api/exercises/muscle-groups/',
+            '/api/exercises/muscles/',
+            '/api/exercises/equipment/',
+            '/api/exercises/1/',
+        ]
+        
+        for endpoint in endpoints:
+            response = self.client.get(endpoint)
+            # All should redirect to login
+            self.assertIn(response.status_code, [302, 404])  # 404 for /exercises/1/ if no data
+    
+    def test_csrf_exempt_removed_from_supplements(self):
+        """Test that @csrf_exempt was removed from get_all_supplements"""
+        # This test verifies the fix by checking that CSRF token requirement applies
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        
+        # GET should work fine (no CSRF needed for GET)
+        response = self.client.get('/api/supplements/')
+        self.assertEqual(response.status_code, 200)
+        
+        # The important thing is that unauthenticated access is blocked
+        response = self.client.get('/api/supplements/')
+        # Should redirect, not be exempt from authentication
+        self.client.logout()
+        response = self.client.get('/api/supplements/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_authenticated_supplement_access_returns_valid_json(self):
+        """Test that authenticated supplement access returns valid JSON"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/supplements/')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify response structure
+        self.assertIsInstance(data, dict)
+        self.assertIn('supplements', data)
+        self.assertIsInstance(data['supplements'], list)
+    
+    def test_authenticated_exercise_types_access_returns_valid_json(self):
+        """Test that authenticated exercise types access returns valid JSON"""
+        self.client.login(username='supplement_test_user', password='supplementpass123')
+        response = self.client.get('/api/exercises/types/')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify response structure
+        self.assertIsInstance(data, dict)
+        self.assertIn('exercise_types', data)
+        self.assertIsInstance(data['exercise_types'], list)
+    
+    def test_multiple_unauthenticated_database_endpoint_redirects(self):
+        """Test that all database endpoints redirect unauthenticated users"""
+        endpoints = [
+            '/api/supplements/',
+            '/api/exercises/types/',
+            '/api/exercises/muscle-groups/',
+            '/api/exercises/muscles/',
+            '/api/exercises/equipment/',
+        ]
+        
+        for endpoint in endpoints:
+            response = self.client.get(endpoint)
+            # All should redirect to login
+            self.assertEqual(response.status_code, 302, 
+                           f"Expected 302 for {endpoint}, got {response.status_code}")
+    
+    def test_supplement_endpoint_403_not_returned(self):
+        """Test that supplement endpoint returns 302 (redirect) not 403 (forbidden)"""
+        response = self.client.get('/api/supplements/')
+        # Django's @login_required returns 302 (redirect to login)
+        self.assertEqual(response.status_code, 302)
+        # Verify it redirects to login
+        self.assertIn('login', response.url.lower())

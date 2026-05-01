@@ -23,6 +23,7 @@ def _safe_int(value):
     return int(value) if value.isdigit() else None
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_exercise_types(request):
     """Get all available exercise types"""
@@ -30,6 +31,7 @@ def get_exercise_types(request):
     return JsonResponse({'exercise_types': list(types)})
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_muscle_groups(request):
     """Get all available muscle groups"""
@@ -37,6 +39,7 @@ def get_muscle_groups(request):
     return JsonResponse({'muscle_groups': list(groups)})
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_muscles(request):
     """Get all available muscles, optionally filtered by muscle group"""
@@ -50,6 +53,7 @@ def get_muscles(request):
     return JsonResponse({'muscles': list(muscles)})
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_equipment(request):
     """Get all available equipment"""
@@ -277,6 +281,7 @@ def get_user_safe_exercises(request):
     return filter_exercises(request)
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_exercise_detail(request, exercise_id):
     """Get detailed information about a specific exercise"""

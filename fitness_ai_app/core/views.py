@@ -2861,7 +2861,7 @@ def save_food_to_database(request):
     })
 
 
-@csrf_exempt
+@login_required
 @require_http_methods(["GET"])
 def get_all_supplements(request):
     """Get all supplements from the SupplementDatabase for display."""
