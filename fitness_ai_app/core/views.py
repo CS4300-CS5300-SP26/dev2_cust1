@@ -917,7 +917,6 @@ def _build_ai_system_prompt(user):
 
 @login_required
 @ratelimit(key='user', rate='20/m', method='POST', block=True)
-@csrf_exempt
 @require_http_methods(["POST"])
 def api_chat(request):
     try:
@@ -972,7 +971,6 @@ def api_chat(request):
 
 @login_required
 @ratelimit(key='user', rate='20/m', method='POST', block=True)
-@csrf_exempt
 @require_http_methods(["POST"])
 def api_chat_stream(request):
     """Stream chat responses token-by-token using Server-Sent Events."""
@@ -1056,7 +1054,6 @@ def api_chat_stream(request):
 
 @login_required
 @ratelimit(key='user', rate='10/m', method='POST', block=True)
-@csrf_exempt
 @require_http_methods(["POST"])
 def api_chat_apply_plan(request):
     """Apply a planner payload from AI chat into train/nutrition records."""
@@ -1554,7 +1551,7 @@ def forgot_password(request):
                         fail_silently=False,
                     )
                 except Exception as e:
-                    logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
+                    logger.error(f'Failed to send password reset email: {str(e)}')
 
             # Random delay between 0.5 and 3 seconds to prevent timing attacks
             elapsed = time.time() - start_time
@@ -2760,6 +2757,7 @@ def get_all_foods(request):
     return JsonResponse({'foods': results, 'count': len(results)})
 
 
+@login_required
 def get_food_units(request):
     """Return distinct serving units from the food database, always including grams, cups, and ounces."""
     db_units = list(FoodItem.objects.values_list('serving_unit', flat=True).distinct())
@@ -2883,7 +2881,6 @@ def get_all_supplements(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["GET"])
 def search_supplements(request):
     """Search SupplementDatabase by name and return results."""
@@ -2903,7 +2900,6 @@ def search_supplements(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST", "GET"])
 def supplement_entries(request):
     """Get or create supplement entries for the logged-in user."""
@@ -2977,7 +2973,6 @@ def supplement_entries(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST"])
 def complete_workout(request):
     """Mark a workout as completed."""
@@ -3019,7 +3014,6 @@ def complete_workout(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["PATCH"])
 def toggle_supplement_taken(request, entry_id):
     """Toggle the 'taken' status of a supplement entry."""
@@ -3044,7 +3038,6 @@ def toggle_supplement_taken(request, entry_id):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST"])
 def save_workout_time(request):
     """Save the total duration for a workout."""
@@ -3080,7 +3073,6 @@ def save_workout_time(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST"])
 def complete_exercises_by_ids(request):
     """Mark specific exercises as completed."""
@@ -3113,7 +3105,6 @@ def complete_exercises_by_ids(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["POST"])
 def save_set_progress(request):
     """Save individual set completion status."""
@@ -3178,7 +3169,6 @@ def save_set_progress(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["GET"])
 def get_set_progress(request):
     """Get set completion status for a workout's exercises."""

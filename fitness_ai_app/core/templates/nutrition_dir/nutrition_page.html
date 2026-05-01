@@ -1046,6 +1046,40 @@
         return div.innerHTML;
     }
 
+    // Safe DOM rendering helper - prevents all HTML injection attacks
+    function safeSetContent(element, content) {
+        element.innerHTML = '';
+        if (typeof content === 'string') {
+            const textNode = document.createTextNode(content);
+            element.appendChild(textNode);
+        }
+        return element;
+    }
+
+    // Safe list item builder for food/supplement items
+    function buildFoodItem(food, onSelectCallback) {
+        const div = document.createElement('div');
+        div.className = 'food-db-item';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'food-db-name';
+        nameSpan.textContent = food.name;  // textContent - safe
+        
+        const macrosSpan = document.createElement('span');
+        macrosSpan.className = 'food-db-macros';
+        macrosSpan.textContent = `${food.calories || 0} cal | P: ${food.protein || 0}g | C: ${food.carbs || 0}g | F: ${food.fats || 0}g`;
+        
+        div.appendChild(nameSpan);
+        div.appendChild(macrosSpan);
+        
+        if (onSelectCallback) {
+            div.style.cursor = 'pointer';
+            div.addEventListener('click', () => onSelectCallback(food));
+        }
+        
+        return div;
+    }
+
     // Save scroll position before form submission and restore after page load
     document.addEventListener('submit', function(e) {
         const form = e.target;
@@ -1074,21 +1108,29 @@
             .then(data => {
                 if (data.foods && data.foods.length > 0) {
                     countEl.textContent = `(${data.count} items)`;
-                    listEl.innerHTML = data.foods.map(function(food) {
-                        return `<div class="food-db-item">
-                            <span class="food-db-name">${escapeHtml(food.name)}</span>
-                            <span class="food-db-macros">${escapeHtml(String(food.calories))} cal | P: ${escapeHtml(String(food.protein || 0))}g | C: ${escapeHtml(String(food.carbs || 0))}g | F: ${escapeHtml(String(food.fats || 0))}g</span>
-                        </div>`;
-                    }).join('');
+                    // Use safe DOM API instead of innerHTML
+                    listEl.innerHTML = '';
+                    data.foods.forEach(function(food) {
+                        const itemDiv = buildFoodItem(food);
+                        listEl.appendChild(itemDiv);
+                    });
                 } else {
                     countEl.textContent = '(0 items)';
-                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No foods in database yet. Add foods using the Search tab!</div>';
+                    listEl.innerHTML = '';
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.style.cssText = 'padding:20px;text-align:center;color:var(--textMuted);';
+                    emptyMsg.textContent = 'No foods in database yet. Add foods using the Search tab!';
+                    listEl.appendChild(emptyMsg);
                 }
             })
             .catch(function(err) {
                 console.error('Failed to load food database:', err);
                 countEl.textContent = '';
-                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load food database</div>';
+                listEl.innerHTML = '';
+                const errorMsg = document.createElement('div');
+                errorMsg.style.cssText = 'padding:20px;text-align:center;color:#e85c5c;';
+                errorMsg.textContent = 'Failed to load food database';
+                listEl.appendChild(errorMsg);
             });
     }
 
@@ -1105,21 +1147,40 @@
             .then(data => {
                 if (data.supplements && data.supplements.length > 0) {
                     countEl.textContent = `(${data.supplements.length} items)`;
-                    listEl.innerHTML = data.supplements.map(function(supplement) {
-                        return `<div class="supplement-db-item">
-                            <span class="supplement-db-name">${supplement.name}</span>
-                            <span class="supplement-db-type">${supplement.supplement_type} | ${supplement.dosage}${supplement.unit}</span>
-                        </div>`;
-                    }).join('');
+                    listEl.innerHTML = '';
+                    data.supplements.forEach(function(supplement) {
+                        const div = document.createElement('div');
+                        div.className = 'supplement-db-item';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'supplement-db-name';
+                        nameSpan.textContent = supplement.name;
+                        
+                        const typeSpan = document.createElement('span');
+                        typeSpan.className = 'supplement-db-type';
+                        typeSpan.textContent = `${supplement.supplement_type} | ${supplement.dosage}${supplement.unit}`;
+                        
+                        div.appendChild(nameSpan);
+                        div.appendChild(typeSpan);
+                        listEl.appendChild(div);
+                    });
                 } else {
                     countEl.textContent = '(0 items)';
-                    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--textMuted);">No supplements in database yet.</div>';
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.style.cssText = 'padding:20px;text-align:center;color:var(--textMuted);';
+                    emptyDiv.textContent = 'No supplements in database yet.';
+                    listEl.innerHTML = '';
+                    listEl.appendChild(emptyDiv);
                 }
             })
             .catch(function(err) {
                 console.error('Failed to load supplement database:', err);
                 countEl.textContent = '';
-                listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#e85c5c;">Failed to load supplement database</div>';
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'padding:20px;text-align:center;color:#e85c5c;';
+                errorDiv.textContent = 'Failed to load supplement database';
+                listEl.innerHTML = '';
+                listEl.appendChild(errorDiv);
             });
     }
 
@@ -1214,17 +1275,36 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.results && data.results.length > 0) {
-                            resultsDiv.innerHTML = data.results.map(function(item) {
-                                return `<div class="food-search-item" data-name="${escapeHtml(item.name)}" data-calories="${escapeHtml(String(item.calories))}" data-protein="${escapeHtml(String(item.protein || 0))}" data-carbs="${escapeHtml(String(item.carbs || 0))}" data-fats="${escapeHtml(String(item.fats || 0))}" data-unit="${escapeHtml(item.serving_unit || 'serving')}" data-size="${escapeHtml(String(item.serving_size || 1))}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
-                                    <div style="font-weight:500;color:white;font-size:13px;">${escapeHtml(item.name)}</div>
-                                    <div style="font-size:11px;color:#888;margin-top:2px;">${escapeHtml(String(item.calories))} cal | P: ${escapeHtml(String(item.protein || 0))}g | C: ${escapeHtml(String(item.carbs || 0))}g | F: ${escapeHtml(String(item.fats || 0))}g</div>
-                                </div>`;
-                            }).join('');
-                            resultsDiv.style.display = 'block';
-                            
-                            // Add click handlers for results
-                            resultsDiv.querySelectorAll('.food-search-item').forEach(function(item) {
-                                item.addEventListener('click', function() {
+                            resultsDiv.innerHTML = '';  // Clear first
+                            data.results.forEach(function(item) {
+                                const div = document.createElement('div');
+                                div.className = 'food-search-item';
+                                div.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;';
+                                
+                                // Use setAttribute for safe attribute setting (auto-encoded)
+                                div.setAttribute('data-name', item.name);
+                                div.setAttribute('data-calories', String(item.calories));
+                                div.setAttribute('data-protein', String(item.protein || 0));
+                                div.setAttribute('data-carbs', String(item.carbs || 0));
+                                div.setAttribute('data-fats', String(item.fats || 0));
+                                div.setAttribute('data-unit', item.serving_unit || 'serving');
+                                div.setAttribute('data-size', String(item.serving_size || 1));
+                                
+                                // Use textContent for safe text content
+                                const nameDiv = document.createElement('div');
+                                nameDiv.style.cssText = 'font-weight:500;color:white;font-size:13px;';
+                                nameDiv.textContent = item.name;
+                                
+                                const macroDiv = document.createElement('div');
+                                macroDiv.style.cssText = 'font-size:11px;color:#888;margin-top:2px;';
+                                macroDiv.textContent = `${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g`;
+                                
+                                div.appendChild(nameDiv);
+                                div.appendChild(macroDiv);
+                                resultsDiv.appendChild(div);
+                                
+                                // Add click handler
+                                div.addEventListener('click', function() {
                                     // Fill in the form fields
                                     form.querySelector('.food-search-input').value = this.dataset.name;
                                     form.querySelector('.food-calories-input').value = this.dataset.calories;
@@ -1377,43 +1457,102 @@
                 const foods = foodData.results || [];
                 const supplements = supplementData.results || [];
                 
+                // Build DOM safely instead of HTML string concatenation
+                modalSearchResults.innerHTML = '';
+                
                 // Add foods section
                 if (foods.length > 0) {
-                    html += '<div style="margin-bottom:16px;"><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Foods</h3>';
-                    html += foods.map(function(item) {
-                        return `<div class="modal-food-item" data-id="${escapeHtml(String(item.id || ''))}" data-name="${escapeHtml(item.name)}" data-calories="${escapeHtml(String(item.calories))}" data-protein="${escapeHtml(String(item.protein || 0))}" data-carbs="${escapeHtml(String(item.carbs || 0))}" data-fats="${escapeHtml(String(item.fats || 0))}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div style="font-weight:500;color:white;font-size:14px;">${escapeHtml(item.name)}</div>
-                                <button class="edit-food-btn" style="background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">Edit</button>
-                            </div>
-                            <div style="font-size:12px;color:#888;margin-top:6px;">${escapeHtml(String(item.calories))} cal | P: ${escapeHtml(String(item.protein || 0))}g | C: ${escapeHtml(String(item.carbs || 0))}g | F: ${escapeHtml(String(item.fats || 0))}g</div>
-                        </div>`;
-                    }).join('');
-                    html += '</div>';
+                    const foodsHeader = document.createElement('h3');
+                    foodsHeader.style.cssText = 'margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;';
+                    foodsHeader.textContent = 'Foods';
+                    modalSearchResults.appendChild(foodsHeader);
+                    
+                    foods.forEach(function(item) {
+                        const div = document.createElement('div');
+                        div.className = 'modal-food-item';
+                        div.style.cssText = 'padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;';
+                        
+                        div.setAttribute('data-id', String(item.id || ''));
+                        div.setAttribute('data-name', item.name);
+                        div.setAttribute('data-calories', String(item.calories));
+                        div.setAttribute('data-protein', String(item.protein || 0));
+                        div.setAttribute('data-carbs', String(item.carbs || 0));
+                        div.setAttribute('data-fats', String(item.fats || 0));
+                        
+                        const headerDiv = document.createElement('div');
+                        headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+                        
+                        const nameDiv = document.createElement('div');
+                        nameDiv.style.cssText = 'font-weight:500;color:white;font-size:14px;';
+                        nameDiv.textContent = item.name;
+                        
+                        const editBtn = document.createElement('button');
+                        editBtn.className = 'edit-food-btn';
+                        editBtn.style.cssText = 'background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;';
+                        editBtn.textContent = 'Edit';
+                        
+                        headerDiv.appendChild(nameDiv);
+                        headerDiv.appendChild(editBtn);
+                        
+                        const macroDiv = document.createElement('div');
+                        macroDiv.style.cssText = 'font-size:12px;color:#888;margin-top:6px;';
+                        macroDiv.textContent = `${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g`;
+                        
+                        div.appendChild(headerDiv);
+                        div.appendChild(macroDiv);
+                        modalSearchResults.appendChild(div);
+                    });
                 }
                 
                 // Add supplements section
                 if (supplements.length > 0) {
-                    html += '<div><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Supplements</h3>';
-                    html += supplements.map(function(item) {
-                        return `<div class="modal-supplement-item" data-name="${escapeHtml(item.name)}" data-type="${escapeHtml(item.supplement_type)}" data-dosage="${escapeHtml(String(item.dosage || ''))}" data-unit="${escapeHtml(item.unit || '')}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div style="font-weight:500;color:white;font-size:14px;">${escapeHtml(item.name)}</div>
-                                <span style="background:rgba(232, 92, 0, 0.2);border:1px solid var(--accent);border-radius:4px;color:var(--accent);padding:2px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">${escapeHtml(item.supplement_type)}</span>
-                            </div>
-                            <div style="font-size:12px;color:#888;margin-top:6px;">${escapeHtml(item.dosage)}${item.unit ? ' ' + escapeHtml(item.unit) : ''}</div>
-                        </div>`;
-                    }).join('');
-                    html += '</div>';
+                    const supplementsHeader = document.createElement('h3');
+                    supplementsHeader.style.cssText = 'margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;';
+                    supplementsHeader.textContent = 'Supplements';
+                    modalSearchResults.appendChild(supplementsHeader);
+                    
+                    supplements.forEach(function(item) {
+                        const div = document.createElement('div');
+                        div.className = 'modal-supplement-item';
+                        div.style.cssText = 'padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;';
+                        
+                        div.setAttribute('data-name', item.name);
+                        div.setAttribute('data-type', item.supplement_type);
+                        div.setAttribute('data-dosage', String(item.dosage || ''));
+                        div.setAttribute('data-unit', item.unit || '');
+                        
+                        const headerDiv = document.createElement('div');
+                        headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+                        
+                        const nameDiv = document.createElement('div');
+                        nameDiv.style.cssText = 'font-weight:500;color:white;font-size:14px;';
+                        nameDiv.textContent = item.name;
+                        
+                        const typeSpan = document.createElement('span');
+                        typeSpan.style.cssText = 'background:rgba(232, 92, 0, 0.2);border:1px solid var(--accent);border-radius:4px;color:var(--accent);padding:2px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;';
+                        typeSpan.textContent = item.supplement_type;
+                        
+                        headerDiv.appendChild(nameDiv);
+                        headerDiv.appendChild(typeSpan);
+                        
+                        const dosageDiv = document.createElement('div');
+                        dosageDiv.style.cssText = 'font-size:12px;color:#888;margin-top:6px;';
+                        dosageDiv.textContent = item.dosage + (item.unit ? ' ' + item.unit : '');
+                        
+                        div.appendChild(headerDiv);
+                        div.appendChild(dosageDiv);
+                        modalSearchResults.appendChild(div);
+                    });
                 }
                 
                 // If no results found
                 if (foods.length === 0 && supplements.length === 0) {
-                    modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">No foods or supplements found.</p>';
+                    const noResultsP = document.createElement('p');
+                    noResultsP.style.cssText = 'color:#666;text-align:center;padding:20px 0;';
+                    noResultsP.textContent = 'No foods or supplements found.';
+                    modalSearchResults.appendChild(noResultsP);
                     return;
                 }
-                
-                modalSearchResults.innerHTML = html;
                 
                 // Add click handlers for food edit buttons
                 modalSearchResults.querySelectorAll('.edit-food-btn').forEach(function(btn) {
@@ -1623,7 +1762,11 @@
             return;
         }
         
-        supplementSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:12px;">Searching...</p>';
+        const searchingP = document.createElement('p');
+        searchingP.style.cssText = 'color:#666;text-align:center;padding:12px;';
+        searchingP.textContent = 'Searching...';
+        supplementSearchResults.innerHTML = '';
+        supplementSearchResults.appendChild(searchingP);
         supplementSearchResults.style.display = 'block';
         
         supplementSearchTimeout = setTimeout(function() {
@@ -1631,16 +1774,31 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.results && data.results.length > 0) {
-                        supplementSearchResults.innerHTML = data.results.map(function(item) {
-                            return `<div class="supplement-search-item" data-id="${item.id}" data-name="${item.name}" data-type="${item.supplement_type}" data-dosage="${item.dosage}" data-unit="${item.unit}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
-                                <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
-                                <div style="font-size:11px;color:#888;margin-top:2px;">${item.dosage} ${item.unit}</div>
-                            </div>`;
-                        }).join('');
-                        supplementSearchResults.style.display = 'block';
-                        
-                        supplementSearchResults.querySelectorAll('.supplement-search-item').forEach(function(item) {
-                            item.addEventListener('click', function() {
+                        supplementSearchResults.innerHTML = '';
+                        data.results.forEach(function(item) {
+                            const div = document.createElement('div');
+                            div.className = 'supplement-search-item';
+                            div.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;';
+                            
+                            div.setAttribute('data-id', item.id);
+                            div.setAttribute('data-name', item.name);
+                            div.setAttribute('data-type', item.supplement_type);
+                            div.setAttribute('data-dosage', item.dosage);
+                            div.setAttribute('data-unit', item.unit);
+                            
+                            const nameDiv = document.createElement('div');
+                            nameDiv.style.cssText = 'font-weight:500;color:white;font-size:13px;';
+                            nameDiv.textContent = item.name;
+                            
+                            const dosageDiv = document.createElement('div');
+                            dosageDiv.style.cssText = 'font-size:11px;color:#888;margin-top:2px;';
+                            dosageDiv.textContent = `${item.dosage} ${item.unit}`;
+                            
+                            div.appendChild(nameDiv);
+                            div.appendChild(dosageDiv);
+                            supplementSearchResults.appendChild(div);
+                            
+                            div.addEventListener('click', function() {
                                 selectedSupplementData = {
                                     id: this.dataset.id,
                                     name: this.dataset.name,
@@ -1659,15 +1817,19 @@
                                 supplementUnit.value = this.dataset.unit;
                             });
                             
-                            item.addEventListener('mouseenter', function() {
+                            div.addEventListener('mouseenter', function() {
                                 this.style.backgroundColor = 'rgba(232, 92, 0, 0.15)';
                             });
-                            item.addEventListener('mouseleave', function() {
+                            div.addEventListener('mouseleave', function() {
                                 this.style.backgroundColor = 'transparent';
                             });
                         });
                     } else {
-                        supplementSearchResults.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No supplements found</p>';
+                        const noResultsP = document.createElement('p');
+                        noResultsP.style.cssText = 'color:#888;text-align:center;padding:12px;';
+                        noResultsP.textContent = 'No supplements found';
+                        supplementSearchResults.innerHTML = '';
+                        supplementSearchResults.appendChild(noResultsP);
                         supplementSearchResults.style.display = 'block';
                     }
                 })
@@ -2135,12 +2297,34 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.results && data.results.length > 0) {
-                        foodSearchResults.innerHTML = data.results.map(food => `
-                            <div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="selectFoodResult(${food.id}, '${food.name.replace(/'/g, "\\'")}', ${food.calories}, ${food.protein || 0}, ${food.carbs || 0}, ${food.fats || 0}, '${(food.serving_unit || 'serving').replace(/'/g, "\\'")}', ${food.serving_size || 1})">
-                                <div style="color:white;font-weight:600;">${food.name}</div>
-                                <div style="color:#888;font-size:11px;margin-top:2px;">${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g</div>
-                            </div>
-                        `).join('');
+                        foodSearchResults.innerHTML = '';
+                        data.results.forEach(food => {
+                            const div = document.createElement('div');
+                            div.style.cssText = 'padding:10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;';
+                            
+                            const nameDiv = document.createElement('div');
+                            nameDiv.style.cssText = 'color:white;font-weight:600;';
+                            nameDiv.textContent = food.name;
+                            
+                            const macroDiv = document.createElement('div');
+                            macroDiv.style.cssText = 'color:#888;font-size:11px;margin-top:2px;';
+                            macroDiv.textContent = `${food.calories} kcal • P: ${food.protein || 0}g C: ${food.carbs || 0}g F: ${food.fats || 0}g`;
+                            
+                            div.appendChild(nameDiv);
+                            div.appendChild(macroDiv);
+                            foodSearchResults.appendChild(div);
+                            
+                            div.addEventListener('click', function() {
+                                selectFoodResult(food.id, food.name, food.calories, food.protein || 0, food.carbs || 0, food.fats || 0, food.serving_unit || 'serving', food.serving_size || 1);
+                            });
+                            
+                            div.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = 'rgba(232, 92, 0, 0.1)';
+                            });
+                            div.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = 'transparent';
+                            });
+                        });
                         foodSearchResults.style.display = 'block';
                     } else {
                         foodSearchResults.innerHTML = '';
@@ -2254,30 +2438,6 @@
             });
     }
 
-    function savedItemCard(content) {
-        return `<div class="saved-item-card" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${content}</div>`;
-    }
-
-    function mealPickerHtml(pickerId) {
-        if (!availableMeals.length) {
-            return `<span style="font-size:11px;color:#888;margin-left:6px;">No meals today</span>`;
-        }
-        const opts = availableMeals.map(m =>
-            `<option value="${m.id}">${m.name.replace(/"/g,'&quot;')}</option>`
-        ).join('');
-        return `
-            <div id="${pickerId}" style="display:none;margin-top:8px;display:none;">
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
-                        <option value="">Pick a meal…</option>
-                        ${opts}
-                    </select>
-                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
-                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;">✕</button>
-                </div>
-            </div>`;
-    }
-
     function toggleMealPicker(btn) {
         const card = btn.closest('.saved-item-card');
         const picker = card.querySelector('.meal-picker-row');
@@ -2288,39 +2448,113 @@
     function renderSavedFoods(foods) {
         const el = document.getElementById('saved-foods-list');
         if (!foods.length) {
-            el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">No saved foods yet.<br>Click the bookmark icon on any food to save it.</div>';
+            const noItemsDiv = document.createElement('div');
+            noItemsDiv.style.cssText = 'text-align:center;padding:30px;color:#888;';
+            noItemsDiv.innerHTML = 'No saved foods yet.<br>Click the bookmark icon on any food to save it.';
+            el.innerHTML = '';
+            el.appendChild(noItemsDiv);
             return;
         }
-        el.innerHTML = foods.map(f => savedItemCard(`
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;color:white;font-size:14px;">${f.name}</div>
-                    <div style="font-size:11px;color:#888;margin-top:2px;">${f.calories} kcal &bull; P:${f.protein}g C:${f.carbs}g F:${f.fats}g</div>
-                    <div style="font-size:11px;color:#666;margin-top:1px;">${f.serving_size} ${f.serving_unit} &bull; saved ${f.created_at}</div>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;">
-                    <button class="add-saved-to-meal-btn" data-type="food"
-                        data-name="${f.name.replace(/"/g,'&quot;')}"
-                        data-calories="${f.calories}" data-protein="${f.protein}"
-                        data-carbs="${f.carbs}" data-fats="${f.fats}"
-                        data-serving-size="${f.serving_size}" data-serving-unit="${f.serving_unit}"
-                        title="Add to a meal" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;">+ Add</button>
-                    <button onclick="deleteSavedItem('food',${f.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="meal-picker-row" style="display:none;margin-top:8px;">
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
-                        <option value="">Pick a meal…</option>
-                        ${availableMeals.map(m => `<option value="${m.id}">${m.name.replace(/</g,'&lt;')}</option>`).join('')}
-                    </select>
-                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
-                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
-                </div>
-            </div>
-        `)).join('');
+        
+        el.innerHTML = '';
+        foods.forEach(f => {
+            const card = document.createElement('div');
+            card.className = 'saved-item-card';
+            card.style.cssText = 'padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;';
+            
+            const mainDiv = document.createElement('div');
+            mainDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;';
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = 'flex:1;min-width:0;';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.style.cssText = 'font-weight:600;color:white;font-size:14px;';
+            nameDiv.textContent = f.name;
+            
+            const macrosDiv = document.createElement('div');
+            macrosDiv.style.cssText = 'font-size:11px;color:#888;margin-top:2px;';
+            macrosDiv.textContent = `${f.calories} kcal • P:${f.protein}g C:${f.carbs}g F:${f.fats}g`;
+            
+            const servingDiv = document.createElement('div');
+            servingDiv.style.cssText = 'font-size:11px;color:#666;margin-top:1px;';
+            servingDiv.textContent = `${f.serving_size} ${f.serving_unit} • saved ${f.created_at}`;
+            
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(macrosDiv);
+            infoDiv.appendChild(servingDiv);
+            
+            const btnDiv = document.createElement('div');
+            btnDiv.style.cssText = 'display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;';
+            
+            const addBtn = document.createElement('button');
+            addBtn.className = 'add-saved-to-meal-btn';
+            addBtn.setAttribute('data-type', 'food');
+            addBtn.setAttribute('data-name', f.name);
+            addBtn.setAttribute('data-calories', f.calories);
+            addBtn.setAttribute('data-protein', f.protein);
+            addBtn.setAttribute('data-carbs', f.carbs);
+            addBtn.setAttribute('data-fats', f.fats);
+            addBtn.setAttribute('data-serving-size', f.serving_size);
+            addBtn.setAttribute('data-serving-unit', f.serving_unit);
+            addBtn.style.cssText = 'border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;';
+            addBtn.title = 'Add to a meal';
+            addBtn.textContent = '+ Add';
+            
+            const delBtn = document.createElement('button');
+            delBtn.style.cssText = 'border:none;background:none;color:#666;cursor:pointer;padding:4px;';
+            delBtn.title = 'Remove';
+            delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+            delBtn.addEventListener('click', function() {
+                deleteSavedItem('food', f.id, this);
+            });
+            
+            btnDiv.appendChild(addBtn);
+            btnDiv.appendChild(delBtn);
+            
+            mainDiv.appendChild(infoDiv);
+            mainDiv.appendChild(btnDiv);
+            
+            const pickerDiv = document.createElement('div');
+            pickerDiv.className = 'meal-picker-row';
+            pickerDiv.style.cssText = 'display:none;margin-top:8px;';
+            
+            const selectDiv = document.createElement('div');
+            selectDiv.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+            
+            const select = document.createElement('select');
+            select.className = 'meal-picker-select';
+            select.style.cssText = 'flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;';
+            const optPlaceholder = document.createElement('option');
+            optPlaceholder.value = '';
+            optPlaceholder.textContent = 'Pick a meal…';
+            select.appendChild(optPlaceholder);
+            availableMeals.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                select.appendChild(opt);
+            });
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'meal-picker-confirm';
+            confirmBtn.style.cssText = 'border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;';
+            confirmBtn.textContent = 'Add →';
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'meal-picker-cancel';
+            cancelBtn.style.cssText = 'border:none;background:none;color:#888;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;';
+            cancelBtn.textContent = '✕';
+            
+            selectDiv.appendChild(select);
+            selectDiv.appendChild(confirmBtn);
+            selectDiv.appendChild(cancelBtn);
+            pickerDiv.appendChild(selectDiv);
+            
+            card.appendChild(mainDiv);
+            card.appendChild(pickerDiv);
+            el.appendChild(card);
+        });
 
         // Wire "+ Add" buttons for foods
         el.querySelectorAll('.add-saved-to-meal-btn[data-type="food"]').forEach(btn => {
@@ -2355,38 +2589,110 @@
     function renderSavedSupplements(supplements) {
         const el = document.getElementById('saved-supplements-list');
         if (!supplements.length) {
-            el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">No saved supplements yet.<br>Click the bookmark icon on any supplement to save it.</div>';
+            const noItemsDiv = document.createElement('div');
+            noItemsDiv.style.cssText = 'text-align:center;padding:30px;color:#888;';
+            noItemsDiv.innerHTML = 'No saved supplements yet.<br>Click the bookmark icon on any supplement to save it.';
+            el.innerHTML = '';
+            el.appendChild(noItemsDiv);
             return;
         }
-        el.innerHTML = supplements.map(s => savedItemCard(`
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;color:white;font-size:14px;">${s.name}</div>
-                    <div style="font-size:11px;color:#888;margin-top:2px;">${s.dosage} ${s.unit} &bull; ${s.supplement_type}</div>
-                    <div style="font-size:11px;color:#666;margin-top:1px;">saved ${s.created_at}</div>
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;">
-                    <button class="add-saved-to-meal-btn" data-type="supplement"
-                        data-name="${s.name.replace(/"/g,'&quot;')}"
-                        data-supplement-type="${s.supplement_type}"
-                        data-dosage="${s.dosage}" data-unit="${s.unit}"
-                        title="Add to a meal" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;">+ Add</button>
-                    <button onclick="deleteSavedItem('supplement',${s.id},this)" title="Remove" style="border:none;background:none;color:#666;cursor:pointer;padding:4px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="meal-picker-row" style="display:none;margin-top:8px;">
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                    <select class="meal-picker-select" style="flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
-                        <option value="">Pick a meal…</option>
-                        ${availableMeals.map(m => `<option value="${m.id}">${m.name.replace(/</g,'&lt;')}</option>`).join('')}
-                    </select>
-                    <button class="meal-picker-confirm" style="border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Add →</button>
-                    <button class="meal-picker-cancel" style="border:none;background:none;color:#888;font-size:12px;cursor:pointer;padding:4px 6px;">✕</button>
-                </div>
-            </div>
-        `)).join('');
+        
+        el.innerHTML = '';
+        supplements.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'saved-item-card';
+            card.style.cssText = 'padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;';
+            
+            const mainDiv = document.createElement('div');
+            mainDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;';
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = 'flex:1;min-width:0;';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.style.cssText = 'font-weight:600;color:white;font-size:14px;';
+            nameDiv.textContent = s.name;
+            
+            const dosageDiv = document.createElement('div');
+            dosageDiv.style.cssText = 'font-size:11px;color:#888;margin-top:2px;';
+            dosageDiv.textContent = `${s.dosage} ${s.unit} • ${s.supplement_type}`;
+            
+            const savedDiv = document.createElement('div');
+            savedDiv.style.cssText = 'font-size:11px;color:#666;margin-top:1px;';
+            savedDiv.textContent = `saved ${s.created_at}`;
+            
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(dosageDiv);
+            infoDiv.appendChild(savedDiv);
+            
+            const btnDiv = document.createElement('div');
+            btnDiv.style.cssText = 'display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px;';
+            
+            const addBtn = document.createElement('button');
+            addBtn.className = 'add-saved-to-meal-btn';
+            addBtn.setAttribute('data-type', 'supplement');
+            addBtn.setAttribute('data-name', s.name);
+            addBtn.setAttribute('data-supplement-type', s.supplement_type);
+            addBtn.setAttribute('data-dosage', s.dosage);
+            addBtn.setAttribute('data-unit', s.unit);
+            addBtn.style.cssText = 'border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;';
+            addBtn.title = 'Add to a meal';
+            addBtn.textContent = '+ Add';
+            
+            const delBtn = document.createElement('button');
+            delBtn.style.cssText = 'border:none;background:none;color:#666;cursor:pointer;padding:4px;';
+            delBtn.title = 'Remove';
+            delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+            delBtn.addEventListener('click', function() {
+                deleteSavedItem('supplement', s.id, this);
+            });
+            
+            btnDiv.appendChild(addBtn);
+            btnDiv.appendChild(delBtn);
+            
+            mainDiv.appendChild(infoDiv);
+            mainDiv.appendChild(btnDiv);
+            
+            const pickerDiv = document.createElement('div');
+            pickerDiv.className = 'meal-picker-row';
+            pickerDiv.style.cssText = 'display:none;margin-top:8px;';
+            
+            const selectDiv = document.createElement('div');
+            selectDiv.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+            
+            const select = document.createElement('select');
+            select.className = 'meal-picker-select';
+            select.style.cssText = 'flex:1;min-width:0;background:var(--card);color:white;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;';
+            const optPlaceholder = document.createElement('option');
+            optPlaceholder.value = '';
+            optPlaceholder.textContent = 'Pick a meal…';
+            select.appendChild(optPlaceholder);
+            availableMeals.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                select.appendChild(opt);
+            });
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'meal-picker-confirm';
+            confirmBtn.style.cssText = 'border:none;background:var(--accent);color:white;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;';
+            confirmBtn.textContent = 'Add →';
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'meal-picker-cancel';
+            cancelBtn.style.cssText = 'border:none;background:none;color:#888;font-size:12px;cursor:pointer;padding:4px 6px;';
+            cancelBtn.textContent = '✕';
+            
+            selectDiv.appendChild(select);
+            selectDiv.appendChild(confirmBtn);
+            selectDiv.appendChild(cancelBtn);
+            pickerDiv.appendChild(selectDiv);
+            
+            card.appendChild(mainDiv);
+            card.appendChild(pickerDiv);
+            el.appendChild(card);
+        });
 
         // Wire "+ Add" buttons for supplements
         el.querySelectorAll('.add-saved-to-meal-btn[data-type="supplement"]').forEach(btn => {

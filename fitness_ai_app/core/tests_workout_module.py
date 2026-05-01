@@ -4195,15 +4195,15 @@ class StoredXSSSecurityTests(TestCase):
         self.assertIn('foods', data)
     
     def test_escape_html_function_in_template(self):
-        """Test that escapeHtml function is present in nutrition template"""
+        """Test that XSS prevention is present in nutrition template - now via DOM API"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Should contain the escapeHtml function definition
-        self.assertIn('function escapeHtml(str)', content)
-        self.assertIn('div.textContent = str;', content)
+        # Should use safe DOM API methods (textContent + createElement) instead of innerHTML with templates
+        self.assertIn('nameSpan.textContent = food.name;', content)
+        self.assertIn('function buildFoodItem(food', content)
     
     def test_xss_payload_in_food_search(self):
         """Test that XSS payloads in food search results are handled"""
@@ -4221,68 +4221,69 @@ class StoredXSSSecurityTests(TestCase):
         self.assertEqual(response.status_code, 200)
     
     def test_escapehtml_used_in_food_database_rendering(self):
-        """Test that escapeHtml is used in food database rendering"""
+        """Test that safe DOM rendering is used in food database - switched from escapeHtml to DOM API"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Check that escapeHtml is used for food name in database card
-        self.assertIn('escapeHtml(food.name)', content)
+        # Check that buildFoodItem uses textContent for safe rendering
+        self.assertIn('function buildFoodItem(food', content)
+        self.assertIn('nameSpan.textContent = food.name;', content)
     
     def test_escapehtml_used_in_food_search_rendering(self):
-        """Test that escapeHtml is used in food search rendering"""
+        """Test that safe DOM rendering is used in food search - switched from escapeHtml to DOM API"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Check that escapeHtml is used for food name in search results
-        self.assertIn('escapeHtml(item.name)', content)
+        # Check that DOM API is used instead of innerHTML with template literals
+        # Food search results now build DOM nodes safely with forEach
+        self.assertIn('nameDiv.textContent = food.name;', content)
+        self.assertIn('data.results.forEach', content)
     
     def test_escapehtml_used_in_modal_rendering(self):
-        """Test that escapeHtml is used in modal rendering"""
+        """Test that safe DOM rendering is used in modal - switched from escapeHtml to DOM API"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Count total uses of escapeHtml to verify all injection points fixed
-        escape_count = content.count('escapeHtml(')
-        
-        # Should have many escapeHtml calls for all fields
-        self.assertGreater(escape_count, 15,
-                          f"Expected multiple escapeHtml calls, found {escape_count}")
+        # Verify DOM API is used throughout for safe rendering
+        # Should use textContent, setAttribute, createElement patterns
+        self.assertGreater(content.count('.textContent ='), 20,
+                          "Expected multiple textContent assignments for safe rendering")
     
     def test_attributes_escaped_in_data_attributes(self):
-        """Test that data attributes are properly escaped"""
+        """Test that data attributes are properly set via setAttribute (auto-escaped)"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Verify data-name attributes use escapeHtml
-        self.assertIn('data-name="${escapeHtml(item.name)}"', content)
+        # Verify setAttribute is used for data attributes (auto-escapes values)
+        self.assertIn('setAttribute(\'data-name\'', content)
     
     def test_numeric_fields_escaped(self):
-        """Test that numeric fields are also escaped"""
+        """Test that numeric fields are safely converted to strings"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Numeric fields should also be escaped
-        self.assertIn('escapeHtml(String(food.calories))', content)
+        # Numeric fields should be converted to strings and set via textContent or setAttribute
+        self.assertIn('String(item.calories)', content)
     
     def test_supplement_fields_escaped(self):
-        """Test that supplement fields are also escaped"""
+        """Test that supplement fields are safely rendered using DOM API"""
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Supplement names should also be escaped
-        self.assertIn('escapeHtml(item.supplement_type)', content)
+        # Supplement rendering should use safe DOM API
+        self.assertIn('supplements.forEach(function(supplement', content)
     
     def test_stored_xss_prevention_comprehensive(self):
         """Comprehensive test of stored XSS prevention"""
@@ -4305,11 +4306,14 @@ class StoredXSSSecurityTests(TestCase):
         # All items should be created (server accepts any data)
         self.assertEqual(FoodItem.objects.filter(meal=self.test_meal).count(), len(payloads))
         
-        # Client-side escaping in template prevents execution
+        # Client-side XSS prevention in template - using DOM API (safer than escapeHtml)
         template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
         with open(template_path, 'r') as f:
             content = f.read()
         
-        # Template should have escaping in place
-        self.assertIn('function escapeHtml(str)', content)
-        self.assertIn('escapeHtml(food.name)', content)
+        # Template should use safe DOM API (textContent) instead of innerHTML with user data
+        # loadFoodDatabase uses buildFoodItem which creates DOM nodes safely
+        self.assertIn('nameSpan.textContent = food.name;', content)  # Use textContent, not innerHTML
+        self.assertIn('function buildFoodItem(food', content)  # DOM API helper function
+        # Verify forEach iteration is used (safer than map + join)
+        self.assertIn('data.foods.forEach(function(food)', content)
