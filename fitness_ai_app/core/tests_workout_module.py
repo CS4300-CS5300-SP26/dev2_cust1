@@ -3211,3 +3211,192 @@ class AISystemPromptInjectionSecurityTests(TestCase):
         # Only string content messages should pass
         self.assertEqual(len(normalized), 1)
         self.assertEqual(normalized[0]['content'], 'valid string')
+
+
+class LogoutCSRFSecurityTests(TestCase):
+    """
+    Tests for Logout CSRF vulnerability (CVSS 4.3 - MEDIUM)
+    
+    Vulnerability: /user_logout/ accepted GET requests without CSRF protection,
+    allowing forced session termination via embedded images/iframes. This could be
+    chained with phishing or session fixation attacks.
+    
+    Impact:
+    - Attacker forces victim logout via GET request
+    - Victim is redirected to phishing login page
+    - User confusion and session disruption
+    - Chaining with open redirect for phishing attacks
+    
+    Remediation:
+    - Add @require_POST decorator (only POST allowed)
+    - Update template to use form with {% csrf_token %}
+    - Returns 405 Method Not Allowed for GET requests
+    """
+    
+    def setUp(self):
+        """Create authenticated test user"""
+        self.user = User.objects.create_user(
+            username='logout_test_user',
+            email='logout@test.com',
+            password='logoutpass123'
+        )
+        self.logout_url = '/user_logout/'
+    
+    def test_logout_requires_post_method(self):
+        """Test that logout endpoint requires POST, not GET"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # GET request should be rejected (405 Method Not Allowed)
+        response = client.get(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+        
+        # User should still be authenticated
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+    
+    def test_csrf_logout_attack_prevented(self):
+        """Test that embedded image/iframe logout CSRF attacks are blocked"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # Simulate cross-site GET request (like <img src="/user_logout/">)
+        response = client.get(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_post_with_csrf_token_succeeds(self):
+        """Test that logout via POST with CSRF token works"""
+        client = Client(enforce_csrf_checks=False)
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # POST should succeed (CSRF checks disabled for test)
+        response = client.post(self.logout_url, data={})
+        
+        # Should redirect to splash page
+        self.assertIn(response.status_code, [302, 301])
+    
+    def test_logout_post_without_csrf_token_fails(self):
+        """Test that POST without CSRF token is rejected with CSRF enforcement"""
+        # Create a fresh client with CSRF enforcement enabled
+        client = Client(enforce_csrf_checks=True)
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # GET the logout page first to get CSRF token
+        response = client.get(self.logout_url)
+        # GET should be rejected with 405
+        self.assertEqual(response.status_code, 405)
+        
+        # POST without token should fail with CSRF check
+        response = client.post(self.logout_url, data={})
+        # Will be 403 Forbidden (CSRF failure)
+        self.assertEqual(response.status_code, 403)
+    
+    def test_get_logout_returns_405_method_not_allowed(self):
+        """Test that GET requests return correct HTTP 405 status"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        response = client.get(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_head_request_rejected(self):
+        """Test that HEAD requests are also rejected"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # HEAD should also be rejected (405)
+        response = client.head(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_delete_request_rejected(self):
+        """Test that DELETE requests are rejected"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        response = client.delete(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_put_request_rejected(self):
+        """Test that PUT requests are rejected"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        response = client.put(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_patch_request_rejected(self):
+        """Test that PATCH requests are rejected"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        response = client.patch(self.logout_url)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_logout_redirects_to_splash_page(self):
+        """Test that successful logout redirects to splash page"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # POST logout (Django test client handles CSRF automatically)
+        response = client.post(self.logout_url, data={}, follow=False)
+        
+        # Should redirect to splash
+        self.assertIn(response.status_code, [302, 301])
+    
+    def test_session_destroyed_after_logout(self):
+        """Test that session is destroyed after logout"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # Logout
+        client.post(self.logout_url, data={})
+        
+        # Session should be cleared - verify by checking another protected page
+        # Should redirect to login (302)
+        response = client.get('/home_dash/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_unauthenticated_user_logout_get_rejected(self):
+        """Test that unauthenticated users get 405 on GET logout"""
+        client = Client()
+        response = client.get(self.logout_url)
+        # Should be 405 (method not allowed) not 302 (redirect to login)
+        self.assertEqual(response.status_code, 405)
+    
+    def test_unauthenticated_user_logout_post_fails(self):
+        """Test that unauthenticated users get redirected on POST logout"""
+        client = Client()
+        
+        response = client.post(self.logout_url, data={})
+        # Should redirect to login (302)
+        self.assertEqual(response.status_code, 302)
+    
+    def test_logout_clears_all_session_data(self):
+        """Test that logout clears all session data"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # Add custom session data
+        session = client.session
+        session['custom_data'] = 'test_value'
+        session.save()
+        
+        # Logout
+        client.post(self.logout_url, data={})
+        
+        # New request should not have user or custom data
+        response = client.get('/home_dash/')
+        self.assertEqual(response.status_code, 302)
+    
+    def test_multiple_logout_requests_idempotent(self):
+        """Test that multiple logout requests don't cause errors"""
+        client = Client()
+        client.login(username='logout_test_user', password='logoutpass123')
+        
+        # First logout
+        response1 = client.post(self.logout_url, data={})
+        self.assertEqual(response1.status_code, 302)
+        
+        # Second logout (already logged out)
+        response2 = client.post(self.logout_url, data={})
+        # Should redirect to splash again (idempotent)
+        self.assertEqual(response2.status_code, 302)

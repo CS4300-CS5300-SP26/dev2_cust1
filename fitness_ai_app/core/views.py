@@ -1604,6 +1604,7 @@ def reset_password(request, token):
     return render(request, 'core/reset_password.html', {'form': form})
 
 
+@require_POST
 def user_logout(request):
     logout(request)
     messages.success(request, 'You have been logged out.')
