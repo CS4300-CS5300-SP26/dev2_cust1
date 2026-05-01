@@ -46,9 +46,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# For tests, use a secure random key; in production, must be set via DJANGO_SECRET_KEY env var
-if 'test' in sys.argv or 'pytest' in sys.argv:
-    # Use a secure random key for testing (generated via get_random_secret_key)
+# For tests/CI, use a secure random key; in production, must be set via DJANGO_SECRET_KEY env var
+def _is_test_or_ci():
+    """Check if running in test mode or CI environment."""
+    return (
+        'test' in sys.argv or 
+        'pytest' in sys.argv or 
+        os.getenv('CI') == 'true' or 
+        os.getenv('GITHUB_ACTIONS') == 'true'
+    )
+
+if _is_test_or_ci():
+    # Use a secure random key for testing/CI (generated via get_random_secret_key)
     SECRET_KEY = 'sq#fcrw--ale)_k$&()fjown$s9%0wvh++0r)1w!s24mqmjmiy'
 else:
     SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
