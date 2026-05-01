@@ -510,3 +510,51 @@ class AIChatMessage(models.Model):
 
     def __str__(self):
         return f"{self.conversation_id} - {self.role}"
+
+
+class RiverEvent(models.Model):
+    """Records real user actions for the live River feed widget."""
+    EVENT_TYPE_CHOICES = [
+        ('workout_complete', 'Workout Complete'),
+        ('fitness_achievement', 'Fitness Achievement'),
+        ('challenge_complete', 'Challenge Complete'),
+        ('personal_record', 'Personal Record'),
+    ]
+    RARITY_CHOICES = [
+        ('common', 'Common'),
+        ('uncommon', 'Uncommon'),
+        ('rare', 'Rare'),
+        ('epic', 'Epic'),
+        ('legendary', 'Legendary'),
+        ('mythic', 'Mythic'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='river_events')
+    event_type = models.CharField(max_length=50, choices=EVENT_TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    detail = models.CharField(max_length=300, default='')
+    rarity = models.CharField(max_length=20, choices=RARITY_CHOICES, default='common')
+    sparked_by = models.ManyToManyField(User, related_name='sparked_events', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event_type} - {self.created_at}"
+
+
+class RiverEventComment(models.Model):
+    event = models.ForeignKey(RiverEvent, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='river_comments')
+    text = models.CharField(max_length=300)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.user.username}: {self.text[:40]}"

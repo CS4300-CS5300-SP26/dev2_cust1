@@ -32,7 +32,7 @@
 
 {% block post_container %}
 <!-- The River — Desktop sidebar -->
-<aside class="river-sidebar" id="river-sidebar" aria-label="The River — Live activity feed"></aside>
+<aside class="river-sidebar" id="river-sidebar" data-username="{{ request.user.username|escapejs }}" aria-label="The River — Live activity feed"></aside>
 
 <!-- The River — Mobile bottom bar -->
 <div class="river-mobile" id="river-mobile"></div>

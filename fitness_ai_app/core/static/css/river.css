@@ -1183,3 +1183,94 @@
     color: var(--textMuted);
     margin-left: 4px;
 }
+
+/* ── Mobile popup spark row ── */
+.mobile-popup-spark-row {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.mobile-popup-spark-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--textMuted);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.mobile-popup-spark-btn:hover {
+    color: var(--accent);
+    background: var(--accentDim);
+    border-color: rgba(232, 92, 0, 0.25);
+}
+.mobile-popup-spark-btn.active {
+    color: var(--accent) !important;
+    background: rgba(232, 92, 0, 0.12) !important;
+    border-color: rgba(232, 92, 0, 0.3) !important;
+}
+.mobile-popup-spark-btn svg {
+    width: 13px;
+    height: 13px;
+}
+.mobile-popup-spark-count {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+}
+
+/* ── Mobile popup comment input ── */
+.mobile-popup-comment-input {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.mobile-popup-comment-field {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--textSecondary);
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+.mobile-popup-comment-field:focus {
+    border-color: var(--accent);
+}
+.mobile-popup-comment-field::placeholder {
+    color: var(--textMuted);
+}
+.mobile-popup-comment-send {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(232, 92, 0, 0.15);
+    border: 1px solid rgba(232, 92, 0, 0.3);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+.mobile-popup-comment-send:hover {
+    background: rgba(232, 92, 0, 0.25);
+    border-color: rgba(232, 92, 0, 0.5);
+}
+.mobile-popup-comment-send svg {
+    width: 14px;
+    height: 14px;
+}
