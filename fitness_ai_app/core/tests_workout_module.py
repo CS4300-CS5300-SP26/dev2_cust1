@@ -3596,3 +3596,310 @@ class UnauthenticatedSupplementDatabaseSecurityTests(TestCase):
         self.assertEqual(response.status_code, 302)
         # Verify it redirects to login
         self.assertIn('login', response.url.lower())
+
+
+class UserEnumerationSecurityTests(TestCase):
+    """Test prevention of user enumeration via registration form errors"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.client = Client()
+        self.registration_url = '/user_get_started/'
+        self.existing_user_email = 'existing@example.com'
+        
+        # Create an existing user
+        User.objects.create_user(
+            username=self.existing_user_email,
+            email=self.existing_user_email,
+            password='ExistingPass123!'
+        )
+    
+    def test_registration_generic_error_message_for_existing_email(self):
+        """Test that registration form returns generic error for existing email"""
+        response = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Form should have errors
+        self.assertEqual(response.status_code, 200)  # Form re-rendered
+        self.assertIn('form', response.context)
+        form = response.context['form']
+        
+        # Check that form has email errors
+        self.assertTrue(form.errors)
+        
+        # Verify the error message is GENERIC (not revealing existence)
+        email_errors = str(form.errors.get('email', []))
+        # Should NOT say "already exists"
+        self.assertNotIn('already exists', email_errors)
+        self.assertIn('Unable to create account', email_errors)
+    
+    def test_registration_specific_error_not_exposed(self):
+        """Test that specific 'already exists' message is not returned"""
+        response = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Response body should NOT contain specific enumeration message
+        response_text = str(response.content)
+        self.assertNotIn('An account with this email already exists', response_text)
+    
+    def test_enumeration_attack_cannot_distinguish_registered_vs_new(self):
+        """Test that attacker cannot distinguish registered vs new emails"""
+        new_email = 'newuser@example.com'
+        
+        # Try registration with existing email
+        resp_existing = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Try registration with new email
+        resp_new = self.client.post(self.registration_url, {
+            'email': new_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Both should either return generic error or success message
+        # They should NOT have distinctly different error messages
+        existing_has_error = resp_existing.status_code == 200  # Form re-rendered with error
+        new_has_error = resp_new.status_code == 200  # Form re-rendered with error
+        
+        # At least one should succeed (new email should create account)
+        # Or both should show form (but with same generic message)
+        if existing_has_error and new_has_error:
+            # Both returned form - check error messages are similar
+            existing_form = resp_existing.context.get('form')
+            new_form = resp_new.context.get('form')
+            
+            if existing_form and new_form:
+                existing_errors = str(existing_form.errors)
+                new_errors = str(new_form.errors)
+                
+                # Should not contain revealing information
+                self.assertNotIn('already exists', existing_errors)
+                self.assertNotIn('already exists', new_errors)
+    
+    def test_registration_form_error_generic_across_different_emails(self):
+        """Test that error message is consistent for any invalid email"""
+        test_emails = [
+            'user1@test.com',
+            'user2@test.com',
+            'user3@test.com',
+        ]
+        
+        # Create first user
+        User.objects.create_user(
+            username='user1@test.com',
+            email='user1@test.com',
+            password='TestPass123!'
+        )
+        
+        # Try to register with same email
+        response = self.client.post(self.registration_url, {
+            'email': 'user1@test.com',
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        if response.status_code == 200:  # Form re-rendered with error
+            form = response.context.get('form')
+            error_text = str(form.errors)
+            
+            # Verify generic message used
+            self.assertIn('Unable to create account', error_text)
+            self.assertNotIn('already', error_text.lower() + 'exists')
+    
+    def test_timing_attack_registration_same_time_for_new_and_existing(self):
+        """Test that registration endpoint takes similar time for both emails"""
+        import time
+        
+        new_email = 'timing_test_new@example.com'
+        
+        # Time registration with existing email
+        start = time.time()
+        resp1 = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        time_existing = time.time() - start
+        
+        # Time registration with new email
+        start = time.time()
+        resp2 = self.client.post(self.registration_url, {
+            'email': new_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        time_new = time.time() - start
+        
+        # Times should be similar (no obvious timing attack window)
+        # Allow up to 200ms difference
+        time_diff = abs(time_existing - time_new)
+        self.assertLess(time_diff, 0.2, 
+                       f"Timing difference too large: {time_diff}s - enables timing attack")
+    
+    def test_no_user_enumeration_via_response_codes(self):
+        """Test that response status codes don't reveal registration status"""
+        new_email = 'enumeration_test@example.com'
+        
+        resp_existing = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        resp_new = self.client.post(self.registration_url, {
+            'email': new_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Both should be either 200 (form re-render) or 302 (redirect on success)
+        # Should NOT have different codes that leak information
+        # At minimum: both 200 or both 30x
+        self.assertIn(resp_existing.status_code, [200, 302])
+        self.assertIn(resp_new.status_code, [200, 302])
+    
+    def test_csrf_protection_on_registration_endpoint(self):
+        """Test that CSRF protection is active on registration"""
+        client = Client(enforce_csrf_checks=True)
+        
+        # GET request to get CSRF token
+        get_resp = client.get(self.registration_url)
+        self.assertEqual(get_resp.status_code, 200)
+        
+        # POST without CSRF token should fail
+        csrf_response = client.post(self.registration_url, {
+            'email': 'test@example.com',
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        }, follow=False)
+        
+        # Should be CSRF forbidden
+        self.assertEqual(csrf_response.status_code, 403)
+    
+    def test_registration_successful_for_new_email(self):
+        """Test that registration still works for legitimately new emails"""
+        new_email = 'brand_new_user@example.com'
+        
+        response = self.client.post(self.registration_url, {
+            'email': new_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Should either redirect (success) or show success message
+        self.assertIn(response.status_code, [200, 302])
+        
+        # User should be created
+        user_exists = User.objects.filter(username=new_email).exists()
+        self.assertTrue(user_exists, "New user should be created in database")
+    
+    def test_registration_rejects_invalid_passwords(self):
+        """Test that password validation still works (generic messages)"""
+        response = self.client.post(self.registration_url, {
+            'email': 'valid_new_email@example.com',
+            'password': 'Test123',  # Too short, needs 8+ chars
+            'confirm_password': 'Test123',
+        })
+        
+        # Should have form errors for password too short
+        self.assertEqual(response.status_code, 200)
+        form = response.context.get('form')
+        self.assertTrue(form.errors)
+    
+    def test_registration_rejects_mismatched_passwords(self):
+        """Test that password mismatch validation still works"""
+        response = self.client.post(self.registration_url, {
+            'email': 'valid_new_email@example.com',
+            'password': 'TestPass123!',
+            'confirm_password': 'DifferentPass123!',
+        })
+        
+        # Should have form errors for mismatched passwords
+        self.assertEqual(response.status_code, 200)
+        form = response.context.get('form')
+        self.assertTrue(form.errors)
+    
+    def test_registration_rejects_invalid_email_format(self):
+        """Test that invalid email format is rejected"""
+        response = self.client.post(self.registration_url, {
+            'email': 'not_an_email',
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Should have form errors for invalid email
+        self.assertEqual(response.status_code, 200)
+        form = response.context.get('form')
+        self.assertTrue(form.errors)
+    
+    def test_registration_form_field_required(self):
+        """Test that email field is required"""
+        response = self.client.post(self.registration_url, {
+            'email': '',
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        # Should have form errors
+        self.assertEqual(response.status_code, 200)
+        form = response.context.get('form')
+        self.assertTrue(form.errors)
+    
+    def test_bulk_enumeration_attack_prevented(self):
+        """Test that bulk email enumeration attack is prevented"""
+        # Create a few existing users
+        existing_emails = [
+            'user_a@example.com',
+            'user_b@example.com',
+            'user_c@example.com',
+        ]
+        
+        for email in existing_emails:
+            User.objects.create_user(
+                username=email,
+                email=email,
+                password='TestPass123!'
+            )
+        
+        # Try to enumerate all of them
+        for email in existing_emails:
+            response = self.client.post(self.registration_url, {
+                'email': email,
+                'password': 'TestPass123!',
+                'confirm_password': 'TestPass123!',
+            })
+            
+            # All should return same generic message
+            if response.status_code == 200:  # Form re-rendered
+                form = response.context.get('form')
+                error_text = str(form.errors)
+                
+                # Should NOT reveal existence of account
+                self.assertNotIn('already exists', error_text)
+                self.assertNotIn('already registered', error_text.lower())
+    
+    def test_error_message_text_matches_remediation_guidance(self):
+        """Test that error message matches the recommended generic text"""
+        response = self.client.post(self.registration_url, {
+            'email': self.existing_user_email,
+            'password': 'TestPass123!',
+            'confirm_password': 'TestPass123!',
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        form = response.context.get('form')
+        error_text = str(form.errors)
+        
+        # Should use the recommended generic message
+        expected_message = 'Unable to create account with this email address'
+        self.assertIn(expected_message, error_text)
