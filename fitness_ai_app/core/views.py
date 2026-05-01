@@ -917,6 +917,7 @@ def _build_ai_system_prompt(user):
 
 @login_required
 @ratelimit(key='user', rate='20/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat(request):
     try:
@@ -971,6 +972,7 @@ def api_chat(request):
 
 @login_required
 @ratelimit(key='user', rate='20/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat_stream(request):
     """Stream chat responses token-by-token using Server-Sent Events."""
@@ -1054,6 +1056,7 @@ def api_chat_stream(request):
 
 @login_required
 @ratelimit(key='user', rate='10/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat_apply_plan(request):
     """Apply a planner payload from AI chat into train/nutrition records."""
@@ -2900,6 +2903,7 @@ def search_supplements(request):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST", "GET"])
 def supplement_entries(request):
     """Get or create supplement entries for the logged-in user."""
@@ -2973,6 +2977,7 @@ def supplement_entries(request):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def complete_workout(request):
     """Mark a workout as completed."""
@@ -3014,6 +3019,7 @@ def complete_workout(request):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["PATCH"])
 def toggle_supplement_taken(request, entry_id):
     """Toggle the 'taken' status of a supplement entry."""
@@ -3038,6 +3044,7 @@ def toggle_supplement_taken(request, entry_id):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def save_workout_time(request):
     """Save the total duration for a workout."""
@@ -3073,6 +3080,7 @@ def save_workout_time(request):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def complete_exercises_by_ids(request):
     """Mark specific exercises as completed."""
@@ -3105,6 +3113,7 @@ def complete_exercises_by_ids(request):
 
 
 @login_required
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def save_set_progress(request):
     """Save individual set completion status."""

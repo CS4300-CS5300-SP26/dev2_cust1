@@ -356,19 +356,19 @@ class LogoutViewTests(TestCase):
 
     def test_logout_redirects_to_splash(self):
         self.client.login(username='logout@spotter.ai', password='testpass123')
-        r = self.client.get('/user_logout/')
+        r = self.client.post('/user_logout/')
         self.assertEqual(r.status_code, 302)
 
     def test_logout_ends_session(self):
         self.client.login(username='logout@spotter.ai', password='testpass123')
-        self.client.get('/user_logout/')
+        self.client.post('/user_logout/')
         r = self.client.get('/home_dash/')
         self.assertEqual(r.status_code, 302)
 
     def test_logout_shows_success_message(self):
         """Test that logout shows success message."""
         self.client.login(username='logout@spotter.ai', password='testpass123')
-        response = self.client.get('/user_logout/', follow=True)
+        response = self.client.post('/user_logout/', follow=True)
         messages = list(response.context['messages'])
         self.assertTrue(any('logged out' in str(m).lower() for m in messages))
 
@@ -948,6 +948,15 @@ class DeleteFoodItemViewTests(TestCase):
 
 class ApiChatViewTests(TestCase):
     """Tests for the api_chat view"""
+
+    def setUp(self):
+        """Create test user and login"""
+        self.user = User.objects.create_user(
+            username='apichat@test.com',
+            email='apichat@test.com',
+            password='testpass123'
+        )
+        self.client.login(username='apichat@test.com', password='testpass123')
 
     def test_invalid_json_body(self):
         r = self.client.post(
@@ -5312,6 +5321,7 @@ class ExerciseAPITestCase(TestCase):
             email='api@test.com',
             password='testpass123'
         )
+        self.client.login(username='apiuser', password='testpass123')
 
         self.strength_type = ExerciseType.objects.create(name='Strength')
         self.cardio_type = ExerciseType.objects.create(name='Cardio')
@@ -5381,6 +5391,7 @@ class ExerciseAPITestCase(TestCase):
 
     def test_filter_exercises_requires_auth(self):
         """Test that filter endpoint requires authentication"""
+        self.client.logout()
         response = self.client.get('/api/exercises/filter/')
         self.assertEqual(response.status_code, 302)  # Redirect to login
 
@@ -5459,6 +5470,7 @@ class ExerciseAPITestCase(TestCase):
 
     def test_add_user_injury_requires_auth(self):
         """Test that add injury requires authentication"""
+        self.client.logout()
         response = self.client.post('/api/user/injury/add/')
         self.assertEqual(response.status_code, 302)  # Redirect to login
 
