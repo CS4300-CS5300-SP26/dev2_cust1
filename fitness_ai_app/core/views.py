@@ -8,6 +8,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
 from openai import OpenAI
 import logging
 import smtplib
@@ -915,6 +916,7 @@ def _build_ai_system_prompt(user):
 
 
 @login_required
+@ratelimit(key='user', rate='20/m', method='POST', block=True)
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat(request):
@@ -969,6 +971,7 @@ def api_chat(request):
 
 
 @login_required
+@ratelimit(key='user', rate='20/m', method='POST', block=True)
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat_stream(request):
@@ -1052,6 +1055,7 @@ def api_chat_stream(request):
 
 
 @login_required
+@ratelimit(key='user', rate='10/m', method='POST', block=True)
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat_apply_plan(request):
@@ -1232,6 +1236,7 @@ from .models import EmailVerification
 
 logger = logging.getLogger(__name__)
 
+@ratelimit(key='ip', rate='10/h', method='POST', block=True)
 def user_get_started(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -1481,6 +1486,7 @@ def verify_email(request, token):
     return redirect('get_started_profile')
 
 
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def user_login(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -1507,6 +1513,7 @@ def user_login(request):
     return render(request, 'core/user_login.html')
 
 
+@ratelimit(key='ip', rate='3/h', method='POST', block=True)
 def forgot_password(request):
     if request.user.is_authenticated:
         return redirect('home_dash')

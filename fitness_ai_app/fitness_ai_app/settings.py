@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -231,3 +232,8 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Email verification setting for development
 EMAIL_VERIFICATION_ENABLED = env_bool('EMAIL_VERIFICATION_ENABLED', False)
+
+# Rate limiting configuration
+# Disable rate limiting when running tests (to avoid test pollution from shared cache)
+TESTING = 'test' in sys.argv
+RATELIMIT_ENABLE = not TESTING
