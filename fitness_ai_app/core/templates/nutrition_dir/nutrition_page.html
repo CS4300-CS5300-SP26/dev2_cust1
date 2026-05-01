@@ -1038,6 +1038,14 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+    // HTML escape function to prevent XSS attacks
+    function escapeHtml(str) {
+        if (typeof str !== 'string') str = String(str);
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     // Save scroll position before form submission and restore after page load
     document.addEventListener('submit', function(e) {
         const form = e.target;
@@ -1068,8 +1076,8 @@
                     countEl.textContent = `(${data.count} items)`;
                     listEl.innerHTML = data.foods.map(function(food) {
                         return `<div class="food-db-item">
-                            <span class="food-db-name">${food.name}</span>
-                            <span class="food-db-macros">${food.calories} cal | P: ${food.protein || 0}g | C: ${food.carbs || 0}g | F: ${food.fats || 0}g</span>
+                            <span class="food-db-name">${escapeHtml(food.name)}</span>
+                            <span class="food-db-macros">${escapeHtml(String(food.calories))} cal | P: ${escapeHtml(String(food.protein || 0))}g | C: ${escapeHtml(String(food.carbs || 0))}g | F: ${escapeHtml(String(food.fats || 0))}g</span>
                         </div>`;
                     }).join('');
                 } else {
@@ -1207,9 +1215,9 @@
                     .then(data => {
                         if (data.results && data.results.length > 0) {
                             resultsDiv.innerHTML = data.results.map(function(item) {
-                                return `<div class="food-search-item" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" data-unit="${item.serving_unit || 'serving'}" data-size="${item.serving_size || 1}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
-                                    <div style="font-weight:500;color:white;font-size:13px;">${item.name}</div>
-                                    <div style="font-size:11px;color:#888;margin-top:2px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
+                                return `<div class="food-search-item" data-name="${escapeHtml(item.name)}" data-calories="${escapeHtml(String(item.calories))}" data-protein="${escapeHtml(String(item.protein || 0))}" data-carbs="${escapeHtml(String(item.carbs || 0))}" data-fats="${escapeHtml(String(item.fats || 0))}" data-unit="${escapeHtml(item.serving_unit || 'serving')}" data-size="${escapeHtml(String(item.serving_size || 1))}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background-color 0.2s;">
+                                    <div style="font-weight:500;color:white;font-size:13px;">${escapeHtml(item.name)}</div>
+                                    <div style="font-size:11px;color:#888;margin-top:2px;">${escapeHtml(String(item.calories))} cal | P: ${escapeHtml(String(item.protein || 0))}g | C: ${escapeHtml(String(item.carbs || 0))}g | F: ${escapeHtml(String(item.fats || 0))}g</div>
                                 </div>`;
                             }).join('');
                             resultsDiv.style.display = 'block';
@@ -1373,12 +1381,12 @@
                 if (foods.length > 0) {
                     html += '<div style="margin-bottom:16px;"><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Foods</h3>';
                     html += foods.map(function(item) {
-                        return `<div class="modal-food-item" data-id="${item.id || ''}" data-name="${item.name}" data-calories="${item.calories}" data-protein="${item.protein || 0}" data-carbs="${item.carbs || 0}" data-fats="${item.fats || 0}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
+                        return `<div class="modal-food-item" data-id="${escapeHtml(String(item.id || ''))}" data-name="${escapeHtml(item.name)}" data-calories="${escapeHtml(String(item.calories))}" data-protein="${escapeHtml(String(item.protein || 0))}" data-carbs="${escapeHtml(String(item.carbs || 0))}" data-fats="${escapeHtml(String(item.fats || 0))}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
+                                <div style="font-weight:500;color:white;font-size:14px;">${escapeHtml(item.name)}</div>
                                 <button class="edit-food-btn" style="background:var(--accent);border:none;border-radius:4px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">Edit</button>
                             </div>
-                            <div style="font-size:12px;color:#888;margin-top:6px;">${item.calories} cal | P: ${item.protein || 0}g | C: ${item.carbs || 0}g | F: ${item.fats || 0}g</div>
+                            <div style="font-size:12px;color:#888;margin-top:6px;">${escapeHtml(String(item.calories))} cal | P: ${escapeHtml(String(item.protein || 0))}g | C: ${escapeHtml(String(item.carbs || 0))}g | F: ${escapeHtml(String(item.fats || 0))}g</div>
                         </div>`;
                     }).join('');
                     html += '</div>';
@@ -1388,12 +1396,12 @@
                 if (supplements.length > 0) {
                     html += '<div><h3 style="margin:0 0 8px 0;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Supplements</h3>';
                     html += supplements.map(function(item) {
-                        return `<div class="modal-supplement-item" data-name="${item.name}" data-type="${item.supplement_type}" data-dosage="${item.dosage || ''}" data-unit="${item.unit || ''}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
+                        return `<div class="modal-supplement-item" data-name="${escapeHtml(item.name)}" data-type="${escapeHtml(item.supplement_type)}" data-dosage="${escapeHtml(String(item.dosage || ''))}" data-unit="${escapeHtml(item.unit || '')}" style="padding:12px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all 0.2s;">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div style="font-weight:500;color:white;font-size:14px;">${item.name}</div>
-                                <span style="background:rgba(232, 92, 0, 0.2);border:1px solid var(--accent);border-radius:4px;color:var(--accent);padding:2px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">${item.supplement_type}</span>
+                                <div style="font-weight:500;color:white;font-size:14px;">${escapeHtml(item.name)}</div>
+                                <span style="background:rgba(232, 92, 0, 0.2);border:1px solid var(--accent);border-radius:4px;color:var(--accent);padding:2px 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">${escapeHtml(item.supplement_type)}</span>
                             </div>
-                            <div style="font-size:12px;color:#888;margin-top:6px;">${item.dosage}${item.unit ? ' ' + item.unit : ''}</div>
+                            <div style="font-size:12px;color:#888;margin-top:6px;">${escapeHtml(item.dosage)}${item.unit ? ' ' + escapeHtml(item.unit) : ''}</div>
                         </div>`;
                     }).join('');
                     html += '</div>';

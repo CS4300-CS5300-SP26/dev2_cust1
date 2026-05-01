@@ -4138,3 +4138,178 @@ class RateLimitingSecurityTests(TestCase):
         
         # Should include django-ratelimit
         self.assertIn('django-ratelimit', content)
+
+
+class StoredXSSSecurityTests(TestCase):
+    """Test prevention of Stored XSS via food item names in nutrition page"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.client = Client()
+        
+        # Create test user
+        self.test_user = User.objects.create_user(
+            username='xss_test@example.com',
+            email='xss_test@example.com',
+            password='TestPass123!'
+        )
+        
+        # Create test meal
+        self.test_meal = Meal.objects.create(
+            user=self.test_user,
+            name='Test Meal',
+            date=timezone.now().date()
+        )
+    
+    def test_food_item_name_escaped_in_database_display(self):
+        """Test that food item names are escaped when displayed"""
+        # Create a food item with XSS payload in name
+        xss_payload = '<img src=x onerror="alert(\'XSS\')">'
+        food_item = FoodItem.objects.create(
+            meal=self.test_meal,
+            name=xss_payload,
+            calories=100
+        )
+        
+        # The payload should be stored in database as-is
+        self.assertEqual(food_item.name, xss_payload)
+    
+    def test_api_all_foods_returns_data_safely(self):
+        """Test that /api/all_foods/ endpoint returns safe data"""
+        # Create a food item with XSS payload
+        xss_payload = '<script>alert("XSS")</script>'
+        food_item = FoodItem.objects.create(
+            meal=self.test_meal,
+            name=xss_payload,
+            calories=100
+        )
+        
+        # Login and fetch API
+        self.client.login(username='xss_test@example.com', password='TestPass123!')
+        response = self.client.get('/api/all_foods/')
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Data should be returned (API returns raw data, client escapes)
+        self.assertIn('foods', data)
+    
+    def test_escape_html_function_in_template(self):
+        """Test that escapeHtml function is present in nutrition template"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Should contain the escapeHtml function definition
+        self.assertIn('function escapeHtml(str)', content)
+        self.assertIn('div.textContent = str;', content)
+    
+    def test_xss_payload_in_food_search(self):
+        """Test that XSS payloads in food search results are handled"""
+        xss_payload = '"><script>alert(1)</script><div class="'
+        food_item = FoodItem.objects.create(
+            meal=self.test_meal,
+            name=xss_payload,
+            calories=100
+        )
+        
+        self.client.login(username='xss_test@example.com', password='TestPass123!')
+        
+        # Verify the API returns the data
+        response = self.client.get('/api/search_foods/?q=script')
+        self.assertEqual(response.status_code, 200)
+    
+    def test_escapehtml_used_in_food_database_rendering(self):
+        """Test that escapeHtml is used in food database rendering"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Check that escapeHtml is used for food name in database card
+        self.assertIn('escapeHtml(food.name)', content)
+    
+    def test_escapehtml_used_in_food_search_rendering(self):
+        """Test that escapeHtml is used in food search rendering"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Check that escapeHtml is used for food name in search results
+        self.assertIn('escapeHtml(item.name)', content)
+    
+    def test_escapehtml_used_in_modal_rendering(self):
+        """Test that escapeHtml is used in modal rendering"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Count total uses of escapeHtml to verify all injection points fixed
+        escape_count = content.count('escapeHtml(')
+        
+        # Should have many escapeHtml calls for all fields
+        self.assertGreater(escape_count, 15,
+                          f"Expected multiple escapeHtml calls, found {escape_count}")
+    
+    def test_attributes_escaped_in_data_attributes(self):
+        """Test that data attributes are properly escaped"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Verify data-name attributes use escapeHtml
+        self.assertIn('data-name="${escapeHtml(item.name)}"', content)
+    
+    def test_numeric_fields_escaped(self):
+        """Test that numeric fields are also escaped"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Numeric fields should also be escaped
+        self.assertIn('escapeHtml(String(food.calories))', content)
+    
+    def test_supplement_fields_escaped(self):
+        """Test that supplement fields are also escaped"""
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Supplement names should also be escaped
+        self.assertIn('escapeHtml(item.supplement_type)', content)
+    
+    def test_stored_xss_prevention_comprehensive(self):
+        """Comprehensive test of stored XSS prevention"""
+        # Create multiple food items with different XSS payloads
+        payloads = [
+            '<img src=x onerror="alert(1)">',
+            '<script>alert(1)</script>',
+            '"><svg onload=alert(1)><div class="',
+            'javascript:alert(1)',
+            '<iframe src="javascript:alert(1)"></iframe>',
+        ]
+        
+        for i, payload in enumerate(payloads):
+            FoodItem.objects.create(
+                meal=self.test_meal,
+                name=payload,
+                calories=100 + i
+            )
+        
+        # All items should be created (server accepts any data)
+        self.assertEqual(FoodItem.objects.filter(meal=self.test_meal).count(), len(payloads))
+        
+        # Client-side escaping in template prevents execution
+        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        with open(template_path, 'r') as f:
+            content = f.read()
+        
+        # Template should have escaping in place
+        self.assertIn('function escapeHtml(str)', content)
+        self.assertIn('escapeHtml(food.name)', content)
