@@ -1140,8 +1140,10 @@ def api_chat_stream(request):
 
             yield f"data: {json.dumps(metadata)}\n\n"
 
-        except Exception:
-            error_data = {"type": "error", "error": "Failed to process stream"}
+        except Exception as e:
+            error_msg = str(e)
+            logging.error(f"api_chat_stream error: {error_msg}", exc_info=True)
+            error_data = {"type": "error", "error": f"Failed to process stream: {error_msg}"}
             yield f"data: {json.dumps(error_data)}\n\n"
 
     response = StreamingHttpResponse(
