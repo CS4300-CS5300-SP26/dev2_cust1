@@ -899,7 +899,7 @@
                                 await refreshConversationList();
                             } else if (data.type === 'replace_text') {
                                 // Backend cleaned the text (removed payload)—remove thinking indicator
-                                // Keep routine displayed, just remove the "Creating..." message
+                                // Update bubble with cleaned reply text
                                 if (thinkingIndicator && thinkingIndicator.parentNode) {
                                     if (thinkingAnimationId) {
                                         clearInterval(thinkingAnimationId);
@@ -910,6 +910,10 @@
                                 }
                                 fullReply = data.text;
                                 hasPlannerPayload = false;
+                                // Update the bubble to show the cleaned text
+                                if (currentBubble) {
+                                    currentBubble.textContent = fullReply;
+                                }
                             } else if (data.type === 'error') {
                                 addBubble('error', data.error);
                             } else if (data.token) {
