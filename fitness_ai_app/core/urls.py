@@ -1,7 +1,17 @@
+from django.http import HttpResponse
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
 from . import exercise_api
+
+
+def _social_redirect(target_url):
+    """Return a view that issues a 307 redirect, preserving the POST method."""
+    def view(request):
+        response = HttpResponse(status=307)
+        response['Location'] = target_url
+        return response
+    return view
 
 urlpatterns = [
     path('', views.splash, name='splash'),
@@ -78,13 +88,9 @@ urlpatterns = [
     path('ai/', views.chat_page, name='ai_page'),
     path('social/', views.social_page, name='social_page'),
     path('verify_email/<uuid:token>/', views.verify_email, name='verify_email'),
-    # Social login shortcuts
-    path('login/google/', RedirectView.as_view(url='/accounts/google/login/', query_string=True), name='google_login'),
-    path('login/apple/', RedirectView.as_view(url='/accounts/apple/login/', query_string=True), name='apple_login'),
-    path('login/facebook/',
-         RedirectView.as_view(url='/accounts/facebook/login/', query_string=True),
-         name='facebook_login'),
-    path('login/instagram/',
-         RedirectView.as_view(url='/accounts/instagram/login/', query_string=True),
-         name='instagram_login'),
+    # Social login shortcuts — use 307 to preserve POST method (skip allauth's intermediate page)
+    path('login/google/', _social_redirect('/accounts/google/login/'), name='google_login'),
+    path('login/apple/', _social_redirect('/accounts/apple/login/'), name='apple_login'),
+    path('login/facebook/', _social_redirect('/accounts/facebook/login/'), name='facebook_login'),
+    path('login/instagram/', _social_redirect('/accounts/instagram/login/'), name='instagram_login'),
 ]
