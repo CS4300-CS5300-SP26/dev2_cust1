@@ -4131,8 +4131,11 @@ class RateLimitingSecurityTests(TestCase):
     def test_requirements_txt_includes_django_ratelimit(self):
         """Test that django-ratelimit is in requirements.txt"""
         import os
+        from pathlib import Path
         
-        requirements_file = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/requirements.txt'
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent  # Get project root
+        requirements_file = base_dir / 'requirements.txt'
         with open(requirements_file, 'r') as f:
             content = f.read()
         
@@ -4196,7 +4199,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_escape_html_function_in_template(self):
         """Test that XSS prevention is present in nutrition template - now via DOM API"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4222,7 +4229,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_escapehtml_used_in_food_database_rendering(self):
         """Test that safe DOM rendering is used in food database - switched from escapeHtml to DOM API"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4233,7 +4244,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_escapehtml_used_in_food_search_rendering(self):
         """Test that safe DOM rendering is used in food search - switched from escapeHtml to DOM API"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4245,7 +4260,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_escapehtml_used_in_modal_rendering(self):
         """Test that safe DOM rendering is used in modal - switched from escapeHtml to DOM API"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4257,7 +4276,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_attributes_escaped_in_data_attributes(self):
         """Test that data attributes are properly set via setAttribute (auto-escaped)"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4267,7 +4290,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_numeric_fields_escaped(self):
         """Test that numeric fields are safely converted to strings"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4277,7 +4304,11 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_supplement_fields_escaped(self):
         """Test that supplement fields are safely rendered using DOM API"""
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        from pathlib import Path
+        
+        # Use dynamic path resolution instead of hardcoded path
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -4287,6 +4318,8 @@ class StoredXSSSecurityTests(TestCase):
     
     def test_stored_xss_prevention_comprehensive(self):
         """Comprehensive test of stored XSS prevention"""
+        from pathlib import Path
+        
         # Create multiple food items with different XSS payloads
         payloads = [
             '<img src=x onerror="alert(1)">',
@@ -4307,7 +4340,8 @@ class StoredXSSSecurityTests(TestCase):
         self.assertEqual(FoodItem.objects.filter(meal=self.test_meal).count(), len(payloads))
         
         # Client-side XSS prevention in template - using DOM API (safer than escapeHtml)
-        template_path = '/home/student/Project-WorkSpace/dev2_cust1/fitness_ai_app/core/templates/nutrition_dir/nutrition_page.html'
+        base_dir = Path(__file__).resolve().parent.parent
+        template_path = base_dir / 'core' / 'templates' / 'nutrition_dir' / 'nutrition_page.html'
         with open(template_path, 'r') as f:
             content = f.read()
         
