@@ -71,7 +71,11 @@ else:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG defaults to False (production-safe) — must be explicitly enabled for development
-DEBUG = env_bool('DEBUG', False)
+# For tests, DEBUG is always True to ensure proper redirect handling (301 vs 302)
+if _is_test_or_ci():
+    DEBUG = True
+else:
+    DEBUG = env_bool('DEBUG', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver,.ondigitalocean.app')
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')

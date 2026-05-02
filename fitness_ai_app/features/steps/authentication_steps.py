@@ -87,7 +87,7 @@ def step_login(context, email, password):
 
 @when('I log out')
 def step_logout(context):
-    context.response = context.test.client.get('/user_logout/')
+    context.response = context.test.client.post('/user_logout/')
 
 
 # ── Then steps ───────────────────────────────────────────────────────────────
