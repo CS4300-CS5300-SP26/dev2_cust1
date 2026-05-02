@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from behave import given, when, then
+from behave import given
 from django.contrib.auth.models import User
 
 from core.models import Meal, FoodItem, Workout, Exercise

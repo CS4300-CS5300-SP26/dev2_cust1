@@ -1,6 +1,5 @@
 from django.http import HttpResponse
 from django.urls import path
-from django.views.generic import RedirectView
 from . import views
 from . import exercise_api
 
@@ -12,6 +11,7 @@ def _social_redirect(target_url):
         response['Location'] = target_url
         return response
     return view
+
 
 urlpatterns = [
     path('', views.splash, name='splash'),
@@ -74,7 +74,8 @@ urlpatterns = [
     path('nutrition/toggle_food_item/', views.toggle_food_item, name='toggle_food_item'),
     path('nutrition/delete_food_item/', views.delete_food_item, name='delete_food_item'),
     path('nutrition/add_supplement_to_meal/', views.add_supplement_to_meal, name='add_supplement_to_meal'),
-    path('nutrition/add_supplement_to_meal_ajax/', views.add_supplement_to_meal_ajax, name='add_supplement_to_meal_ajax'),
+    path('nutrition/add_supplement_to_meal_ajax/',
+         views.add_supplement_to_meal_ajax, name='add_supplement_to_meal_ajax'),
     path('nutrition/toggle_meal_supplement/', views.toggle_meal_supplement, name='toggle_meal_supplement'),
     path('nutrition/delete_meal_supplement/', views.delete_meal_supplement, name='delete_meal_supplement'),
     # Saved items

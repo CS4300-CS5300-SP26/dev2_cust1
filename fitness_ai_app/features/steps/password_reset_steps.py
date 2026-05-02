@@ -1,6 +1,5 @@
 """Step definitions for password reset BDD scenarios."""
 
-import uuid
 from datetime import timedelta
 
 from behave import given, when, then

@@ -22,6 +22,7 @@ from .models import (
     SavedFood, SavedSupplement, SavedMeal, FoodGroup,
 )
 from .forms import RegistrationForm
+from .views import compute_achievements_challenges
 
 
 # Added from feature/log-in branch
@@ -1035,7 +1036,8 @@ class ApiChatViewTests(TestCase):
             '<planner_payload>'
             '{"workout_plan":{"workout_name":"Push Day","goal":"strength","date":"2026-04-27",'
             '"exercises":[{"name":"Bench Press","muscle_group":"chest","sets":4,"reps":8,"weight":135}]},'
-            '"nutrition_plan":{"date":"2026-04-27","meals":[{"name":"Lunch","items":[{"name":"Chicken Rice","calories":650,"protein":45,"carbs":70,"fats":18}]}],'
+            '"nutrition_plan":{"date":"2026-04-27","meals":[{"name":"Lunch","items":['
+            '{"name":"Chicken Rice","calories":650,"protein":45,"carbs":70,"fats":18}]}],'
             '"supplements":[{"name":"Creatine Monohydrate","supplement_type":"amino_acid","dosage":"5","unit":"g"}]}}'
             '</planner_payload>'
         )
@@ -1064,7 +1066,7 @@ class ApiChatViewTests(TestCase):
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_chat_returns_exercises_only_button_label(self, mock_openai_cls):
         """Verify button shows 'Add exercises' when only workout_plan is in payload."""
-        user = User.objects.create_user(
+        User.objects.create_user(
             username='exerciseonly@example.com',
             email='exerciseonly@example.com',
             password='TestPass123!',
@@ -1100,7 +1102,7 @@ class ApiChatViewTests(TestCase):
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_chat_returns_nutrition_only_button_label(self, mock_openai_cls):
         """Verify button shows 'Add nutritions' when only nutrition_plan is in payload."""
-        user = User.objects.create_user(
+        User.objects.create_user(
             username='nutritiononly@example.com',
             email='nutritiononly@example.com',
             password='TestPass123!',
@@ -1112,7 +1114,8 @@ class ApiChatViewTests(TestCase):
         mock_resp.choices[0].message.content = (
             'Here is a meal plan for your muscle gain.\n'
             '<planner_payload>'
-            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":300,"protein":10,"carbs":50,"fats":5}]}],'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":['
+            '{"name":"Oatmeal","calories":300,"protein":10,"carbs":50,"fats":5}]}],'
             '"supplements":[{"name":"Whey Protein","supplement_type":"protein","dosage":"30","unit":"g"}]}}'
             '</planner_payload>'
         )
@@ -1133,8 +1136,9 @@ class ApiChatViewTests(TestCase):
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_chat_meal_items_are_separated_not_combined(self, mock_openai_cls):
-        """Verify that meal items are separate, not combined (e.g., Oatmeal, Milk, Banana as 3 items, not 1)."""
-        user = User.objects.create_user(
+        """Verify that meal items are separate, not combined
+        (e.g., Oatmeal, Milk, Banana as 3 items, not 1)."""
+        User.objects.create_user(
             username='mealseparate@example.com',
             email='mealseparate@example.com',
             password='TestPass123!',
@@ -1147,7 +1151,12 @@ class ApiChatViewTests(TestCase):
         mock_resp.choices[0].message.content = (
             'Here is your breakfast plan with all components separated.\n'
             '<planner_payload>'
-            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0},{"name":"Peanut Butter","calories":190,"protein":8,"carbs":7,"fats":16},{"name":"Whey Protein","calories":120,"protein":25,"carbs":2,"fats":1}]}],'
+            '{"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":['
+            '{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},'
+            '{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},'
+            '{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0},'
+            '{"name":"Peanut Butter","calories":190,"protein":8,"carbs":7,"fats":16},'
+            '{"name":"Whey Protein","calories":120,"protein":25,"carbs":2,"fats":1}]}],'
             '"supplements":[]}}'
             '</planner_payload>'
         )
@@ -1155,22 +1164,24 @@ class ApiChatViewTests(TestCase):
 
         r = self.client.post(
             '/api/chat',
-            data=json.dumps({'messages': [{'role': 'user', 'content': 'create breakfast with oatmeal, milk, banana, peanut butter, and whey'}]}),
+            data=json.dumps({'messages': [{'role': 'user', 'content': (
+                'create breakfast with oatmeal, milk, banana, peanut butter, and whey'
+            )}]}),
             content_type='application/json',
         )
         self.assertEqual(r.status_code, 200)
         payload = r.json()
         self.assertIn('planner_action', payload)
-        
+
         # Verify payload has 5 separate items
         nutrition_plan = payload['planner_action']['payload'].get('nutrition_plan')
         self.assertIsNotNone(nutrition_plan)
         meals = nutrition_plan.get('meals', [])
         self.assertEqual(len(meals), 1)
-        
+
         items = meals[0].get('items', [])
         self.assertEqual(len(items), 5, f"Expected 5 items but got {len(items)}: {[item['name'] for item in items]}")
-        
+
         # Verify each item has correct name and macro values
         item_names = [item['name'] for item in items]
         self.assertIn('Oatmeal', item_names)
@@ -1178,7 +1189,7 @@ class ApiChatViewTests(TestCase):
         self.assertIn('Banana', item_names)
         self.assertIn('Peanut Butter', item_names)
         self.assertIn('Whey Protein', item_names)
-        
+
         # Verify individual calorie values (not combined)
         item_dict = {item['name']: item for item in items}
         self.assertEqual(item_dict['Oatmeal']['calories'], 200)
@@ -1426,7 +1437,7 @@ class ApiChatViewTests(TestCase):
     @mock.patch('core.views.OpenAI')
     @mock.patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     def test_profile_option_catalog_is_included_in_system_context(self, mock_openai_cls):
-        user = User.objects.create_user(
+        User.objects.create_user(
             username='optionschat@example.com',
             email='optionschat@example.com',
             password='TestPass123!',
@@ -7460,10 +7471,6 @@ class PopulateSupplementsCommandTests(TestCase):
 # Achievement & Challenge Tests
 # ─────────────────────────────────────────────────────────────────────────────
 
-from datetime import date, timedelta
-from .models import Workout, Exercise, Meal, FoodItem
-from .views import compute_achievements_challenges
-
 
 class ComputeAchievementsChallengesTests(TestCase):
     """Unit tests for the compute_achievements_challenges helper function."""
@@ -7904,7 +7911,7 @@ class CompleteWorkoutAchievementProgressTests(TestCase):
 
     def test_total_workouts_increments_in_stats(self):
         # Complete another workout first
-        w2 = Workout.objects.create(
+        Workout.objects.create(
             user=self.user, name='W2', goal='strength', status='completed',
             date=date.today() - timedelta(days=1)
         )
@@ -8086,7 +8093,7 @@ class RiverFeedAPITests(TestCase):
         RiverEvent.objects.filter(pk=old_event.pk).update(
             created_at=tz.now() - timedelta(hours=2)
         )
-        new_event = RiverEvent.objects.create(
+        RiverEvent.objects.create(
             user=self.user,
             event_type='workout_complete',
             title='new event',
@@ -8475,6 +8482,7 @@ class RiverSparkAPITests(TestCase):
 # ===========================================================================
 # Saved Items – Unit Tests
 # ===========================================================================
+
 
 class SaveFoodItemViewTests(TestCase):
     """Tests for POST /nutrition/save_food_item/"""

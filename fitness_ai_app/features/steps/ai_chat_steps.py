@@ -5,7 +5,7 @@ import json
 from behave import given, when, then
 from django.contrib.auth.models import User
 
-from core.models import AIChatConversation, AIChatMessage
+from core.models import AIChatConversation
 
 
 def _get_ai_user(context):

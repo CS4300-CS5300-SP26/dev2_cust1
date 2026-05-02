@@ -471,6 +471,8 @@ class SavedMeal(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.user.email})"
+
+
 class AIChatConversation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_chat_conversations')
     title = models.CharField(max_length=120, default='New Chat')

@@ -4,7 +4,6 @@ import json
 
 from behave import given, when, then
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 from core.models import RiverEvent
 

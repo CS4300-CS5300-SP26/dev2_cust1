@@ -5,13 +5,12 @@ import random
 import re
 
 from django.http import JsonResponse, StreamingHttpResponse
-from django.shortcuts import render
+from django.core.mail import send_mail
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 from openai import OpenAI
 import logging
-import smtplib
 from datetime import datetime, date, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -53,6 +52,7 @@ from .models import (
     AIChatMessage,
     RiverEvent,
     RiverEventComment,
+    EmailVerification,
 )
 
 
@@ -788,44 +788,6 @@ def _get_week_nutrition_context(user, days_ahead=7):
     return '\n'.join(lines)
 
 
-
-    if not user or not user.is_authenticated:
-        return None
-
-    if conversation_id is None:
-        return AIChatConversation.objects.create(
-            user=user,
-            title=_build_chat_conversation_title(normalized_messages),
-        )
-
-    try:
-        conversation_id = int(conversation_id)
-    except (TypeError, ValueError):
-        return False
-
-    return AIChatConversation.objects.filter(id=conversation_id, user=user).first()
-
-
-def _save_chat_conversation_state(conversation, normalized_messages, reply):
-    if not conversation:
-        return
-
-    all_messages = [*normalized_messages, {'role': 'assistant', 'content': reply}]
-    conversation.messages.all().delete()
-    AIChatMessage.objects.bulk_create(
-        [
-            AIChatMessage(
-                conversation=conversation,
-                role=message['role'],
-                content=message['content'],
-            )
-            for message in all_messages
-        ]
-    )
-    conversation.title = _build_chat_conversation_title(all_messages)
-    conversation.save()
-
-
 def _build_ai_user_context(user):
     """Build a compact user context snapshot for personalized coaching."""
     profile_options_context = _build_profile_option_catalog()
@@ -960,29 +922,90 @@ def _build_ai_system_prompt(user):
             '5. For supplements, include concise caution about interactions/contraindications when relevant.\n'
             '6. Keep responses concise and coach-like: usually 3-6 sentences, optionally short bullets.\n'
             '7. If key info is missing, ask one focused follow-up question.\n'
-            '8. When giving app navigation help, use exact user-visible UI labels from this app; avoid generic or invented menus.\n'
-            '9. Do not tell users to paste text unless there is a real text input for that exact step; for goal selection, instruct tap/select the listed option.\n'
-            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names unless they actually exist in this app.\n'
-            '11. If asked which profile options are available, list the exact options from the provided profile option context.\n'
-            '12. Use the provided "Train Plan (Next 7 days)" and "Nutrition Plan (Next 7 days)" context sections to understand what the user has scheduled. When user asks about their plan (e.g., "what\'s my plan today?", "what exercises do I have tomorrow?", "show me next week"), refer to these sections. Plans are organized by date with headers (e.g., "Mon, Apr 28"). If a day is already heavily planned, mention it; if empty, suggest adding workouts/meals. When suggesting new plans, check for existing content and integrate thoughtfully (don\'t duplicate if similar workouts/meals exist for that date).\n'
-            '13. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond with BOTH (1) a detailed natural-language summary listing exactly what workouts/meals/supplements you are creating (be specific: list actual exercise names, muscle groups, sets/reps; list actual meal names and food items), AND (2) a planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the concrete plan and include it in the payload. Do NOT ask for permission—the user will see an "Add" button in the app interface.\n'
-            '14. Response format for plans: First, describe the plan in natural language (e.g., "Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 without including them. Description and payload MUST match exactly.\n'
-            'Use this exact planner_payload format. ONLY include sections you are creating (omit null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
+            '8. When giving app navigation help, use exact user-visible UI labels from this app; '
+            'avoid generic or invented menus.\n'
+            '9. Do not tell users to paste text unless there is a real text input for that exact step; '
+            'for goal selection, instruct tap/select the listed option.\n'
+            '10. Do not suggest hidden edit modes, pencil icons, or alternate section names '
+            'unless they actually exist in this app.\n'
+            '11. If asked which profile options are available, list the exact options from the '
+            'provided profile option context.\n'
+            '12. Use the provided "Train Plan (Next 7 days)" and "Nutrition Plan (Next 7 days)" '
+            'context sections to understand what the user has scheduled. When user asks about their '
+            'plan (e.g., "what\'s my plan today?", "what exercises do I have tomorrow?", "show me '
+            'next week"), refer to these sections. Plans are organized by date with headers (e.g., '
+            '"Mon, Apr 28"). If a day is already heavily planned, mention it; if empty, suggest '
+            'adding workouts/meals. When suggesting new plans, check for existing content and '
+            'integrate thoughtfully (don\'t duplicate if similar workouts/meals exist for that date).\n'
+            '13. CRITICAL RULE—When user asks for a plan (exercises, meals, or both): ALWAYS respond '
+            'with BOTH (1) a detailed natural-language summary listing exactly what '
+            'workouts/meals/supplements you are creating (be specific: list actual exercise names, '
+            'muscle groups, sets/reps; list actual meal names and food items), AND (2) a '
+            'planner_payload XML block. NEVER just describe what you COULD do—ACTUALLY CREATE the '
+            'concrete plan and include it in the payload. Do NOT ask for permission—the user will '
+            'see an "Add" button in the app interface.\n'
+            '14. Response format for plans: First, describe the plan in natural language (e.g., '
+            '"Day 1: Upper body strength—Push-ups (3x10), Rows (3x10); Breakfast—Oatmeal (200 cal), '
+            'Milk (100 cal), Banana (90 cal); Lunch—Chicken (350 cal), Rice (250 cal)"). Then append '
+            'the planner_payload. CRITICAL: If user asks for a 7-day plan, you MUST include ALL 7 '
+            'days in the payload as an ARRAY. DO NOT create just 1 day. DO NOT describe Day 2-7 '
+            'without including them. Description and payload MUST match exactly.\n'
+            'Use this exact planner_payload format. ONLY include sections you are creating (omit '
+            'null sections). IMPORTANT: Each food/drink component MUST be a separate item (e.g., '
+            'Breakfast with Oatmeal item, Milk item, Banana item—NOT combined).\n'
             'Single-day example:\n'
             '<planner_payload>\n'
-            '{"workout_plan":{"workout_name":"Upper Body","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}],"supplements":[]}}\n'
+            '{"workout_plan":{"workout_name":"Upper Body","goal":"muscle_gain","date":"2026-04-29",'
+            '"exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},'
+            '{"name":"Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},'
+            '"nutrition_plan":{"date":"2026-04-29","meals":[{"name":"Breakfast","items":['
+            '{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},'
+            '{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2}]}],"supplements":[]}}\n'
             '</planner_payload>\n'
-            'MULTI-DAY RULE (MANDATORY): When user asks for "7-day" OR "weekly" OR "multiple days" plan, you MUST generate plan_payload with workout_plan and nutrition_plan as ARRAYS containing ALL requested days. See multi-day example below:\n'
+            'MULTI-DAY RULE (MANDATORY): When user asks for "7-day" OR "weekly" OR "multiple days" '
+            'plan, you MUST generate plan_payload with workout_plan and nutrition_plan as ARRAYS '
+            'containing ALL requested days. See multi-day example below:\n'
             '<planner_payload>\n'
-            '{"workout_plan":[{"workout_name":"Day 1 Upper","goal":"muscle_gain","date":"2026-04-29","exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},{"name":"Dumbbell Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},{"workout_name":"Day 2 Lower","goal":"muscle_gain","date":"2026-04-30","exercises":[{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0},{"name":"Deadlifts","muscle_group":"back","sets":3,"reps":8,"weight":0}]},{"workout_name":"Day 3 Full Body","goal":"muscle_gain","date":"2026-05-01","exercises":[{"name":"Bench Press","muscle_group":"chest","sets":3,"reps":8,"weight":0},{"name":"Pull-ups","muscle_group":"back","sets":3,"reps":5,"weight":0}]}],"nutrition_plan":[{"date":"2026-04-29","meals":[{"name":"Breakfast","items":[{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]},{"name":"Lunch","items":[{"name":"Chicken","calories":350,"protein":50,"carbs":0,"fats":15},{"name":"Rice","calories":250,"protein":5,"carbs":55,"fats":1}]}],"supplements":[]},{"date":"2026-04-30","meals":[{"name":"Breakfast","items":[{"name":"Eggs","calories":155,"protein":13,"carbs":1,"fats":11},{"name":"Toast","calories":80,"protein":3,"carbs":14,"fats":1}]},{"name":"Lunch","items":[{"name":"Salmon","calories":300,"protein":35,"carbs":0,"fats":18},{"name":"Quinoa","calories":220,"protein":8,"carbs":39,"fats":3}]}],"supplements":[]},{"date":"2026-05-01","meals":[{"name":"Breakfast","items":[{"name":"Greek Yogurt","calories":150,"protein":20,"carbs":8,"fats":2},{"name":"Berries","calories":80,"protein":1,"carbs":18,"fats":0}]},{"name":"Lunch","items":[{"name":"Turkey","calories":280,"protein":50,"carbs":0,"fats":6},{"name":"Sweet Potato","calories":200,"protein":4,"carbs":45,"fats":0}]}],"supplements":[]}]}\n'
+            '{"workout_plan":[{"workout_name":"Day 1 Upper","goal":"muscle_gain","date":"2026-04-29",'
+            '"exercises":[{"name":"Push-ups","muscle_group":"chest","sets":3,"reps":10,"weight":0},'
+            '{"name":"Dumbbell Rows","muscle_group":"back","sets":3,"reps":10,"weight":0}]},'
+            '{"workout_name":"Day 2 Lower","goal":"muscle_gain","date":"2026-04-30","exercises":['
+            '{"name":"Squats","muscle_group":"legs","sets":3,"reps":10,"weight":0},'
+            '{"name":"Deadlifts","muscle_group":"back","sets":3,"reps":8,"weight":0}]},'
+            '{"workout_name":"Day 3 Full Body","goal":"muscle_gain","date":"2026-05-01","exercises":['
+            '{"name":"Bench Press","muscle_group":"chest","sets":3,"reps":8,"weight":0},'
+            '{"name":"Pull-ups","muscle_group":"back","sets":3,"reps":5,"weight":0}]}],'
+            '"nutrition_plan":[{"date":"2026-04-29","meals":[{"name":"Breakfast","items":['
+            '{"name":"Oatmeal","calories":200,"protein":8,"carbs":35,"fats":4},'
+            '{"name":"Milk","calories":100,"protein":8,"carbs":12,"fats":2},'
+            '{"name":"Banana","calories":90,"protein":1,"carbs":23,"fats":0}]},'
+            '{"name":"Lunch","items":[{"name":"Chicken","calories":350,"protein":50,"carbs":0,'
+            '"fats":15},{"name":"Rice","calories":250,"protein":5,"carbs":55,"fats":1}]}]},'
+            '"supplements":[]},{"date":"2026-04-30","meals":[{"name":"Breakfast","items":['
+            '{"name":"Eggs","calories":155,"protein":13,"carbs":1,"fats":11},'
+            '{"name":"Toast","calories":80,"protein":3,"carbs":14,"fats":1}]},'
+            '{"name":"Lunch","items":[{"name":"Salmon","calories":300,"protein":35,"carbs":0,'
+            '"fats":18},{"name":"Quinoa","calories":220,"protein":8,"carbs":39,"fats":3}]}]},'
+            '"supplements":[]},{"date":"2026-05-01","meals":[{"name":"Breakfast","items":['
+            '{"name":"Greek Yogurt","calories":150,"protein":20,"carbs":8,"fats":2},'
+            '{"name":"Berries","calories":80,"protein":1,"carbs":18,"fats":0}]},'
+            '{"name":"Lunch","items":[{"name":"Turkey","calories":280,"protein":50,"carbs":0,'
+            '"fats":6},{"name":"Sweet Potato","calories":200,"protein":4,"carbs":45,"fats":0}]}]},'
+            '"supplements":[]}]}\n'
             '</planner_payload>\n'
-            '15. Only include <planner_payload> when responding to user request for a concrete plan. Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", "plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from the payload. Response description must match payload exactly.\n'
+            '15. Only include <planner_payload> when responding to user request for a concrete plan. '
+            'Never include markdown code fences. Omit null/empty sections. CRITICAL: Each meal must '
+            'have individual food items (not combined names like "Oatmeal, milk, banana"—must be 3 '
+            'items). MANDATORY: If user asks for multiple days (e.g., "7-day plan", "weekly plan", '
+            '"plan for the week"), ALL days MUST be in the payload as arrays. NEVER omit days from '
+            'the payload. Response description must match payload exactly.\n'
             'App context:\n'
             '- Nutrition page tracks calories, protein, carbs, fats, and supplement entries.\n'
             '- Train page tracks workouts, exercises, sets, reps, and completion state.\n'
             '- Home dashboard tracks daily progress toward calorie and workout goals.\n'
             '- Profile editing opens from the top-right profile bubble menu item "Profile".\n'
-            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" (tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
+            '- Goal changes happen in section "Fitness Profile" under "Primary Fitness Goal" '
+            '(tap/select an existing option such as "Weight Loss"), then submit "Save & Continue".\n'
             '- Calorie target changes use field "Daily Calorie Goal (kcal)" on the same page.\n\n'
             '- Bio is in section "Additional Information" with field label "About You" (textarea).\n'
             '- Profile form fields are directly editable on the page; there is no separate edit/pencil step.\n\n'
@@ -1042,7 +1065,7 @@ def api_chat(request):
         if planner_action:
             response_payload['planner_action'] = planner_action
         return JsonResponse(response_payload)
-    except Exception as e:
+    except Exception:
         return JsonResponse({"error": "Failed to process chat request"}, status=502)
 
 
@@ -1117,7 +1140,7 @@ def api_chat_stream(request):
 
             yield f"data: {json.dumps(metadata)}\n\n"
 
-        except Exception as e:
+        except Exception:
             error_data = {"type": "error", "error": "Failed to process stream"}
             yield f"data: {json.dumps(error_data)}\n\n"
 
@@ -1307,10 +1330,9 @@ def api_chat_history_detail(request, conversation_id):
     }
     return JsonResponse(payload)
 
-from django.core.mail import send_mail
-from .models import EmailVerification
 
 logger = logging.getLogger(__name__)
+
 
 @ratelimit(key='ip', rate='10/h', method='POST', block=True)
 def user_get_started(request):
@@ -1333,16 +1355,24 @@ def user_get_started(request):
                         verify_url = request.build_absolute_uri(f'/verify_email/{verification.token}/')
                         logger.info(f'Verify URL: {verify_url}')
 
-                        html_message = f"""
-                        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                            <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                            <p style="color:#fff;font-size:1.1rem;text-align:center;">Welcome! Click the button below to verify your email and activate your account.</p>
-                            <div style="text-align:center;margin:32px 0;">
-                                <a href="{verify_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Verify My Email</a>
-                            </div>
-                            <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-                        </div>
-                        """
+                        html_message = (
+                            '<div style="font-family:Arial,sans-serif;max-width:480px;'
+                            'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
+                            '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
+                            '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
+                            'Welcome! Click the button below to verify your email and activate'
+                            ' your account.</p>'
+                            '<div style="text-align:center;margin:32px 0;">'
+                            f'<a href="{verify_url}" style="display:inline-block;'
+                            'padding:16px 48px;background:#F67D26;color:#fff;'
+                            'font-size:1.1rem;font-weight:600;border-radius:12px;'
+                            'text-decoration:none;">Verify My Email</a>'
+                            '</div>'
+                            '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;'
+                            'text-align:center;">This link expires in 24 hours. If you'
+                            " didn't create an account, you can ignore this email.</p>"
+                            '</div>'
+                        )
 
                         logger.info(f'Sending verification email to {user.email} from {settings.DEFAULT_FROM_EMAIL}')
                         result = send_mail(
@@ -1362,7 +1392,7 @@ def user_get_started(request):
                         verification = EmailVerification.objects.create(user=user, verified=True)
                         logger.info(f'Email verification disabled - user auto-activated: {user.username}')
                         messages.success(request, 'Account created successfully! You can now log in.')
-            except Exception as e:
+            except Exception:
                 logger.exception(f'Failed during signup for {form.cleaned_data.get("email")}')
                 form.add_error(None, 'We could not create your account right now.')
                 return render(request, 'core/user_get_started.html', {'form': form})
@@ -1610,16 +1640,23 @@ def forgot_password(request):
                     reset_url = request.build_absolute_uri(f'/reset_password/{reset.token}/')
 
                     # Send reset email
-                    html_message = f"""
-                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#111;border-radius:16px;">
-                        <h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>
-                        <p style="color:#fff;font-size:1.1rem;text-align:center;">Click the button below to reset your password.</p>
-                        <div style="text-align:center;margin:32px 0;">
-                            <a href="{reset_url}" style="display:inline-block;padding:16px 48px;background:#F67D26;color:#fff;font-size:1.1rem;font-weight:600;border-radius:12px;text-decoration:none;">Reset Password</a>
-                        </div>
-                        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;text-align:center;">This link expires in 24 hours. If you didn't request a password reset, you can ignore this email.</p>
-                    </div>
-                    """
+                    html_message = (
+                        '<div style="font-family:Arial,sans-serif;max-width:480px;'
+                        'margin:0 auto;padding:32px;background:#111;border-radius:16px;">'
+                        '<h1 style="color:#F67D26;text-align:center;">Spotter.ai</h1>'
+                        '<p style="color:#fff;font-size:1.1rem;text-align:center;">'
+                        'Click the button below to reset your password.</p>'
+                        '<div style="text-align:center;margin:32px 0;">'
+                        f'<a href="{reset_url}" style="display:inline-block;'
+                        'padding:16px 48px;background:#F67D26;color:#fff;'
+                        'font-size:1.1rem;font-weight:600;border-radius:12px;'
+                        'text-decoration:none;">Reset Password</a>'
+                        '</div>'
+                        '<p style="color:rgba(255,255,255,0.5);font-size:0.85rem;'
+                        'text-align:center;">This link expires in 24 hours. If you'
+                        " didn't request a password reset, you can ignore this email.</p>"
+                        '</div>'
+                    )
 
                     send_mail(
                         'Reset your Spotter.ai password',
@@ -1701,7 +1738,7 @@ def home_dash(request):
         profile = request.user.profile
         if profile.social_login_user and not profile.onboarding_completed:
             return redirect('get_started_profile')
-    except:
+    except Exception:
         pass
 
     # Check for discard action from profile
@@ -2045,7 +2082,10 @@ def edit_exercise(request):
         return redirect(f"{reverse('train_page')}?date={date_param}" if date_param else reverse('train_page'))
 
     was_completed = exercise.completed
-    progress_before = compute_achievements_challenges(request.user) if not was_completed and status == 'completed' else None
+    if not was_completed and status == 'completed':
+        progress_before = compute_achievements_challenges(request.user)
+    else:
+        progress_before = None
 
     exercise.name = exercise_name
     exercise.muscle_group = muscle_group
@@ -2313,8 +2353,6 @@ def add_food_item_ajax(request):
 
     if meal.items.count() >= 30:
         return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
-    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
-    serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
 
     group_id = request.POST.get('group_id')
     group = None
@@ -3059,7 +3097,7 @@ def save_food_to_database(request):
                     return JsonResponse({'error': 'Cannot modify system food items'}, status=403)
             except FoodItem.DoesNotExist:
                 return JsonResponse({'error': 'Food item not found'}, status=404)
-        
+
         food_item.name = name
         food_item.calories = calories
         food_item.protein = protein
@@ -3391,8 +3429,6 @@ def save_set_progress(request):
         return JsonResponse({'success': False, 'error': 'set_data must be a non-empty list'}, status=400)
 
     try:
-        from django.db.models import Q
-
         saved_count = 0
         for item in set_data:
             exercise_id = item.get('exercise_id')

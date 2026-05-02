@@ -50,11 +50,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 def _is_test_or_ci():
     """Check if running in test mode or CI environment."""
     return (
-        'test' in sys.argv or 
-        'pytest' in sys.argv or 
-        os.getenv('CI') == 'true' or 
-        os.getenv('GITHUB_ACTIONS') == 'true'
+        'test' in sys.argv
+        or 'pytest' in sys.argv
+        or os.getenv('CI') == 'true'
+        or os.getenv('GITHUB_ACTIONS') == 'true'
     )
+
 
 if _is_test_or_ci():
     # Use a secure random key for testing/CI (generated via get_random_secret_key)
@@ -64,7 +65,9 @@ else:
     if not SECRET_KEY:
         raise RuntimeError(
             "DJANGO_SECRET_KEY environment variable must be set for production. "
-            "Generate one with: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+            "Generate one with: python -c "
+            "\"from django.core.management.utils import get_random_secret_key; "
+            "print(get_random_secret_key())\""
         )
     if 'insecure' in SECRET_KEY.lower():
         raise RuntimeError("DJANGO_SECRET_KEY must be a secure, random value. Never use 'insecure' keys.")
@@ -217,7 +220,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', True)
     SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', True)
-    
+
     # Additional security headers
     SECURE_CONTENT_SECURITY_POLICY = {
         "default-src": ("'self'",),
