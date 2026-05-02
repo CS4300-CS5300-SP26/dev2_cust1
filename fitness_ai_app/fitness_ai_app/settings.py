@@ -274,3 +274,7 @@ EMAIL_VERIFICATION_ENABLED = env_bool('EMAIL_VERIFICATION_ENABLED', False)
 # Disable rate limiting when running tests (to avoid test pollution from shared cache)
 TESTING = 'test' in sys.argv
 RATELIMIT_ENABLE = not TESTING
+# When using reverse proxy with Unix sockets, REMOTE_ADDR is empty.
+# Configure django-ratelimit to use X-Forwarded-For or X-Real-IP instead.
+# X-Forwarded-For is preferred (standard for reverse proxies); falls back to X-Real-IP if needed.
+RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'
