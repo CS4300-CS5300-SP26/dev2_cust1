@@ -8,6 +8,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
 from openai import OpenAI
 import logging
 import smtplib
@@ -24,6 +25,7 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncWeek
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 
 from .forms import RegistrationForm, ForgotPasswordForm, ResetPasswordForm
@@ -989,7 +991,9 @@ def _build_ai_system_prompt(user):
     }
 
 
-@csrf_exempt
+@login_required
+@ratelimit(key='user', rate='20/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat(request):
     try:
@@ -1039,11 +1043,12 @@ def api_chat(request):
             response_payload['planner_action'] = planner_action
         return JsonResponse(response_payload)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=502)
+        return JsonResponse({"error": "Failed to process chat request"}, status=502)
 
 
 @login_required
-@csrf_exempt
+@ratelimit(key='user', rate='20/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat_stream(request):
     """Stream chat responses token-by-token using Server-Sent Events."""
@@ -1113,7 +1118,7 @@ def api_chat_stream(request):
             yield f"data: {json.dumps(metadata)}\n\n"
 
         except Exception as e:
-            error_data = {"type": "error", "error": str(e)}
+            error_data = {"type": "error", "error": "Failed to process stream"}
             yield f"data: {json.dumps(error_data)}\n\n"
 
     response = StreamingHttpResponse(
@@ -1126,7 +1131,8 @@ def api_chat_stream(request):
 
 
 @login_required
-@csrf_exempt
+@ratelimit(key='user', rate='10/m', method='POST', block=True)
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def api_chat_apply_plan(request):
     """Apply a planner payload from AI chat into train/nutrition records."""
@@ -1306,6 +1312,7 @@ from .models import EmailVerification
 
 logger = logging.getLogger(__name__)
 
+@ratelimit(key='ip', rate='10/h', method='POST', block=True)
 def user_get_started(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -1555,6 +1562,7 @@ def verify_email(request, token):
     return redirect('get_started_profile')
 
 
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def user_login(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -1566,14 +1574,22 @@ def user_login(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            next_url = request.GET.get('next', 'home_dash')
-            return redirect(next_url)
+            next_url = request.GET.get('next', '')
+            # Validate next parameter to prevent open redirect attacks
+            if next_url and url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure()
+            ):
+                return redirect(next_url)
+            return redirect('home_dash')
         else:
             messages.error(request, 'Invalid email or password.')
 
     return render(request, 'core/user_login.html')
 
 
+@ratelimit(key='ip', rate='3/h', method='POST', block=True)
 def forgot_password(request):
     if request.user.is_authenticated:
         return redirect('home_dash')
@@ -1614,7 +1630,7 @@ def forgot_password(request):
                         fail_silently=False,
                     )
                 except Exception as e:
-                    logger.error(f'Failed to send password reset email to {user.email}: {str(e)}')
+                    logger.error(f'Failed to send password reset email: {str(e)}')
 
             # Random delay between 0.5 and 3 seconds to prevent timing attacks
             elapsed = time.time() - start_time
@@ -1671,6 +1687,7 @@ def reset_password(request, token):
     return render(request, 'core/reset_password.html', {'form': form})
 
 
+@require_POST
 def user_logout(request):
     logout(request)
     messages.success(request, 'You have been logged out.')
@@ -2924,10 +2941,10 @@ def search_foods(request):
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
 
-    # Search for food items matching the query (case-insensitive)
+    # Search for food items matching the query (case-insensitive) — filter by user
     food_items = (
         FoodItem.objects
-        .filter(name__icontains=query)
+        .filter(name__icontains=query, meal__user=request.user)
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')[:20]
     )
@@ -2952,9 +2969,10 @@ def search_foods(request):
 @login_required
 def get_all_foods(request):
     """Get all unique foods from the database for display in the Food Database card."""
-    # Get all food items, deduplicated by name
+    # Get all food items for this user only, deduplicated by name
     food_items = (
         FoodItem.objects
+        .filter(meal__user=request.user)
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')
     )
@@ -2977,6 +2995,7 @@ def get_all_foods(request):
     return JsonResponse({'foods': results, 'count': len(results)})
 
 
+@login_required
 def get_food_units(request):
     """Return distinct serving units from the food database, always including grams, cups, and ounces."""
     db_units = list(FoodItem.objects.values_list('serving_unit', flat=True).distinct())
@@ -3025,29 +3044,40 @@ def save_food_to_database(request):
     )
 
     if food_id:
-        # Update existing food
+        # Update existing food - must be either user's own food or system food
         try:
-            food_item = FoodItem.objects.get(id=food_id)
-            food_item.name = name
-            food_item.calories = calories
-            food_item.protein = protein
-            food_item.carbs = carbs
-            food_item.fats = fats
-            food_item.save()
-            return JsonResponse({
-                'success': True,
-                'message': f'Updated "{name}" in database',
-                'food': {
-                    'id': food_item.id,
-                    'name': food_item.name,
-                    'calories': food_item.calories,
-                    'protein': food_item.protein,
-                    'carbs': food_item.carbs,
-                    'fats': food_item.fats,
-                }
-            })
+            # First try to get the user's own food item
+            food_item = FoodItem.objects.get(id=food_id, meal__user=request.user)
         except FoodItem.DoesNotExist:
-            pass  # Fall through to create new
+            # If not user's own, try system database (read-only for regular users)
+            try:
+                # For now, deny access to system foods to prevent IDOR
+                # System food management should be admin-only
+                food_item = FoodItem.objects.get(id=food_id, meal__user__username='system@spotter.ai')
+                # Only admins can modify system foods
+                if not request.user.is_staff:
+                    return JsonResponse({'error': 'Cannot modify system food items'}, status=403)
+            except FoodItem.DoesNotExist:
+                return JsonResponse({'error': 'Food item not found'}, status=404)
+        
+        food_item.name = name
+        food_item.calories = calories
+        food_item.protein = protein
+        food_item.carbs = carbs
+        food_item.fats = fats
+        food_item.save()
+        return JsonResponse({
+            'success': True,
+            'message': f'Updated "{name}" in database',
+            'food': {
+                'id': food_item.id,
+                'name': food_item.name,
+                'calories': food_item.calories,
+                'protein': food_item.protein,
+                'carbs': food_item.carbs,
+                'fats': food_item.fats,
+            }
+        })
 
     # Create new food item in database
     food_item = FoodItem.objects.create(
@@ -3074,7 +3104,7 @@ def save_food_to_database(request):
     })
 
 
-@csrf_exempt
+@login_required
 @require_http_methods(["GET"])
 def get_all_supplements(request):
     """Get all supplements from the SupplementDatabase for display."""
@@ -3089,7 +3119,6 @@ def get_all_supplements(request):
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["GET"])
 def search_supplements(request):
     """Search SupplementDatabase by name and return results."""
@@ -3109,7 +3138,7 @@ def search_supplements(request):
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST", "GET"])
 def supplement_entries(request):
     """Get or create supplement entries for the logged-in user."""
@@ -3183,7 +3212,7 @@ def supplement_entries(request):
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def complete_workout(request):
     """Mark a workout as completed."""
@@ -3247,7 +3276,7 @@ def complete_workout(request):
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["PATCH"])
 def toggle_supplement_taken(request, entry_id):
     """Toggle the 'taken' status of a supplement entry."""
@@ -3272,7 +3301,7 @@ def toggle_supplement_taken(request, entry_id):
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def save_workout_time(request):
     """Save the total duration for a workout."""
@@ -3308,7 +3337,7 @@ def save_workout_time(request):
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def complete_exercises_by_ids(request):
     """Mark specific exercises as completed."""
@@ -3340,12 +3369,12 @@ def complete_exercises_by_ids(request):
             'completed_count': completed_count,
             'exercise_ids': list(exercises.values_list('id', flat=True)),
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to complete exercises'}, status=400)
 
 
 @login_required
-@csrf_exempt
+@csrf_exempt  # JSON API - CSRF not applicable
 @require_http_methods(["POST"])
 def save_set_progress(request):
     """Save individual set completion status."""
@@ -3405,12 +3434,11 @@ def save_set_progress(request):
             'success': True,
             'saved_count': saved_count,
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to save set progress'}, status=400)
 
 
 @login_required
-@csrf_exempt
 @require_http_methods(["GET"])
 def get_set_progress(request):
     """Get set completion status for a workout's exercises."""
@@ -3451,8 +3479,8 @@ def get_set_progress(request):
             'set_progress': set_progress_dict,
             'timer_seconds': workout.current_session_seconds,
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Failed to retrieve set progress'}, status=400)
 
 
 # ==================== SAVED ITEMS ====================

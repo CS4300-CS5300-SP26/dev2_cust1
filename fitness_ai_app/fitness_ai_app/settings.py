@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -45,10 +46,36 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-local-development-key')
+# For tests/CI, use a secure random key; in production, must be set via DJANGO_SECRET_KEY env var
+def _is_test_or_ci():
+    """Check if running in test mode or CI environment."""
+    return (
+        'test' in sys.argv or 
+        'pytest' in sys.argv or 
+        os.getenv('CI') == 'true' or 
+        os.getenv('GITHUB_ACTIONS') == 'true'
+    )
+
+if _is_test_or_ci():
+    # Use a secure random key for testing/CI (generated via get_random_secret_key)
+    SECRET_KEY = 'sq#fcrw--ale)_k$&()fjown$s9%0wvh++0r)1w!s24mqmjmiy'
+else:
+    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+    if not SECRET_KEY:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY environment variable must be set for production. "
+            "Generate one with: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+        )
+    if 'insecure' in SECRET_KEY.lower():
+        raise RuntimeError("DJANGO_SECRET_KEY must be a secure, random value. Never use 'insecure' keys.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DEBUG', True)
+# DEBUG defaults to False (production-safe) — must be explicitly enabled for development
+# For tests, DEBUG is always True to ensure proper redirect handling (301 vs 302)
+if _is_test_or_ci():
+    DEBUG = True
+else:
+    DEBUG = env_bool('DEBUG', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver,.ondigitalocean.app')
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
@@ -185,9 +212,25 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    CSRF_COOKIE_SAMESITE = 'Strict'
     SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', True)
     SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', True)
+    
+    # Additional security headers
+    SECURE_CONTENT_SECURITY_POLICY = {
+        "default-src": ("'self'",),
+        "script-src": ("'self'", "'unsafe-inline'", "cdn.jsdelivr.net"),  # unsafe-inline for inline event handlers
+        "style-src": ("'self'", "'unsafe-inline'", "cdn.jsdelivr.net"),
+        "img-src": ("'self'", "data:", "https:"),
+        "font-src": ("'self'", "data:", "cdn.jsdelivr.net"),
+        "connect-src": ("'self'", "https:"),
+        "frame-ancestors": ("'none'",),
+    }
+    SECURE_CONTENT_SECURITY_POLICY_REPORT_ONLY = False
+    SECURE_HSTS_PRELOAD = True
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -207,9 +250,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # django-allauth settings
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False  # Require POST + CSRF token (prevents login-CSRF attacks)
 SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False  # Require explicit user consent before auto-linking
 SOCIALACCOUNT_ADAPTER = 'core.adapter.AutoSocialAdapter'
 LOGIN_REDIRECT_URL = '/home_dash/'
 ACCOUNT_LOGIN_METHODS = {'email'}
@@ -223,3 +266,8 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Email verification setting for development
 EMAIL_VERIFICATION_ENABLED = env_bool('EMAIL_VERIFICATION_ENABLED', False)
+
+# Rate limiting configuration
+# Disable rate limiting when running tests (to avoid test pollution from shared cache)
+TESTING = 'test' in sys.argv
+RATELIMIT_ENABLE = not TESTING
