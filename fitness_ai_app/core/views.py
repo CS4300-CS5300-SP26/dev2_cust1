@@ -2316,10 +2316,11 @@ def add_food_item_ajax(request):
     except ValueError:
         protein = carbs = fats = 0
 
+    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
+    serving_unit = (request.POST.get('serving_unit', 'serving') or 'serving').strip()
+
     if meal.items.count() >= 30:
         return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
-    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
-    serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
 
     group_id = request.POST.get('group_id')
     group = None
@@ -2340,6 +2341,8 @@ def add_food_item_ajax(request):
         'protein': item.protein,
         'carbs': item.carbs,
         'fats': item.fats,
+        'serving_size': str(item.serving_size),
+        'serving_unit': item.serving_unit,
     })
 
 
