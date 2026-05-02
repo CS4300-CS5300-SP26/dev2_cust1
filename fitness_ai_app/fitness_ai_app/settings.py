@@ -276,5 +276,6 @@ TESTING = 'test' in sys.argv
 RATELIMIT_ENABLE = not TESTING
 # When using reverse proxy with Unix sockets, REMOTE_ADDR is empty.
 # Configure django-ratelimit to use X-Forwarded-For or X-Real-IP instead.
-# X-Forwarded-For is preferred (standard for reverse proxies); falls back to X-Real-IP if needed.
-RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'
+# Only set this in production where reverse proxy is expected; in dev/tests use default REMOTE_ADDR
+if not DEBUG and not TESTING:
+    RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'
