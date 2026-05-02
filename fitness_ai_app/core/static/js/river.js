@@ -115,6 +115,12 @@
   let riverHeight = 700;
   let generatorTimeout = null;
 
+  // Per-event comment drafts (preserved across DOM re-renders)
+  var commentDrafts = {};
+
+  // State fingerprint for mobile popup (avoids wiping input on every tick)
+  var mobilePopupState = {};
+
   // Hold tracking (hover-pause)
   const holdAccum = new Map();
   let currentHoldId = null;
@@ -125,6 +131,17 @@
   let channelEl = null;
   let mobileFieldEl = null;
   let mobilePopupEl = null;
+
+  // Real-user identity (read from data-username on the sidebar root element)
+  var currentUsername = '';
+
+  // Track DB ids we've already pushed so polls don't create duplicates
+  var seenDbIds = new Set();
+
+  function getCsrfToken() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HELPERS
@@ -406,6 +423,7 @@
     var durationMs = dur[0] + Math.random() * (dur[1] - dur[0]);
     var spawnDelay = opts.spawnAfterMs != null ? opts.spawnAfterMs : Math.random() * RIVER_TIMING.flowStartDelayMs;
     var id = nextId++;
+    var dbId = opts.dbId || null;
     var rarity = opts.rarity || pickRarity(opts.eventType);
     var classInteractive = opts.classInteractive != null ? opts.classInteractive : pickClassInteractive(rarity);
     var cpe = RIVER_TIMING.commentsPerEvent;
@@ -414,6 +432,7 @@
 
     activeEvents.push({
       id: id,
+      dbId: dbId,
       eventType: opts.eventType,
       actorUsername: opts.actorUsername,
       actorAvatarUrl: opts.actorAvatarUrl,
@@ -425,10 +444,11 @@
       actionUrl: opts.actionUrl || '',
       rarity: rarity,
       classInteractive: classInteractive,
-      sparkCount: Math.floor(Math.random() * 12),
-      sparkedByMe: false,
+      sparkCount: opts.sparkCount != null ? opts.sparkCount : Math.floor(Math.random() * 12),
+      sparkedByMe: opts.sparkedByMe || false,
       viewedByMe: false,
-      comments: opts.comments || generateMockComments(commentCount),
+      // Real events start with server-provided comments (or empty); mocks get fake ones
+      comments: opts.comments || (dbId ? [] : generateMockComments(commentCount)),
       createdAt: now,
       expiresAt: now + EVENT_LIFETIME[rarity],
       flowStartAt: now + spawnDelay,
@@ -452,20 +472,54 @@
   function sparkEvent(id) {
     var ev = activeEvents.find(function (e) { return e.id === id; });
     if (!ev) return;
+    // Optimistic toggle
     if (ev.sparkedByMe) { ev.sparkedByMe = false; ev.sparkCount = Math.max(0, ev.sparkCount - 1); }
     else { ev.sparkedByMe = true; ev.sparkCount += 1; }
+
+    if (ev.dbId) {
+      fetch('/api/river/spark/' + ev.dbId + '/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          ev.sparkCount = data.spark_count;
+          ev.sparkedByMe = data.sparked;
+        })
+        .catch(function () { /* silently ignore */ });
+    }
   }
 
   function addComment(id, text) {
     var ev = activeEvents.find(function (e) { return e.id === id; });
     if (!ev || !text.trim()) return;
-    ev.comments.push({
-      username: 'You',
-      avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=You',
+    delete commentDrafts[id];
+    var displayName = currentUsername || 'You';
+    var optimistic = {
+      username: displayName,
+      avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(displayName),
       tier: 'bronze',
       text: text.trim(),
       timestamp: Date.now(),
-    });
+    };
+    ev.comments.push(optimistic);
+
+    if (ev.dbId) {
+      fetch('/api/river/comment/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ event_id: ev.dbId, text: text.trim() }),
+      }).catch(function () {
+        // Roll back the optimistic comment on failure
+        var idx = ev.comments.indexOf(optimistic);
+        if (idx !== -1) ev.comments.splice(idx, 1);
+      });
+    }
   }
 
   function pickWeightedTemplate() {
@@ -575,13 +629,89 @@
   }
 
   function startMockGenerator() {
-    if (generatorTimeout) return;
-    seedEvents();
-    scheduleGeneratorTick();
+    // Mock events disabled — river is driven by real user activity via /api/river/feed/
+    // if (generatorTimeout) return;
+    // seedEvents();
+    // scheduleGeneratorTick();
   }
 
   function stopMockGenerator() {
     if (generatorTimeout) { clearTimeout(generatorTimeout); generatorTimeout = null; }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REAL EVENT POLLING — pulls from /api/river/feed/ every 30 s
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Start looking back 5 minutes so the first load shows very recent activity
+  // without flooding the river with a full 24-hour backlog.
+  var lastRealEventMs = Date.now() - (5 * 60 * 1000);
+  var realPollInterval = null;
+
+  function rarityToTier(rarity) {
+    var map = { common: 'bronze', uncommon: 'silver', rare: 'gold', epic: 'platinum', legendary: 'platinum', mythic: 'diamond' };
+    return map[rarity] || 'bronze';
+  }
+
+  function fetchRealEvents() {
+    // Always look back at least 5 min so comments on existing events stay fresh
+    var since = Math.min(lastRealEventMs, Date.now() - 5 * 60 * 1000);
+    fetch('/api/river/feed/?since=' + since, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.events)) return;
+        var maxMs = lastRealEventMs;
+        // Events arrive newest-first; reverse so older ones flow in first
+        var evs = data.events.slice().reverse();
+        evs.forEach(function (ev) {
+          if (ev.created_at_ms > maxMs) maxMs = ev.created_at_ms;
+
+          // Map server comments to the local comment shape
+          var serverComments = (ev.comments || []).map(function (c) {
+            return {
+              username: c.username,
+              avatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(c.username),
+              tier: 'bronze',
+              text: c.text,
+              timestamp: c.created_at_ms,
+            };
+          });
+
+          // If already in the active list, refresh its comments and spark count
+          var existing = activeEvents.find(function (e) { return e.dbId === ev.id; });
+          if (existing) {
+            existing.comments = serverComments;
+            existing.sparkCount = ev.spark_count != null ? ev.spark_count : existing.sparkCount;
+            existing.sparkedByMe = ev.sparked_by_me != null ? ev.sparked_by_me : existing.sparkedByMe;
+            return;
+          }
+
+          // Skip events we've already pushed (they expired and were removed)
+          if (seenDbIds.has(ev.id)) return;
+          seenDbIds.add(ev.id);
+
+          pushRiverEvent({
+            dbId: ev.id,
+            eventType: ev.event_type,
+            actorUsername: ev.username,
+            actorAvatarUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=' + encodeURIComponent(ev.username),
+            actorTier: rarityToTier(ev.rarity),
+            title: ev.title,
+            detail: ev.detail,
+            rarity: ev.rarity,
+            comments: serverComments,
+            sparkCount: ev.spark_count || 0,
+            sparkedByMe: ev.sparked_by_me || false,
+          });
+        });
+        lastRealEventMs = maxMs;
+      })
+      .catch(function () { /* silently ignore network errors */ });
+  }
+
+  function startRealEventPoll() {
+    fetchRealEvents();
+    realPollInterval = setInterval(fetchRealEvents, 5000);
   }
 
   function setSpeed(speed) {
@@ -737,24 +867,26 @@
       '</div>';
 
     var commentsHtml = '';
-    if (ev.comments.length > 0) {
+    {
       var expanded = (commentsExpandedId === ev.id);
-      var shown = expanded ? ev.comments : ev.comments.slice(-2);
       commentsHtml = '<div class="pill-comments' + (expanded ? ' pill-comments-expanded' : '') + '" data-comments-zone="' + ev.id + '">';
-      commentsHtml += '<div class="pill-comments-header"><span class="pill-comments-label">' + ev.comments.length + ' comments</span></div>';
-      commentsHtml += '<div class="pill-comments-scroll">';
-      for (var i = 0; i < shown.length; i++) {
-        var c = shown[i];
-        commentsHtml += '<div class="pill-comment">' +
-          '<img class="pill-comment-avatar" src="' + esc(c.avatarUrl) + '" alt="" loading="lazy">' +
-          '<div class="pill-comment-body">' +
-            '<span class="pill-comment-user">' + esc(c.username) + '</span>' +
-            '<span class="pill-comment-text">' + esc(c.text) + '</span>' +
-          '</div>' +
-          '<span class="pill-comment-time">' + timeAgo(c.timestamp) + '</span>' +
-        '</div>';
+      if (ev.comments.length > 0) {
+        var shown = expanded ? ev.comments : ev.comments.slice(-2);
+        commentsHtml += '<div class="pill-comments-header" data-comments-toggle="' + ev.id + '" style="cursor:pointer;"><span class="pill-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span></div>';
+        commentsHtml += '<div class="pill-comments-scroll">';
+        for (var i = 0; i < shown.length; i++) {
+          var c = shown[i];
+          commentsHtml += '<div class="pill-comment">' +
+            '<img class="pill-comment-avatar" src="' + esc(c.avatarUrl) + '" alt="" loading="lazy">' +
+            '<div class="pill-comment-body">' +
+              '<span class="pill-comment-user">' + esc(c.username) + '</span>' +
+              '<span class="pill-comment-text">' + esc(c.text) + '</span>' +
+            '</div>' +
+            '<span class="pill-comment-time">' + timeAgo(c.timestamp) + '</span>' +
+          '</div>';
+        }
+        commentsHtml += '</div>';
       }
-      commentsHtml += '</div>';
       commentsHtml += '<div class="pill-comment-input">' +
         '<input class="pill-comment-field" data-comment-input="' + ev.id + '" placeholder="Add a comment…" maxlength="100">' +
         '<button class="pill-comment-send" data-comment-send="' + ev.id + '">' +
@@ -850,6 +982,11 @@
 
         html += '</div>';
         trackEl.innerHTML = html;
+        // Restore any in-progress comment draft so typing isn't lost on re-render
+        if (commentDrafts[ev.id]) {
+          var draftInput = trackEl.querySelector('[data-comment-input="' + ev.id + '"]');
+          if (draftInput) draftInput.value = commentDrafts[ev.id];
+        }
         trackEl._renderedId = ev.id;
         trackEl._renderedHovered = isHovered;
         trackEl._renderedExpandUp = expandUp;
@@ -929,14 +1066,38 @@
   function renderMobilePopup() {
     var popup = document.getElementById('river-mobile-popup');
     if (!popup) return;
-    if (hoveredId == null) { popup.style.display = 'none'; return; }
+    if (hoveredId == null) {
+      popup.style.display = 'none';
+      mobilePopupState = {};
+      return;
+    }
     var ev = activeEvents.find(function (e) { return e.id === hoveredId; });
-    if (!ev) { popup.style.display = 'none'; return; }
+    if (!ev) {
+      popup.style.display = 'none';
+      mobilePopupState = {};
+      return;
+    }
 
-    var tc = tierColor(ev.actorTier); // kept for potential future use
     popup.style.display = 'block';
+
+    // Skip re-render when nothing meaningful changed — preserves input focus and draft text
+    var minuteBucket = Math.floor(nowMs / 60000);
+    var lastComment = ev.comments.length > 0 ? ev.comments[ev.comments.length - 1].text : '';
+    if (mobilePopupState.id === ev.id &&
+        mobilePopupState.sparkCount === ev.sparkCount &&
+        mobilePopupState.sparkedByMe === ev.sparkedByMe &&
+        mobilePopupState.commentCount === ev.comments.length &&
+        mobilePopupState.lastComment === lastComment &&
+        mobilePopupState.minuteBucket === minuteBucket) {
+      return;
+    }
+    mobilePopupState = {
+      id: ev.id, sparkCount: ev.sparkCount, sparkedByMe: ev.sparkedByMe,
+      commentCount: ev.comments.length, lastComment: lastComment, minuteBucket: minuteBucket,
+    };
+
     popup.className = 'river-mobile-popup';
-    popup.style.cssText += ';border-color:' + rarityBorder(ev) + ';';
+    popup.style.borderColor = rarityBorder(ev);
 
     var html = '<div class="mobile-popup-header">' +
       '<div class="mobile-popup-avatar"><img src="' + esc(ev.actorAvatarUrl) + '" alt=""></div>' +
@@ -952,8 +1113,15 @@
     '<div class="mobile-popup-action">' + esc(ev.title) + '</div>' +
     (ev.detail ? '<div class="mobile-popup-detail">' + esc(ev.detail) + '</div>' : '');
 
+    html += '<div class="mobile-popup-spark-row">' +
+      '<button class="mobile-popup-spark-btn' + (ev.sparkedByMe ? ' active' : '') + '" data-mobile-spark="' + ev.id + '">' +
+        '<svg viewBox="0 0 24 24" fill="' + (ev.sparkedByMe ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
+        '<span class="mobile-popup-spark-count">' + ev.sparkCount + '</span>' +
+      '</button>' +
+    '</div>';
+
     if (ev.comments.length > 0) {
-      html += '<div class="mobile-popup-comments"><span class="mobile-popup-comments-label">' + ev.comments.length + ' comments</span>';
+      html += '<div class="mobile-popup-comments"><span class="mobile-popup-comments-label">' + ev.comments.length + ' comment' + (ev.comments.length !== 1 ? 's' : '') + '</span>';
       var shown = ev.comments.slice(-3);
       for (var i = 0; i < shown.length; i++) {
         var c = shown[i];
@@ -966,7 +1134,18 @@
       html += '</div>';
     }
 
+    html += '<div class="mobile-popup-comment-input">' +
+      '<input class="mobile-popup-comment-field" data-mobile-comment-input="' + ev.id + '" placeholder="Add a comment…" maxlength="100">' +
+      '<button class="mobile-popup-comment-send" data-mobile-comment-send="' + ev.id + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>' +
+      '</button>' +
+    '</div>';
+
     popup.innerHTML = html;
+    if (commentDrafts['m' + ev.id]) {
+      var draftField = popup.querySelector('[data-mobile-comment-input]');
+      if (draftField) draftField.value = commentDrafts['m' + ev.id];
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1091,12 +1270,18 @@
         }
         return;
       }
-      var commentsZone = e.target.closest('[data-comments-zone]');
-      if (commentsZone) {
-        var cId = parseInt(commentsZone.dataset.commentsZone, 10);
+      // Only the comments header (data-comments-toggle) toggles expand — not the input row
+      var commentsToggle = e.target.closest('[data-comments-toggle]');
+      if (commentsToggle) {
+        var cId = parseInt(commentsToggle.dataset.commentsToggle, 10);
         commentsExpandedId = (commentsExpandedId === cId) ? null : cId;
         return;
       }
+    });
+
+    channelEl.addEventListener('input', function (e) {
+      var field = e.target.closest('[data-comment-input]');
+      if (field) commentDrafts[parseInt(field.dataset.commentInput, 10)] = field.value;
     });
 
     channelEl.addEventListener('keydown', function (e) {
@@ -1125,19 +1310,64 @@
           hoveredId = id;
           currentHoldId = id;
           currentHoldStart = Date.now();
+          mobilePopupState = {};
           renderMobilePopup();
         }
       }
     });
 
     document.addEventListener('click', function (e) {
-      if (hoveredId != null && !e.target.closest('.river-mobile-field') && !e.target.closest('.river-mobile-popup')) {
+      if (hoveredId != null && !e.target.closest('.river-mobile-field') && !e.target.closest('.river-mobile-popup') && !e.target.closest('.pill-track')) {
         hoveredId = null;
         currentHoldId = null;
         currentHoldStart = 0;
+        mobilePopupState = {};
         renderMobilePopup();
       }
     });
+
+    var popupEl = document.getElementById('river-mobile-popup');
+    if (popupEl) {
+      popupEl.addEventListener('click', function (e) {
+        var sparkBtn = e.target.closest('[data-mobile-spark]');
+        if (sparkBtn) {
+          sparkEvent(parseInt(sparkBtn.dataset.mobileSpark, 10));
+          mobilePopupState = {};
+          return;
+        }
+        var sendBtn = e.target.closest('[data-mobile-comment-send]');
+        if (sendBtn) {
+          var evId = parseInt(sendBtn.dataset.mobileCommentSend, 10);
+          var field = popupEl.querySelector('[data-mobile-comment-input]');
+          if (field && field.value.trim()) {
+            addComment(evId, field.value);
+            delete commentDrafts['m' + evId];
+            field.value = '';
+            mobilePopupState = {};
+          }
+          return;
+        }
+      });
+
+      popupEl.addEventListener('input', function (e) {
+        var field = e.target.closest('[data-mobile-comment-input]');
+        if (field) commentDrafts['m' + parseInt(field.dataset.mobileCommentInput, 10)] = field.value;
+      });
+
+      popupEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          var field = e.target.closest('[data-mobile-comment-input]');
+          if (field && field.value.trim()) {
+            e.preventDefault();
+            var evId = parseInt(field.dataset.mobileCommentInput, 10);
+            addComment(evId, field.value);
+            delete commentDrafts['m' + evId];
+            field.value = '';
+            mobilePopupState = {};
+          }
+        }
+      });
+    }
   }
 
   function setupDragHandle() {
@@ -1222,6 +1452,9 @@
     sidebarEl = document.getElementById('river-sidebar');
     if (!sidebarEl) return;
 
+    // Read the logged-in user's name for comment attribution
+    currentUsername = sidebarEl.dataset.username || '';
+
     sidebarEl.innerHTML = buildSidebarHTML();
     channelEl = document.getElementById('river-channel');
 
@@ -1246,6 +1479,7 @@
     setupDragHandle();
 
     startMockGenerator();
+    startRealEventPoll();
     startPositionLoop();
   }
 
