@@ -6,6 +6,8 @@ from datetime import date
 from behave import given, when, then
 from django.contrib.auth.models import User
 
+from datetime import date as date_cls
+
 from core.models import Meal, FoodItem, SavedFood, SavedMeal
 
 
@@ -46,6 +48,21 @@ def step_other_user_meal(context, name):
     )
 
 
+@given('the system food database contains "{food_name}"')
+def step_system_food_exists(context, food_name):
+    system_user, _ = User.objects.get_or_create(
+        username='system@spotter.ai',
+        defaults={'email': 'system@spotter.ai', 'is_active': False}
+    )
+    system_meal, _ = Meal.objects.get_or_create(
+        user=system_user, name='Food Database', date=date_cls(2000, 1, 1)
+    )
+    FoodItem.objects.get_or_create(
+        meal=system_meal, name=food_name,
+        defaults={'calories': 150, 'protein': 10, 'carbs': 15, 'fats': 5}
+    )
+
+
 # ── When steps ───────────────────────────────────────────────────────────────
 
 @when('I add a meal named "{name}" for date "{date_str}"')
@@ -82,6 +99,19 @@ def step_add_food_item(context, name, calories):
     })
 
 
+@when('I add a food item "{name}" with {calories:d} calories and {servings:d} servings of "{unit}" to that meal')
+def step_add_food_item_with_servings(context, name, calories, servings, unit):
+    context.response = context.test.client.post('/nutrition/add_food_item/', {
+        'meal_id': context.current_meal.id,
+        'food_name': name,
+        'food_calories': str(calories),
+        'serving_size': str(servings),
+        'serving_unit': unit,
+        'date': str(date.today()),
+    })
+    context.last_food_name = name
+
+
 @when('I try to add a food item "{name}" with "{calories}" calories to that meal')
 def step_try_add_food_item_invalid(context, name, calories):
     context.response = context.test.client.post('/nutrition/add_food_item/', {
@@ -108,6 +138,33 @@ def step_delete_food_item(context):
     })
 
 
+@when('I edit the food item with {servings:d} servings and {calories:d} calories')
+def step_edit_food_item(context, servings, calories):
+    item = context.current_food_item
+    context.response = context.test.client.post('/nutrition/add_food_item/', {
+        'meal_id': context.current_meal.id,
+        'item_id': item.id,
+        'food_name': item.name,
+        'food_calories': str(calories),
+        'protein': str(item.protein),
+        'carbs': str(item.carbs),
+        'fats': str(item.fats),
+        'serving_size': str(servings),
+        'serving_unit': item.serving_unit,
+        'date': str(date.today()),
+    })
+
+
+@when('I search foods for "{query}"')
+def step_search_foods(context, query):
+    context.response = context.test.client.get(f'/api/search_foods/?q={query}')
+
+
+@when('I fetch all foods')
+def step_fetch_all_foods(context):
+    context.response = context.test.client.get('/api/all_foods/')
+
+
 @when('I try to add a food item to the other user\'s meal')
 def step_add_to_other_meal(context):
     context.response = context.test.client.post('/nutrition/add_food_item/', {
@@ -119,6 +176,20 @@ def step_add_to_other_meal(context):
 
 
 # ── Then steps ───────────────────────────────────────────────────────────────
+
+@then('the search results should include "{food_name}"')
+def step_search_results_include(context, food_name):
+    data = json.loads(context.response.content)
+    names = [r['name'] for r in data.get('results', [])]
+    assert food_name in names, f'"{food_name}" not found in search results: {names}'
+
+
+@then('the all-foods response should include "{food_name}"')
+def step_all_foods_include(context, food_name):
+    data = json.loads(context.response.content)
+    names = [f['name'] for f in data.get('foods', [])]
+    assert food_name in names, f'"{food_name}" not found in all-foods: {names}'
+
 
 @then("the today_string context should match today's date")
 def step_today_string_matches(context):
@@ -163,6 +234,26 @@ def step_auto_generated_meal_exists(context, date_str):
 def step_food_item_exists_check(context, name, calories):
     assert FoodItem.objects.filter(name=name, calories=calories).exists(), (
         f'FoodItem "{name}" ({calories} kcal) not found'
+    )
+
+
+@then('the food item should have {calories:d} calories')
+def step_food_item_updated_calories(context, calories):
+    context.current_food_item.refresh_from_db()
+    assert context.current_food_item.calories == calories, (
+        f'Expected {calories} calories, got {context.current_food_item.calories}'
+    )
+
+
+@then('the food item should have serving size {servings:d} and unit "{unit}"')
+def step_food_item_serving_size(context, servings, unit):
+    item = FoodItem.objects.filter(name=context.last_food_name).first()
+    assert item is not None, f'No food item named "{context.last_food_name}" found'
+    assert float(item.serving_size) == float(servings), (
+        f'Expected serving_size={servings}, got {item.serving_size}'
+    )
+    assert item.serving_unit == unit, (
+        f'Expected serving_unit="{unit}", got "{item.serving_unit}"'
     )
 
 
@@ -274,6 +365,21 @@ def step_save_meal_as_template(context):
         data=json.dumps({'meal_id': context.current_meal.id}),
         content_type='application/json',
     )
+
+
+@when('I add the saved food to that meal via ajax')
+def step_add_saved_food_via_ajax(context):
+    sf = context.saved_food
+    context.response = context.test.client.post('/nutrition/add_food_item_ajax/', {
+        'meal_id': context.current_meal.id,
+        'food_name': sf.name,
+        'food_calories': str(sf.calories),
+        'protein': str(sf.protein),
+        'carbs': str(sf.carbs),
+        'fats': str(sf.fats),
+        'serving_size': str(sf.serving_size),
+        'serving_unit': sf.serving_unit,
+    })
 
 
 @when('I delete the saved food item')

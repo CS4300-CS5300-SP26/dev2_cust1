@@ -200,10 +200,25 @@
                 </div>
             </div>
             
-            <!-- Search Results -->
-            <div id="modalSearchResults" style="flex:1;overflow-y:auto;padding:0 20px 16px;">
-                <p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>
+            <!-- Browse section: shown when nothing has been typed yet -->
+            <div id="browseDatabaseSection" style="flex:1;overflow-y:auto;padding:0 20px 16px;">
+                <div style="margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Foods</span>
+                        <span id="foodDatabaseCount" style="font-size:11px;color:#666;"></span>
+                    </div>
+                    <div id="foodDatabaseList"></div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Supplements</span>
+                        <span id="supplementDatabaseCount" style="font-size:11px;color:#666;"></span>
+                    </div>
+                    <div id="supplementDatabaseList"></div>
+                </div>
             </div>
+            <!-- Search Results: shown when user has typed 2+ characters -->
+            <div id="modalSearchResults" style="display:none;flex:1;overflow-y:auto;padding:0 20px 16px;"></div>
             
             <!-- Edit Form (hidden by default) -->
             <div id="foodEditForm" style="display:none;padding:16px 20px;border-top:1px solid var(--border);">
@@ -318,15 +333,15 @@
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Protein (g)</label>
-                            <input type="number" name="protein" id="foodProteinInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="protein" id="foodProteinInput" min="0" max="999" step="0.01" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Carbs (g)</label>
-                            <input type="number" name="carbs" id="foodCarbsInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="carbs" id="foodCarbsInput" min="0" max="999" step="0.01" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div>
                             <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">Fats (g)</label>
-                            <input type="number" name="fats" id="foodFatsInput" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" name="fats" id="foodFatsInput" min="0" max="999" step="0.01" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                     </div>
                     <div style="margin-bottom:16px;">
@@ -437,9 +452,9 @@
                             <input type="number" id="mealFoodCaloriesInput" placeholder="Calories" min="0" max="999" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div class="meal-macro-grid" style="margin-bottom:8px;">
-                            <input type="number" id="mealFoodProteinInput" placeholder="Protein (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <input type="number" id="mealFoodCarbsInput" placeholder="Carbs (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
-                            <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodProteinInput" placeholder="Protein (g)" min="0" step="0.01" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodCarbsInput" placeholder="Carbs (g)" min="0" step="0.01" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
+                            <input type="number" id="mealFoodFatsInput" placeholder="Fats (g)" min="0" step="0.01" style="padding:8px;border:1px solid var(--border);border-radius:6px;background-color:rgba(0,0,0,0.3);color:white;font-size:12px;box-sizing:border-box;">
                         </div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
                             <div>
@@ -1418,7 +1433,9 @@
 
     function resetModalState() {
         modalSearchInput.value = '';
-        modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>';
+        modalSearchResults.innerHTML = '';
+        modalSearchResults.style.display = 'none';
+        document.getElementById('browseDatabaseSection').style.display = 'block';
         foodEditForm.style.display = 'none';
         addNewFoodSection.style.display = 'block';
         statusMessage.style.display = 'none';
@@ -1436,14 +1453,19 @@
     // Modal search functionality (search both foods and supplements)
     modalSearchInput.addEventListener('input', function() {
         const query = this.value.trim();
-        
+        const browseSection = document.getElementById('browseDatabaseSection');
+
         if (modalSearchTimeout) clearTimeout(modalSearchTimeout);
-        
+
         if (query.length < 2) {
-            modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Type at least 2 characters to search</p>';
+            modalSearchResults.style.display = 'none';
+            modalSearchResults.innerHTML = '';
+            browseSection.style.display = 'block';
             return;
         }
-        
+
+        browseSection.style.display = 'none';
+        modalSearchResults.style.display = 'block';
         modalSearchResults.innerHTML = '<p style="color:#666;text-align:center;padding:20px 0;">Searching...</p>';
         
         modalSearchTimeout = setTimeout(function() {
@@ -2032,6 +2054,17 @@
         document.getElementById('foodFatsInput').value = fats;
         document.getElementById('foodServingsInput').value = servingSize || '1';
         setUnitDropdown('foodUnitSelect', servingUnit || 'serving');
+        // Sync prevUnit to the item's actual unit so unit changes calculate correctly
+        document.getElementById('foodUnitSelect').dataset.prevUnit = servingUnit || 'serving';
+        // Build the nutrition anchor so changing servings/units recalculates macros
+        modalNutritionBase = buildNutritionBase(
+            parseFloat(calories) || 0,
+            parseFloat(protein) || 0,
+            parseFloat(carbs) || 0,
+            parseFloat(fats) || 0,
+            parseFloat(servingSize) || 1,
+            servingUnit || 'serving'
+        );
         document.getElementById('addFoodItemBtn').textContent = 'Save Changes';
         addItemModal.style.display = 'flex';
         showFoodForm();
@@ -2756,6 +2789,10 @@
         });
     }
 
+    function savedItemCard(innerHtml) {
+        return `<div class="saved-item-card" style="padding:12px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.2);margin-bottom:8px;">${innerHtml}</div>`;
+    }
+
     function renderSavedMeals(meals) {
         const el = document.getElementById('saved-meals-list');
         if (!meals.length) {
@@ -3025,10 +3062,10 @@
             return;
         }
 
-        calEl.value  = Math.round(base.calories  * scale);
-        protEl.value = Math.round(base.protein   * scale);
-        carbEl.value = Math.round(base.carbs     * scale);
-        fatEl.value  = Math.round(base.fats      * scale);
+        calEl.value  = Math.round(base.calories * scale);
+        protEl.value = parseFloat((base.protein * scale).toFixed(2));
+        carbEl.value = parseFloat((base.carbs   * scale).toFixed(2));
+        fatEl.value  = parseFloat((base.fats    * scale).toFixed(2));
     }
 
     // Wire the main modal food form

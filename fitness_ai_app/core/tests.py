@@ -757,6 +757,101 @@ class AddFoodItemViewTests(TestCase):
         r = self.client.get('/nutrition/add_food_item/')
         self.assertEqual(r.status_code, 405)
 
+    def test_add_food_item_persists_serving_size(self):
+        r = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'food_name': 'Oatmeal',
+            'food_calories': '300',
+            'protein': '10',
+            'carbs': '50',
+            'fats': '5',
+            'serving_size': '2',
+            'serving_unit': 'cup',
+            'date': str(date.today()),
+        })
+        self.assertEqual(r.status_code, 302)
+        item = FoodItem.objects.get(meal=self.meal, name='Oatmeal')
+        self.assertEqual(float(item.serving_size), 2.0)
+        self.assertEqual(item.serving_unit, 'cup')
+
+    def test_edit_food_item_updates_calories_and_macros(self):
+        item = FoodItem.objects.create(
+            meal=self.meal, name='Chicken', calories=200, protein=30,
+            carbs=0, fats=5, serving_size=1, serving_unit='serving'
+        )
+        r = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': item.id,
+            'food_name': 'Chicken',
+            'food_calories': '400',
+            'protein': '60',
+            'carbs': '0',
+            'fats': '10',
+            'serving_size': '2',
+            'serving_unit': 'serving',
+            'date': str(date.today()),
+        })
+        self.assertEqual(r.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.calories, 400)
+        self.assertEqual(item.protein, 60)
+        # serving_size and serving_unit are not persisted on edit
+        self.assertEqual(float(item.serving_size), 1.0)
+        self.assertEqual(item.serving_unit, 'serving')
+
+    def test_edit_food_item_accepts_decimal_macros_and_rounds_to_int(self):
+        # When JS recalculates 3g carbs / 2 servings = 1.5g, the form submits "1.5".
+        # The view must accept the decimal string and round it to the nearest integer.
+        item = FoodItem.objects.create(
+            meal=self.meal, name='Test Food', calories=120, protein=12,
+            carbs=3, fats=2, serving_size=2, serving_unit='serving'
+        )
+        r = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': item.id,
+            'food_name': 'Test Food',
+            'food_calories': '60',
+            'protein': '6',
+            'carbs': '1.5',   # decimal submitted by JS recalculation
+            'fats': '1',
+            'serving_size': '1',
+            'serving_unit': 'serving',
+            'date': str(date.today()),
+        })
+        self.assertEqual(r.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.calories, 60)
+        self.assertEqual(item.protein, 6)
+        self.assertEqual(item.carbs, 2)   # 1.5 rounds to 2
+        self.assertEqual(item.fats, 1)
+
+    def test_edit_food_item_decimal_macros_do_not_zero_out_other_macros(self):
+        # Before fix: int("1.5") raised ValueError → all macros zeroed.
+        item = FoodItem.objects.create(
+            meal=self.meal, name='Rice', calories=216, protein=5,
+            carbs=45, fats=2, serving_size=2, serving_unit='serving'
+        )
+        r = self.client.post('/nutrition/add_food_item/', {
+            'meal_id': self.meal.id,
+            'item_id': item.id,
+            'food_name': 'Rice',
+            'food_calories': '108',
+            'protein': '2.5',
+            'carbs': '22.5',
+            'fats': '1',
+            'serving_size': '1',
+            'serving_unit': 'serving',
+            'date': str(date.today()),
+        })
+        self.assertEqual(r.status_code, 302)
+        item.refresh_from_db()
+        # Protein and carbs must not be zeroed out (the key regression check)
+        self.assertGreater(item.protein, 0)
+        self.assertGreater(item.carbs, 0)
+        # round(2.5) = 2 in Python (banker's rounding to even)
+        self.assertEqual(item.protein, round(2.5))
+        self.assertEqual(item.carbs, round(22.5))
+
 
 class AddFoodItemAjaxTests(TestCase):
     """Tests for the add_food_item_ajax JSON endpoint used by the Create-a-Meal modal."""
@@ -827,6 +922,22 @@ class AddFoodItemAjaxTests(TestCase):
         self.assertEqual(data['protein'], 0)
         self.assertEqual(data['carbs'], 0)
         self.assertEqual(data['fats'], 0)
+
+    def test_add_food_item_ajax_persists_serving_size(self):
+        r = self.client.post('/nutrition/add_food_item_ajax/', {
+            'meal_id': self.meal.id,
+            'food_name': 'Oats',
+            'food_calories': '150',
+            'protein': '5',
+            'carbs': '27',
+            'fats': '3',
+            'serving_size': '2',
+            'serving_unit': 'cup',
+        })
+        self.assertEqual(r.status_code, 200)
+        item = FoodItem.objects.get(meal=self.meal, name='Oats')
+        self.assertEqual(float(item.serving_size), 2.0)
+        self.assertEqual(item.serving_unit, 'cup')
 
 
 class ToggleFoodItemViewTests(TestCase):
@@ -1786,6 +1897,41 @@ class FoodDatabaseViewsCoverageTests(TestCase):
     # -------------------------------------------------------------------------
     # search_foods tests
     # -------------------------------------------------------------------------
+    def _make_system_user_with_food(self, food_name, calories=100, protein=10):
+        """Helper: create the system user with a food item in its database meal."""
+        system_user, _ = User.objects.get_or_create(
+            username='system@spotter.ai',
+            defaults={'email': 'system@spotter.ai', 'is_active': False}
+        )
+        system_meal, _ = Meal.objects.get_or_create(
+            user=system_user, name='Food Database', date=date(2000, 1, 1)
+        )
+        return FoodItem.objects.create(
+            meal=system_meal, name=food_name, calories=calories, protein=protein
+        )
+
+    def test_search_foods_includes_system_foods(self):
+        system_food = self._make_system_user_with_food('Grilled Chicken Breast (100g)', 165, 31)
+        r = self.client.get(reverse('search_foods'), {'q': 'Grilled Chicken'})
+        self.assertEqual(r.status_code, 200)
+        names = [item['name'] for item in r.json()['results']]
+        self.assertIn(system_food.name, names)
+
+    def test_search_foods_includes_own_and_system_foods(self):
+        self._make_system_user_with_food('System Apple', 95, 0)
+        FoodItem.objects.create(meal=self.meal, name='My Apple', calories=90, protein=0)
+        r = self.client.get(reverse('search_foods'), {'q': 'Apple'})
+        names = [item['name'] for item in r.json()['results']]
+        self.assertIn('System Apple', names)
+        self.assertIn('My Apple', names)
+
+    def test_get_all_foods_includes_system_foods(self):
+        self._make_system_user_with_food('Brown Rice Cooked (1 cup)', 216, 5)
+        r = self.client.get(reverse('get_all_foods'))
+        self.assertEqual(r.status_code, 200)
+        names = [f['name'] for f in r.json()['foods']]
+        self.assertIn('Brown Rice Cooked (1 cup)', names)
+
     def test_search_foods_empty_for_short_query(self):
         """search_foods returns empty results when query is less than 2 characters"""
         # Create a food item to ensure it's not returned
@@ -8795,6 +8941,22 @@ class GetSavedItemsViewTests(TestCase):
         self.client.logout()
         r = self.client.get(self.url)
         self.assertIn(r.status_code, [302, 403])
+
+    def test_returns_saved_meals_in_response(self):
+        SavedMeal.objects.create(
+            user=self.user, name='My Template',
+            items=[{'type': 'food', 'name': 'Rice', 'calories': 200,
+                    'protein': 4, 'carbs': 40, 'fats': 1,
+                    'serving_size': '1', 'serving_unit': 'serving'}]
+        )
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+        meal_names = [m['name'] for m in data['meals']]
+        self.assertIn('My Template', meal_names)
+        # foods and supplements are still present in the response when meals exist
+        self.assertIn('foods', data)
+        self.assertIn('supplements', data)
 
 
 class DeleteSavedItemViewTests(TestCase):
