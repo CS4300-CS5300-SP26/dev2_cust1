@@ -2164,6 +2164,7 @@ def nutrition_page(request):
         'meals': meals,
         'selected_date': selected_date,
         'date_string': selected_date.strftime('%Y-%m-%d'),
+        'today_string': date.today().strftime('%Y-%m-%d'),
         'prev_date': prev_date,
         'next_date': next_date,
         'total_calories': total_calories,

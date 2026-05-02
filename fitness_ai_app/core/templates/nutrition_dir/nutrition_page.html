@@ -1955,6 +1955,10 @@
             
             // Show selected tab
             if (tabName === 'today') {
+                if ('{{ date_string }}' !== '{{ today_string }}') {
+                    window.location.href = '{% url "nutrition_page" %}';
+                    return;
+                }
                 document.querySelector('.meals-list-container').parentElement.style.display = 'block';
             } else if (tabName === 'saved') {
                 openSavedItemsModal();

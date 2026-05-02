@@ -31,6 +31,10 @@ Feature: Nutrition Tracking
     When I visit "/nutrition/?date=not-a-date"
     Then the response status code should be 200
 
+  Scenario: Today button context always reflects current date
+    When I visit "/nutrition/?date=2025-06-15"
+    Then the today_string context should match today's date
+
   # --- Meal management ---
 
   Scenario: Add a meal

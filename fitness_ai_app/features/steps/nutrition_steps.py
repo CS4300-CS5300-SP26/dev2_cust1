@@ -120,6 +120,13 @@ def step_add_to_other_meal(context):
 
 # ── Then steps ───────────────────────────────────────────────────────────────
 
+@then("the today_string context should match today's date")
+def step_today_string_matches(context):
+    expected = date.today().strftime('%Y-%m-%d')
+    actual = context.response.context['today_string']
+    assert actual == expected, f'Expected today_string={expected}, got {actual}'
+
+
 @then('the response status code should be {code:d}')
 def step_status_code(context, code):
     assert context.response.status_code == code, (

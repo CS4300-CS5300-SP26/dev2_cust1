@@ -608,6 +608,14 @@ class NutritionPageViewTests(TestCase):
         self.assertEqual(r.context['prev_date'], '2025-06-14')
         self.assertEqual(r.context['next_date'], '2025-06-16')
 
+    def test_today_string_always_reflects_actual_today(self):
+        # today_string must equal today regardless of which date is selected,
+        # so the Today tab button can redirect back to the current date.
+        r = self.client.get('/nutrition/?date=2025-06-15')
+        self.assertEqual(r.context['today_string'], date.today().strftime('%Y-%m-%d'))
+        r2 = self.client.get('/nutrition/')
+        self.assertEqual(r2.context['today_string'], date.today().strftime('%Y-%m-%d'))
+
     def test_does_not_show_other_users_meals(self):
         other = User.objects.create_user(username='other@spotter.ai', password='pass12345')
         Meal.objects.create(user=other, name='Secret Meal', date=date.today())
