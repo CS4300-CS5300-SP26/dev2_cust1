@@ -454,23 +454,23 @@ class SocialLoginRedirectTests(TestCase):
 
     def test_google_redirect(self):
         r = self.client.get('/login/google/')
-        self.assertEqual(r.status_code, 302)
-        self.assertIn('/accounts/google/login/', r.url)
+        self.assertEqual(r.status_code, 307)
+        self.assertIn('/accounts/google/login/', r['Location'])
 
     def test_apple_redirect(self):
         r = self.client.get('/login/apple/')
-        self.assertEqual(r.status_code, 302)
-        self.assertIn('/accounts/apple/login/', r.url)
+        self.assertEqual(r.status_code, 307)
+        self.assertIn('/accounts/apple/login/', r['Location'])
 
     def test_facebook_redirect(self):
         r = self.client.get('/login/facebook/')
-        self.assertEqual(r.status_code, 302)
-        self.assertIn('/accounts/facebook/login/', r.url)
+        self.assertEqual(r.status_code, 307)
+        self.assertIn('/accounts/facebook/login/', r['Location'])
 
     def test_instagram_redirect(self):
         r = self.client.get('/login/instagram/')
-        self.assertEqual(r.status_code, 302)
-        self.assertIn('/accounts/instagram/login/', r.url)
+        self.assertEqual(r.status_code, 307)
+        self.assertIn('/accounts/instagram/login/', r['Location'])
 
 # END of: Added from feature/log-in branch
 # ---------------------------------------------------------------------------
