@@ -2206,6 +2206,7 @@ def nutrition_page(request):
         'meals': meals,
         'selected_date': selected_date,
         'date_string': selected_date.strftime('%Y-%m-%d'),
+        'today_string': date.today().strftime('%Y-%m-%d'),
         'prev_date': prev_date,
         'next_date': next_date,
         'total_calories': total_calories,
@@ -2289,9 +2290,9 @@ def add_food_item(request):
     fats = request.POST.get('fats', '0')
 
     try:
-        protein = int(protein) if protein else 0
-        carbs = int(carbs) if carbs else 0
-        fats = int(fats) if fats else 0
+        protein = round(float(protein)) if protein else 0
+        carbs = round(float(carbs)) if carbs else 0
+        fats = round(float(fats)) if fats else 0
     except ValueError:
         protein = carbs = fats = 0
 
@@ -2312,6 +2313,8 @@ def add_food_item(request):
         if meal.items.count() >= 30:
             messages.error(request, 'Item limit reached (30 max per meal).')
             return redirect(f"{reverse('nutrition_page')}?date={date_param}")
+        serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
+        serving_unit = request.POST.get('serving_unit', 'serving').strip() or 'serving'
         progress_before = compute_achievements_challenges(request.user)
         FoodItem.objects.create(
             meal=meal,
@@ -2319,7 +2322,9 @@ def add_food_item(request):
             calories=calories,
             protein=protein,
             carbs=carbs,
-            fats=fats
+            fats=fats,
+            serving_size=serving_size,
+            serving_unit=serving_unit,
         )
         messages.success(request, f'Food item "{food_name}" added to {meal.name}.')
         _emit_achievement_challenge_diffs(request.user, progress_before)
@@ -2353,6 +2358,9 @@ def add_food_item_ajax(request):
     except ValueError:
         protein = carbs = fats = 0
 
+    serving_size = _parse_serving_size(request.POST.get('serving_size', '1'))
+    serving_unit = (request.POST.get('serving_unit', 'serving') or 'serving').strip()
+
     if meal.items.count() >= 30:
         return JsonResponse({'error': 'Item limit reached (30 max per meal).'}, status=400)
 
@@ -2365,6 +2373,7 @@ def add_food_item_ajax(request):
     item = FoodItem.objects.create(
         meal=meal, name=food_name, calories=calories,
         protein=protein, carbs=carbs, fats=fats, group=group,
+        serving_size=serving_size, serving_unit=serving_unit,
     )
     _emit_achievement_challenge_diffs(request.user, progress_before)
     return JsonResponse({
@@ -2374,6 +2383,8 @@ def add_food_item_ajax(request):
         'protein': item.protein,
         'carbs': item.carbs,
         'fats': item.fats,
+        'serving_size': str(item.serving_size),
+        'serving_unit': item.serving_unit,
     })
 
 
@@ -2981,12 +2992,17 @@ def search_foods(request):
     if not query or len(query) < 2:
         return JsonResponse({'results': []})
 
-    # Search for food items matching the query (case-insensitive) — filter by user
+    # Include the logged-in user's own foods AND the shared system database foods
     food_items = (
         FoodItem.objects
-        .filter(name__icontains=query, meal__user=request.user)
+        .filter(
+            name__icontains=query,
+        )
+        .filter(
+            Q(meal__user=request.user) | Q(meal__user__username='system@spotter.ai')
+        )
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
-        .order_by('name')[:20]
+        .order_by('name')[:40]
     )
 
     # Deduplicate by name (keep entry with best macro data)
@@ -3009,10 +3025,12 @@ def search_foods(request):
 @login_required
 def get_all_foods(request):
     """Get all unique foods from the database for display in the Food Database card."""
-    # Get all food items for this user only, deduplicated by name
+    # Include the logged-in user's own foods AND the shared system database foods
     food_items = (
         FoodItem.objects
-        .filter(meal__user=request.user)
+        .filter(
+            Q(meal__user=request.user) | Q(meal__user__username='system@spotter.ai')
+        )
         .values('id', 'name', 'calories', 'protein', 'carbs', 'fats')
         .order_by('name')
     )

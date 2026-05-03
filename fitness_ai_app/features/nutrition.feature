@@ -31,6 +31,10 @@ Feature: Nutrition Tracking
     When I visit "/nutrition/?date=not-a-date"
     Then the response status code should be 200
 
+  Scenario: Today button context always reflects current date
+    When I visit "/nutrition/?date=2025-06-15"
+    Then the today_string context should match today's date
+
   # --- Meal management ---
 
   Scenario: Add a meal
@@ -68,6 +72,17 @@ Feature: Nutrition Tracking
     And a completed food item "Eggs" with 200 calories exists in that meal
     When I toggle the food item
     Then the food item should be marked as incomplete
+
+  Scenario: Edit a food item saves recalculated calories without persisting serving size
+    Given a meal named "Breakfast" exists for today
+    And a food item "Chicken" with 200 calories exists in that meal
+    When I edit the food item with 2 servings and 400 calories
+    Then the food item should have 400 calories
+
+  Scenario: Adding a food item persists the chosen serving size
+    Given a meal named "Breakfast" exists for today
+    When I add a food item "Oatmeal" with 300 calories and 2 servings of "cup" to that meal
+    Then the food item should have serving size 2 and unit "cup"
 
   Scenario: Delete a food item
     Given a meal named "Breakfast" exists for today
@@ -120,6 +135,12 @@ Feature: Nutrition Tracking
     When I save the meal as a template
     Then the meal template should be in my saved meals
 
+  Scenario: Add a saved food to a meal via ajax endpoint
+    Given a meal named "Breakfast" exists for today
+    And I have a saved food item "Banana"
+    When I add the saved food to that meal via ajax
+    Then a food item named "Banana" with 100 calories should exist
+
   Scenario: Delete a saved food item
     Given I have a saved food item "Banana"
     When I delete the saved food item
@@ -134,3 +155,15 @@ Feature: Nutrition Tracking
     Given I have a saved meal template "Huge Meal" with 31 food items
     When I add the saved meal to today
     Then the response status code should be 400
+
+  # --- System food database visibility ---
+
+  Scenario: System food database foods appear in search results
+    Given the system food database contains "Grilled Chicken Breast (100g)"
+    When I search foods for "Grilled Chicken"
+    Then the search results should include "Grilled Chicken Breast (100g)"
+
+  Scenario: System food database foods appear in get_all_foods
+    Given the system food database contains "Brown Rice Cooked (1 cup)"
+    When I fetch all foods
+    Then the all-foods response should include "Brown Rice Cooked (1 cup)"
