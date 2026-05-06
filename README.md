@@ -2,6 +2,8 @@
 
 A Django-based fitness AI web application.
 
+YouTube Demo: https://youtu.be/nUIlfZpTbb0
+
 ## Getting Started
 `cd /dev2_cust1/fitness_ai_app`
 
